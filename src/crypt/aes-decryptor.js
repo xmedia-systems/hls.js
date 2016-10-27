@@ -157,36 +157,53 @@ class AESDecryptor {
     let invSubMix2 = this.invSubMix[2];
     let invSubMix3 = this.invSubMix[3];
     let invSBOX = this.invSBox;
-    let output = new Uint8Array(inputData.byteLength);
 
     // parse iv to Uint32Array
     let iv = this.uint8ArrayToUint32Array_(aesIV);
+
+    //let ntoh = function (word) {
+    //  return (word << 24) |
+    //    ((word & 0xff00) << 8) |
+    //    ((word & 0xff0000) >> 8) |
+    //    (word >>> 24);
+    //};
 
     let mixing0 = iv[0];
     let mixing1 = iv[1];
     let mixing2 = iv[2];
     let mixing3 = iv[3];
 
-    let input = new DataView(inputData);
+    let input = new Uint8Array(inputData);
+
+    let output = new Uint8Array(input.byteLength);
 
     let s = new Uint32Array(4);
     let t = new Uint32Array(4);
     let r = new Uint32Array(4);
     let resultUint8 = new Uint8Array(r.buffer);
 
+    let w0;
+    let w1;
+    let w2;
+    let w3;
+
+    let ksRow;
+    let i;
+
+    //let start = Date.now();
     while (offset < inputData.byteLength) {
-      let w0 = input.getUint32(offset);
-      let w1 = input.getUint32(offset + 4);
-      let w2 = input.getUint32(offset + 8);
-      let w3 = input.getUint32(offset + 12);
+      w0 = input[offset + 3] | (input[offset + 2] << 8) | (input[offset + 1] << 16) | (input[offset + 0] << 24);
+      w1 = input[offset + 7] | (input[offset + 6] << 8) | (input[offset + 5] << 16) | (input[offset + 4] << 24);
+      w2 = input[offset + 11] | (input[offset + 10] << 8) | (input[offset + 9] << 16) | (input[offset + 8] << 24);
+      w3 = input[offset + 15] | (input[offset + 14] << 8) | (input[offset + 13] << 16) | (input[offset + 12] << 24);
 
       s[0] = w0 ^ invKey0;
       s[1] = w3 ^ invKey1;
       s[2] = w2 ^ invKey2;
       s[3] = w1 ^ invKey3;
 
-      let ksRow = 4;
-      let i;
+      ksRow = 4;
+
       for (i = 1; i < nRounds; i++) {
         t[0] = invSubMix0[s[0] >>> 24] ^ invSubMix1[(s[1] >>> 16) & 0xff] ^ invSubMix2[(s[2] >>> 8) & 0xff] ^ invSubMix3[s[3] & 0xff] ^ invKeySched[ksRow++];
         t[1] = invSubMix0[s[1] >>> 24] ^ invSubMix1[(s[2] >>> 16) & 0xff] ^ invSubMix2[(s[3] >>> 8) & 0xff] ^ invSubMix3[s[0] & 0xff] ^ invKeySched[ksRow++];
@@ -209,9 +226,11 @@ class AESDecryptor {
       r[1] = t[2] ^ mixing2;
       r[0] = t[1] ^ mixing3;
 
-      // convert result to uint8Array and write to output
-      for (i = 0; i < 16; i++) {
+      for (i = 0; i < 16; i += 4) {
         output[i + offset] = resultUint8[15 - i];
+        output[i + offset + 1] = resultUint8[14 - i];
+        output[i + offset + 2] = resultUint8[13 - i];
+        output[i + offset + 3] = resultUint8[12 - i];
       }
 
       // reset iv to last 4 unsigned int
@@ -222,6 +241,8 @@ class AESDecryptor {
 
       offset += 16;
     }
+
+    //console.log('loop over', (Date.now() - start));
 
     return this.unpad_(output).buffer;
   }
