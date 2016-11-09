@@ -402,6 +402,9 @@ class PlaylistLoader extends EventHandler {
       case 'manifest':
         details = ErrorDetails.MANIFEST_LOAD_ERROR;
         fatal = true;
+        if (context.url && context.url.substring(0, 5) === 'http:' && document.location.protocol === 'https:') {
+          response.text = 'Unable to fetch HTTP resource over HTTPS';
+        }
         break;
       case 'level':
         details = ErrorDetails.LEVEL_LOAD_ERROR;

@@ -3106,9 +3106,9 @@ var StreamController = function (_EventHandler) {
   }, {
     key: '_fetchPayloadOrEos',
     value: function _fetchPayloadOrEos(_ref) {
-      var pos = _ref.pos,
-          bufferInfo = _ref.bufferInfo,
-          levelDetails = _ref.levelDetails;
+      var pos = _ref.pos;
+      var bufferInfo = _ref.bufferInfo;
+      var levelDetails = _ref.levelDetails;
 
       var fragPrevious = this.fragPrevious,
           level = this.level,
@@ -3150,13 +3150,13 @@ var StreamController = function (_EventHandler) {
   }, {
     key: '_ensureFragmentAtLivePoint',
     value: function _ensureFragmentAtLivePoint(_ref2) {
-      var levelDetails = _ref2.levelDetails,
-          bufferEnd = _ref2.bufferEnd,
-          start = _ref2.start,
-          end = _ref2.end,
-          fragPrevious = _ref2.fragPrevious,
-          fragments = _ref2.fragments,
-          fragLen = _ref2.fragLen;
+      var levelDetails = _ref2.levelDetails;
+      var bufferEnd = _ref2.bufferEnd;
+      var start = _ref2.start;
+      var end = _ref2.end;
+      var fragPrevious = _ref2.fragPrevious;
+      var fragments = _ref2.fragments;
+      var fragLen = _ref2.fragLen;
 
       var config = this.hls.config,
           media = this.media;
@@ -3215,13 +3215,13 @@ var StreamController = function (_EventHandler) {
   }, {
     key: '_findFragment',
     value: function _findFragment(_ref3) {
-      var start = _ref3.start,
-          fragPrevious = _ref3.fragPrevious,
-          fragLen = _ref3.fragLen,
-          fragments = _ref3.fragments,
-          bufferEnd = _ref3.bufferEnd,
-          end = _ref3.end,
-          levelDetails = _ref3.levelDetails;
+      var start = _ref3.start;
+      var fragPrevious = _ref3.fragPrevious;
+      var fragLen = _ref3.fragLen;
+      var fragments = _ref3.fragments;
+      var bufferEnd = _ref3.bufferEnd;
+      var end = _ref3.end;
+      var levelDetails = _ref3.levelDetails;
 
       var config = this.hls.config;
 
@@ -3290,11 +3290,11 @@ var StreamController = function (_EventHandler) {
   }, {
     key: '_loadFragmentOrKey',
     value: function _loadFragmentOrKey(_ref4) {
-      var frag = _ref4.frag,
-          level = _ref4.level,
-          levelDetails = _ref4.levelDetails,
-          pos = _ref4.pos,
-          bufferEnd = _ref4.bufferEnd;
+      var frag = _ref4.frag;
+      var level = _ref4.level;
+      var levelDetails = _ref4.levelDetails;
+      var pos = _ref4.pos;
+      var bufferEnd = _ref4.bufferEnd;
 
       var hls = this.hls,
           config = hls.config;
@@ -8937,6 +8937,9 @@ var PlaylistLoader = function (_EventHandler) {
         case 'manifest':
           details = _errors.ErrorDetails.MANIFEST_LOAD_ERROR;
           fatal = true;
+          if (context.url && context.url.substring(0, 5) === 'http:' && document.location.protocol === 'https:') {
+            response.text = 'Unable to fetch HTTP resource over HTTPS';
+          }
           break;
         case 'level':
           details = _errors.ErrorDetails.LEVEL_LOAD_ERROR;
