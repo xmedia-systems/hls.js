@@ -23,11 +23,11 @@ class Decrypter {
   }
 
   decrypt(data, key, iv, callback) {
-    if (this.disableWebCrypto && this.hls.config.enableSoftwareAES) {
+    //if (this.disableWebCrypto && this.hls.config.enableSoftwareAES) {
       this.decryptBySoftware(data, key, iv, callback);
-    } else {
-      this.decryptByWebCrypto(data, key, iv, callback);
-    }
+    //} else {
+    //  this.decryptByWebCrypto(data, key, iv, callback);
+    //}
   }
 
   decryptByWebCrypto(data, key, iv, callback) {

@@ -76,9 +76,10 @@ class Demuxer {
       if (this.decrypter == null) {
         this.decrypter = new Decrypter(this.hls);
       }
-
+      var startTime = performance.now();
       var localthis = this;
       this.decrypter.decrypt(data, decryptdata.key, decryptdata.iv, function(decryptedData){
+        localthis.hls.trigger(Event.FRAG_DECRYPTED, { level : level, sn : sn, stats: { tstart: startTime, tdecrypt: performance.now() } });
         localthis.pushDecrypted(decryptedData, audioCodec, videoCodec, timeOffset, cc, level, sn, duration,accurateTimeOffset);
       });
     } else {
