@@ -37,7 +37,7 @@ import ID3 from '../demux/id3';
   push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration,accurateTimeOffset) {
     var track,
         id3 = new ID3(data),
-        pts = 90 * id3.timeStamp || timeOffset * 90000,
+        pts = timeOffset * 90000,
         config, frameLength, frameDuration, frameIndex, offset, headerLength, stamp, len, aacSample;
 
     let contiguous = false;
