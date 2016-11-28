@@ -34,6 +34,7 @@ class StreamController extends EventHandler {
       Event.MEDIA_DETACHING,
       Event.MANIFEST_LOADING,
       Event.MANIFEST_PARSED,
+      Event.LEVEL_SWITCH,
       Event.LEVEL_LOADED,
       Event.KEY_LOADED,
       Event.FRAG_LOADED,
@@ -266,6 +267,7 @@ class StreamController extends EventHandler {
 
   _fetchPayloadOrEos({pos, bufferInfo, levelDetails}) {
     const fragPrevious = this.fragPrevious,
+          fragCurrentOldLevel = this.fragCurrentOldLevel,
           level = this.level,
           fragments = levelDetails.fragments,
           fragLen = fragments.length;
@@ -289,7 +291,7 @@ class StreamController extends EventHandler {
         return false;
       }
 
-      frag = this._ensureFragmentAtLivePoint({levelDetails, bufferEnd, start, end, fragPrevious, fragments, fragLen});
+      frag = this._ensureFragmentAtLivePoint({levelDetails, bufferEnd, start, end, fragPrevious, fragCurrentOldLevel, fragments, fragLen});
       // if it explicitely returns null don't load any fragment and exit function now
       if (frag === null) {
         return false;
@@ -310,7 +312,7 @@ class StreamController extends EventHandler {
     return true;
   }
 
-  _ensureFragmentAtLivePoint({levelDetails, bufferEnd, start, end, fragPrevious, fragments, fragLen}) {
+  _ensureFragmentAtLivePoint({levelDetails, bufferEnd, start, end, fragPrevious, fragCurrentOldLevel, fragments, fragLen}) {
     const config = this.hls.config, media = this.media;
 
     let frag;
@@ -342,16 +344,33 @@ class StreamController extends EventHandler {
       return null;
     }
 
+    let targetSN;
     if (this.startFragRequested && !levelDetails.PTSKnown) {
       /* we are switching level on live playlist, but we don't have any PTS info for that quality level ...
          try to load frag matching with next SN.
          even if SN are not synchronized between playlists, loading this frag will help us
          compute playlist sliding and find the right one after in case it was not the right consecutive one */
       if (fragPrevious) {
-        var targetSN = fragPrevious.sn + 1;
+        targetSN = fragPrevious.sn + 1;
         if (targetSN >= levelDetails.startSN && targetSN <= levelDetails.endSN) {
           frag = fragments[targetSN - levelDetails.startSN];
           logger.log(`live playlist, switching playlist, load frag with next SN: ${frag.sn}`);
+        }
+      }
+      if (!frag && fragCurrentOldLevel) {
+        // First attempt to download segments from the same discontinuity group
+        var sameCCFragments = fragments.filter((frag) => frag.cc >= fragCurrentOldLevel.cc);
+        if (sameCCFragments.length) {
+          targetSN = fragCurrentOldLevel.sn + 1;
+          // Now try to use the sn as a point of reference to try to be more accurate
+          if (targetSN >= sameCCFragments[0].sn && targetSN <= sameCCFragments[sameCCFragments.length - 1].sn) {
+            frag = fragments[targetSN - sameCCFragments[0].sn];
+            logger.warn(`live playlist with no fragPrevious, load frag with same cc and the next sn: [cc/sn] [${frag.cc}/${frag.sn}]`);
+          } else {
+            // Use the middle segment if the sn doesn't seem accurate
+            frag = sameCCFragments[Math.min(sameCCFragments.length - 1, Math.round((sameCCFragments.length -1) / 2))];
+            logger.warn(`live playlist with no fragPrevious, load the middle frag with same cc`);
+          }
         }
       }
       if (!frag) {
@@ -362,6 +381,8 @@ class StreamController extends EventHandler {
         logger.log(`live playlist, switching playlist, unknown, load middle frag : ${frag.sn}`);
       }
     }
+
+    this.fragCurrentOldLevel = null;
     return frag;
   }
 
@@ -802,6 +823,10 @@ class StreamController extends EventHandler {
     if (config.autoStartLoad) {
       this.hls.startLoad(config.startPosition);
     }
+  }
+
+  onLevelSwitch() {
+    this.fragCurrentOldLevel = this.fragCurrent;
   }
 
   onLevelLoaded(data) {
