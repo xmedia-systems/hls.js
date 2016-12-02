@@ -51,6 +51,7 @@ class StreamController extends EventHandler {
     this.audioCodecSwap = false;
     this.ticks = 0;
     this.ontick = this.tick.bind(this);
+    this.jumpToNextRange = false;
   }
 
   destroy() {
@@ -182,7 +183,7 @@ class StreamController extends EventHandler {
   // Ironically the "idle" state is the on we do the most logic in it seems ....
   // NOTE: Maybe we could rather schedule a check for buffer length after half of the currently
   //       played segment, or on pause/play/seek instead of naively checking every 100ms?
-  _doTickIdle() {
+   _doTickIdle() {
     const hls = this.hls,
           config = hls.config,
           media = this.media;
@@ -265,7 +266,7 @@ class StreamController extends EventHandler {
   }
 
   _fetchPayloadOrEos({pos, bufferInfo, levelDetails}) {
-    const fragPrevious = this.fragPrevious,
+    let fragPrevious = this.fragPrevious,
           level = this.level,
           fragments = levelDetails.fragments,
           fragLen = fragments.length;
@@ -389,7 +390,7 @@ class StreamController extends EventHandler {
             //  ...--------><-----------------------------><---------....
             // previous frag         matching fragment         next frag
             //  return -1             return 0                 return 1
-        //logger.log(`level/sn/start/end/bufEnd:${level}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
+        logger.log(`level/sn/start/end/bufEnd:${levelDetails}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
         if ((candidate.start + candidate.duration - maxFragLookUpTolerance) <= bufferEnd) {
           return 1;
         }// if maxFragLookUpTolerance will have negative value then don't return -1 for first element
@@ -405,12 +406,17 @@ class StreamController extends EventHandler {
     if (foundFrag) {
       frag = foundFrag;
       start = foundFrag.start;
-      //logger.log('find SN matching with pos:' +  bufferEnd + ':' + frag.sn);
-      if (fragPrevious && frag.level === fragPrevious.level && frag.sn === fragPrevious.sn) {
+      const curSNIdx = frag.sn - levelDetails.startSN;
+      if (frag.skip) {
+        frag = fragments[curSNIdx+1];
+        logger.log(`Frag marked as skip, load next one: ${frag.sn}`);
+        this.jumpToNextRange = true;
+      }
+      // logger.log('find SN matching with pos:' +  bufferEnd + ':' + frag.sn);
+     else if (fragPrevious && frag.level === fragPrevious.level && frag.sn === fragPrevious.sn) {
         if (frag.sn < levelDetails.endSN) {
-          let deltaPTS = fragPrevious.deltaPTS,
-          curSNIdx = frag.sn - levelDetails.startSN;
-          // if there is a significant delta between audio and video, larger than max allowed hole,
+          let deltaPTS = fragPrevious.deltaPTS;
+          // if there is a significant delta b etween audio and video, larger than max allowed hole,
           // and if previous remuxed fragment did not start with a keyframe. (fragPrevious.dropped)
           // let's try to load previous fragment again to get last keyframe
           // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
@@ -1174,7 +1180,7 @@ class StreamController extends EventHandler {
     }
     let media = this.media,
         // 0.5 : tolerance needed as some browsers stalls playback before reaching buffered end
-        mediaBuffered = media && BufferHelper.isBuffered(media,media.currentTime) && BufferHelper.isBuffered(media,media.currentTime+0.5);
+        mediaBuffered = media && BufferHelper.isBuffered(media,media.currentTime) && BufferHelper.isBuffered(media,media.currentTime+0.5) || BufferHelper.isBuffered(media, frag.start);
     switch(data.details) {
       case ErrorDetails.FRAG_LOAD_ERROR:
       case ErrorDetails.FRAG_LOAD_TIMEOUT:
@@ -1198,6 +1204,8 @@ class StreamController extends EventHandler {
             logger.warn(`mediaController: frag loading failed, retry in ${delay} ms`);
             this.retryDate = performance.now() + delay;
             // retry loading state
+            frag.skip = true;
+            this.jumpToNextRange = true;
             this.state = State.FRAG_LOADING_WAITING_RETRY;
           } else {
             logger.error(`mediaController: ${data.details} reaches max retry, redispatch as fatal ...`);
@@ -1340,14 +1348,18 @@ _checkBuffer() {
             // no buffer available @ currentTime, check if next buffer is close (within a config.maxSeekHole second range)
             var nextBufferStart = bufferInfo.nextStart, delta = nextBufferStart-currentTime;
             if(nextBufferStart &&
-               (delta < config.maxSeekHole) &&
-               (delta > 0)) {
+              (this.jumpToNextRange || (delta < config.maxSeekHole) &&
+               (delta > 0))) {
               // next buffer is close ! adjust currentTime to nextBufferStart
               // this will ensure effective video decoding
               logger.log(`adjust currentTime from ${media.currentTime} to next buffered @ ${nextBufferStart} + nudge ${this.seekHoleNudgeDuration}`);
               let hole = nextBufferStart + this.seekHoleNudgeDuration - media.currentTime;
               media.currentTime = nextBufferStart + this.seekHoleNudgeDuration;
               this.hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole : hole});
+              if (this.jumpToNextRange) {
+                logger.log('Jumping to next buffered range regardless of hole size');
+              }
+              this.jumpToNextRange = false;
             }
           }
         }
