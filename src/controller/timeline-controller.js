@@ -18,7 +18,8 @@ class TimelineController extends EventHandler {
                 Event.MANIFEST_LOADED,
                 Event.FRAG_LOADED,
                 Event.LEVEL_SWITCH,
-                Event.INIT_PTS_FOUND);
+                Event.INIT_PTS_FOUND,
+                Event.LEVEL_UPDATED);
 
     this.hls = hls;
     this.config = hls.config;
@@ -28,6 +29,8 @@ class TimelineController extends EventHandler {
     this.tracks = [];
     this.unparsedVttFrags = [];
     this.initPTS = undefined;
+    this.startSN = 0;
+    this.averageTargetDuration = 0;
 
     if (this.config.enableCEA708Captions)
     {
@@ -214,7 +217,7 @@ class TimelineController extends EventHandler {
           hls = this.hls;
 
         // Parse the WebVTT file contents.
-        WebVTTParser.parse(data.payload, this.initPTS, function (cues) {
+        WebVTTParser.parse(data.payload, this.initPTS, this.startSN, this.averageTargetDuration, function (cues) {
             // Add cues and trigger event with success true.
             cues.forEach(cue => {
               textTracks[data.frag.trackId].addCue(cue);
@@ -245,6 +248,11 @@ class TimelineController extends EventHandler {
         this.cea608Parser.addData(data.samples[i].pts, ccdatas);
       }
     }
+  }
+
+  onLevelUpdated(data) {
+    this.startSN = data.details.startSN;
+    this.averageTargetDuration = data.details.averagetargetduration;
   }
 
   extractCea608Data(byteArray) {
