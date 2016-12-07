@@ -73,12 +73,14 @@ import ID3 from '../demux/id3';
 
     if (!track.audiosamplerate) {
       config = ADTS.getAudioConfig(this.observer,data, offset, audioCodec);
-      track.config = config.config;
-      track.audiosamplerate = config.samplerate;
-      track.channelCount = config.channelCount;
-      track.codec = config.codec;
+      if (config) {
+        track.config = config.config;
+        track.audiosamplerate = config.samplerate;
+        track.channelCount = config.channelCount;
+        track.codec = config.codec;
+        logger.log(`parsed codec:${track.codec},rate:${config.samplerate},nb channel:${config.channelCount}`);
+      }
       track.duration = duration;
-      logger.log(`parsed codec:${track.codec},rate:${config.samplerate},nb channel:${config.channelCount}`);
     }
     frameIndex = 0;
     frameDuration = 1024 * 90000 / track.audiosamplerate;
