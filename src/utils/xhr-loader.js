@@ -61,7 +61,10 @@ class XhrLoader {
     stats.tfirst = 0;
     stats.loaded = 0;
     if (this.xhrSetup) {
-      this.xhrSetup(xhr, context.url);
+      let newUrl = this.xhrSetup(xhr, context.url);
+      if (newUrl) {
+        xhr.open('GET', newUrl, true);
+      }
     }
     // setup timeout before we perform request
     this.requestTimeout = window.setTimeout(this.loadtimeout.bind(this), this.config.timeout);
