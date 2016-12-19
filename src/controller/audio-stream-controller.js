@@ -183,9 +183,7 @@ class AudioStreamController extends EventHandler {
             frag = fragments[0];
           } else {
             let foundFrag,
-                // Search tolerance should be large enough to include the smallest fragment in the stream.
-                shortestFragDuration = fragments.reduce((minVal, frag) => { return Math.min(minVal, frag.duration); }, fragments[0].duration),
-                maxFragLookUpTolerance = Math.min(config.maxFragLookUpTolerance, shortestFragDuration),
+                maxFragLookUpTolerance = config.maxFragLookUpTolerance,
                 fragNext = (fragPrevious) ? fragments.find((fragment) => { return fragment.sn === fragPrevious.sn + 1; }) : undefined,
                 fragmentWithinToleranceTest = (candidate) => {
                   // offset should be within fragment boundary - config.maxFragLookUpTolerance
@@ -201,10 +199,11 @@ class AudioStreamController extends EventHandler {
                   // previous frag         matching fragment         next frag
                   //  return -1             return 0                 return 1
                   //logger.log(`level/sn/start/end/bufEnd:${level}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
-                  if ((candidate.start + candidate.duration - maxFragLookUpTolerance) <= bufferEnd) {
+                  let candidateLookupTolerance = Math.min(maxFragLookUpTolerance, candidate.duration);
+                  if ((candidate.start + candidate.duration - candidateLookupTolerance) <= bufferEnd) {
                     return 1;
                   }// if maxFragLookUpTolerance will have negative value then don't return -1 for first element
-                  else if (candidate.start - maxFragLookUpTolerance > bufferEnd && candidate.start) {
+                  else if (candidate.start - candidateLookupTolerance > bufferEnd && candidate.start) {
                     return -1;
                   }
                   return 0;
