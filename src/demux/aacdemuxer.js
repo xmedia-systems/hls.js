@@ -77,7 +77,7 @@ import ID3 from '../demux/id3';
       track.audiosamplerate = config.samplerate;
       track.channelCount = config.channelCount;
       track.codec = config.codec;
-      track.manifestCodec = audioCodec;
+      track.manifestCodec = config.manifestCodec;
       track.duration = duration;
       logger.log(`parsed codec:${track.codec},rate:${config.samplerate},nb channel:${config.channelCount}`);
     }
@@ -111,8 +111,7 @@ import ID3 from '../demux/id3';
         break;
       }
     }
-    const id3Track = (id3.payload) ? { samples : [ { pts: pts, dts : pts, unit : id3.payload} ] } : { samples: [] };
-    this.remuxer.remux(level, sn, cc, this._aacTrack, {samples : []}, id3Track, { samples: [] }, timeOffset, contiguous,accurateTimeOffset, defaultInitPTS);
+    this.remuxer.remux(level, sn , cc, track,{samples : []}, {samples : [ { pts: pts, dts : pts, unit : id3.payload} ]}, { samples: [] }, timeOffset, contiguous,accurateTimeOffset, defaultInitPTS);
   }
 
   destroy() {
