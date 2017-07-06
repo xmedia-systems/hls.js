@@ -9,10 +9,15 @@ import WebVTTParser from '../utils/webvtt-parser';
 import {logger} from '../utils/logger';
 
 function clearCurrentCues(track) {
-  if (track && track.cues) {
+  if (track) {
+    let trackMode = track.mode;
+    if (trackMode === 'disabled') {
+      track.mode = 'hidden';
+    }
     while (track.cues.length > 0) {
       track.removeCue(track.cues[0]);
     }
+    track.mode = trackMode;
   }
 }
 
