@@ -219,12 +219,15 @@ class TimelineController extends EventHandler {
 
     // clear outdated subtitles
     const media = this.media;
-    if (media) {
-      const textTracks = media.textTracks;
-      if (textTracks) {
-        for (let i = 0; i < textTracks.length; i++) {
-          clearCurrentCues(textTracks[i]);
-        }
+    if (!media || !media.textTracks) {
+      return;
+    }
+
+    const textTracks = media.textTracks;
+    for (let i = 0; i < textTracks.length; i++) {
+      // do not clear tracks that are managed externally
+      if (textTracks[i].textTrack1 || textTracks[i].textTrack2) {
+        clearCurrentCues(textTracks[i]);
       }
     }
   }
