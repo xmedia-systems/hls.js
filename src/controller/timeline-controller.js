@@ -12,7 +12,7 @@ function clearCurrentCues(track) {
   if (track) {
     let trackMode = track.mode;
 
-    // When track.mode is disabled, track.cues will be empty.
+    // When track.mode is disabled, track.cues will be null.
     // To guarantee the removal of cues, we need to temporarily
     // change the mode to hidden
     if (trackMode === 'disabled') {
