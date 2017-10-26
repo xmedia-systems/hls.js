@@ -91,9 +91,7 @@ const utf8ArrayToStr = function(array, startingIndex) {
         }
     }
     return out;
-}
-
-
+};
 
 const WebVTTParser = {
     parse: function(vttByteArray, syncPTS, vttCCs, cc, callBack, errorCallBack) {
@@ -140,7 +138,7 @@ const WebVTTParser = {
             cue.id = hash(cue.startTime) + hash(cue.endTime) + hash(cue.text);
 
             // Fix encoding of special characters. TODO: Test with all sorts of weird characters.
-            cue.text = decodeURIComponent(escape(atob(cue.text)));
+            cue.text = decodeURIComponent(encodeURIComponent(cue.text));
             if (cue.endTime > 0) {
               cues.push(cue);
             }
