@@ -56,11 +56,50 @@ const calculateOffset = function(vttCCs, cc, presentationTime) {
     vttCCs.presentationOffset = presentationTime;
 };
 
+const utf8ArrayToStr = function(array, startingIndex) {
+    const len = array.length;
+    let c;
+    let char2;
+    let char3;
+    let out = '';
+    let i = startingIndex || 0;
+    while (i < len) {
+        c = array[i++];
+        // If the character is 3 (END_OF_TEXT) or 0 (NULL) then skip it
+        if (c === 0x00 || c === 0x03) {
+            continue;
+        }
+        switch (c >> 4) {
+            case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7:
+            // 0xxxxxxx
+                out += String.fromCharCode(c);
+                break;
+            case 12: case 13:
+            // 110x xxxx   10xx xxxx
+                char2 = array[i++];
+                out += String.fromCharCode(((c & 0x1F) << 6) | (char2 & 0x3F));
+                break;
+            case 14:
+                // 1110 xxxx  10xx xxxx  10xx xxxx
+                char2 = array[i++];
+                char3 = array[i++];
+                out += String.fromCharCode(((c & 0x0F) << 12) |
+                    ((char2 & 0x3F) << 6) |
+                    ((char3 & 0x3F) << 0));
+                break;
+            default:
+        }
+    }
+    return out;
+}
+
+
+
 const WebVTTParser = {
     parse: function(vttByteArray, syncPTS, vttCCs, cc, callBack, errorCallBack) {
         // Convert byteArray into string, replacing any somewhat exotic linefeeds with "\n", then split on that character.
         let re = /\r\n|\n\r|\n|\r/g;
-        let vttLines = String.fromCharCode.apply(null, new Uint8Array(vttByteArray)).trim().replace(re, '\n').split('\n');
+        let vttLines = utf8ArrayToStr(new Uint8Array(vttByteArray)).trim().replace(re, '\n').split('\n');
         let cueTime = '00:00.000';
         let mpegTs = 0;
         let localTime = 0;
@@ -101,7 +140,7 @@ const WebVTTParser = {
             cue.id = hash(cue.startTime) + hash(cue.endTime) + hash(cue.text);
 
             // Fix encoding of special characters. TODO: Test with all sorts of weird characters.
-            cue.text = decodeURIComponent(escape(cue.text));
+            cue.text = decodeURIComponent(escape(atob(cue.text)));
             if (cue.endTime > 0) {
               cues.push(cue);
             }
