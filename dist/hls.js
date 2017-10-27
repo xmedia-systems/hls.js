@@ -70,7 +70,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "/dist/";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 7);
+/******/ 	return __webpack_require__(__webpack_require__.s = 10);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -1196,7 +1196,6 @@ function isUndefined(arg) {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 
 // EXTERNAL MODULE: ./src/events.js
 var events = __webpack_require__(1);
@@ -5422,13 +5421,239 @@ var demuxer_inline_DemuxerInline = function () {
 /* harmony default export */ var demuxer_inline = __webpack_exports__["a"] = (demuxer_inline_DemuxerInline);
 
 /***/ }),
-/* 7 */
+/* 7 */,
+/* 8 */
+/***/ (function(module, exports, __webpack_require__) {
+
+function webpackBootstrapFunc (modules) {
+/******/  // The module cache
+/******/  var installedModules = {};
+
+/******/  // The require function
+/******/  function __webpack_require__(moduleId) {
+
+/******/    // Check if module is in cache
+/******/    if(installedModules[moduleId])
+/******/      return installedModules[moduleId].exports;
+
+/******/    // Create a new module (and put it into the cache)
+/******/    var module = installedModules[moduleId] = {
+/******/      i: moduleId,
+/******/      l: false,
+/******/      exports: {}
+/******/    };
+
+/******/    // Execute the module function
+/******/    modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+
+/******/    // Flag the module as loaded
+/******/    module.l = true;
+
+/******/    // Return the exports of the module
+/******/    return module.exports;
+/******/  }
+
+/******/  // expose the modules object (__webpack_modules__)
+/******/  __webpack_require__.m = modules;
+
+/******/  // expose the module cache
+/******/  __webpack_require__.c = installedModules;
+
+/******/  // identity function for calling harmony imports with the correct context
+/******/  __webpack_require__.i = function(value) { return value; };
+
+/******/  // define getter function for harmony exports
+/******/  __webpack_require__.d = function(exports, name, getter) {
+/******/    if(!__webpack_require__.o(exports, name)) {
+/******/      Object.defineProperty(exports, name, {
+/******/        configurable: false,
+/******/        enumerable: true,
+/******/        get: getter
+/******/      });
+/******/    }
+/******/  };
+
+/******/  // getDefaultExport function for compatibility with non-harmony modules
+/******/  __webpack_require__.n = function(module) {
+/******/    var getter = module && module.__esModule ?
+/******/      function getDefault() { return module['default']; } :
+/******/      function getModuleExports() { return module; };
+/******/    __webpack_require__.d(getter, 'a', getter);
+/******/    return getter;
+/******/  };
+
+/******/  // Object.prototype.hasOwnProperty.call
+/******/  __webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
+
+/******/  // __webpack_public_path__
+/******/  __webpack_require__.p = "/";
+
+/******/  // on error function for async loading
+/******/  __webpack_require__.oe = function(err) { console.error(err); throw err; };
+
+  var f = __webpack_require__(__webpack_require__.s = ENTRY_MODULE)
+  return f.default || f // try to call default if defined to also support babel esmodule exports
+}
+
+// http://stackoverflow.com/a/2593661/130442
+function quoteRegExp (str) {
+  return (str + '').replace(/[.?*+^$[\]\\(){}|-]/g, '\\$&')
+}
+
+function getModuleDependencies (module) {
+  var retval = []
+  var fnString = module.toString()
+  var wrapperSignature = fnString.match(/^function\s?\(\w+,\s*\w+,\s*(\w+)\)/)
+  if (!wrapperSignature) return retval
+
+  var webpackRequireName = wrapperSignature[1]
+  var re = new RegExp('(\\\\n|\\W)' + quoteRegExp(webpackRequireName) + '\\((\/\\*.*?\\*\/)?\s?.*?([\\.|\\-|\\w|\/|@]+).*?\\)', 'g') // additional chars when output.pathinfo is true
+  var match
+  while ((match = re.exec(fnString))) {
+    retval.push(match[3])
+  }
+  return retval
+}
+
+function getRequiredModules (sources, moduleId) {
+  var modulesQueue = [moduleId]
+  var requiredModules = []
+  var seenModules = {}
+
+  while (modulesQueue.length) {
+    var moduleToCheck = modulesQueue.pop()
+    if (seenModules[moduleToCheck] || !sources[moduleToCheck]) continue
+    seenModules[moduleToCheck] = true
+    requiredModules.push(moduleToCheck)
+    var newModules = getModuleDependencies(sources[moduleToCheck])
+    modulesQueue = modulesQueue.concat(newModules)
+  }
+
+  return requiredModules
+}
+
+module.exports = function (moduleId, options) {
+  options = options || {}
+  var sources = __webpack_require__.m
+
+  var requiredModules = options.all ? Object.keys(sources) : getRequiredModules(sources, moduleId)
+  var src = '(' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(moduleId)) + ')({' + requiredModules.map(function (id) { return '' + JSON.stringify(id) + ': ' + sources[id].toString() }).join(',') + '})(self);'
+
+  var blob = new window.Blob([src], { type: 'text/javascript' })
+  if (options.bare) { return blob }
+
+  var URL = window.URL || window.webkitURL || window.mozURL || window.msURL
+
+  var workerUrl = URL.createObjectURL(blob)
+  var worker = new window.Worker(workerUrl)
+  worker.objectURL = workerUrl
+
+  return worker
+}
+
+
+/***/ }),
+/* 9 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-var cues_namespaceObject = {};
-__webpack_require__.d(cues_namespaceObject, "createCues", function() { return createCues; });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__demux_demuxer_inline__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__events__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__utils_logger__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_events__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_events___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_events__);
+/* demuxer web worker.
+ *  - listen to worker message, and trigger DemuxerInline upon reception of Fragments.
+ *  - provides MP4 Boxes back to main thread using [transferable objects](https://developers.google.com/web/updates/2011/12/Transferable-Objects-Lightning-Fast) in order to minimize message passing overhead.
+ */
+
+
+
+
+
+
+var DemuxerWorker = function DemuxerWorker(self) {
+  // observer setup
+  var observer = new __WEBPACK_IMPORTED_MODULE_3_events___default.a();
+  observer.trigger = function trigger(event) {
+    for (var _len = arguments.length, data = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+      data[_key - 1] = arguments[_key];
+    }
+
+    observer.emit.apply(observer, [event, event].concat(data));
+  };
+
+  observer.off = function off(event) {
+    for (var _len2 = arguments.length, data = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
+      data[_key2 - 1] = arguments[_key2];
+    }
+
+    observer.removeListener.apply(observer, [event].concat(data));
+  };
+
+  var forwardMessage = function forwardMessage(ev, data) {
+    self.postMessage({ event: ev, data: data });
+  };
+
+  self.addEventListener('message', function (ev) {
+    var data = ev.data;
+    //console.log('demuxer cmd:' + data.cmd);
+    switch (data.cmd) {
+      case 'init':
+        var config = JSON.parse(data.config);
+        self.demuxer = new __WEBPACK_IMPORTED_MODULE_0__demux_demuxer_inline__["a" /* default */](observer, data.typeSupported, config, data.vendor);
+        try {
+          Object(__WEBPACK_IMPORTED_MODULE_2__utils_logger__["a" /* enableLogs */])(config.debug === true);
+        } catch (err) {
+          console.warn('demuxerWorker: unable to enable logs');
+        }
+        // signal end of worker init
+        forwardMessage('init', null);
+        break;
+      case 'demux':
+        self.demuxer.push(data.data, data.decryptdata, data.initSegment, data.audioCodec, data.videoCodec, data.timeOffset, data.discontinuity, data.trackSwitch, data.contiguous, data.duration, data.accurateTimeOffset, data.defaultInitPTS);
+        break;
+      default:
+        break;
+    }
+  });
+
+  // forward events to main thread
+  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_DECRYPTED, forwardMessage);
+  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSING_INIT_SEGMENT, forwardMessage);
+  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSED, forwardMessage);
+  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].ERROR, forwardMessage);
+  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSING_METADATA, forwardMessage);
+  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSING_USERDATA, forwardMessage);
+  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].INIT_PTS_FOUND, forwardMessage);
+
+  // special case for FRAG_PARSING_DATA: pass data1/data2 as transferable object (no copy)
+  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSING_DATA, function (ev, data) {
+    var transferable = [];
+    var message = { event: ev, data: data };
+    if (data.data1) {
+      message.data1 = data.data1.buffer;
+      transferable.push(data.data1.buffer);
+      delete data.data1;
+    }
+    if (data.data2) {
+      message.data2 = data.data2.buffer;
+      transferable.push(data.data2.buffer);
+      delete data.data2;
+    }
+    self.postMessage(message, transferable);
+  });
+};
+
+/* harmony default export */ __webpack_exports__["default"] = (DemuxerWorker);
+
+/***/ }),
+/* 10 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 
 // EXTERNAL MODULE: ./node_modules/url-toolkit/src/url-toolkit.js
 var url_toolkit = __webpack_require__(5);
@@ -9185,98 +9410,6 @@ var level_controller_LevelController = function (_EventHandler) {
 }(event_handler);
 
 /* harmony default export */ var level_controller = (level_controller_LevelController);
-// EXTERNAL MODULE: ./src/demux/id3.js
-var id3 = __webpack_require__(3);
-
-// CONCATENATED MODULE: ./src/controller/id3-track-controller.js
-function id3_track_controller__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function id3_track_controller__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function id3_track_controller__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-/*
- * id3 metadata track controller
-*/
-
-
-
-
-
-var id3_track_controller_ID3TrackController = function (_EventHandler) {
-  id3_track_controller__inherits(ID3TrackController, _EventHandler);
-
-  function ID3TrackController(hls) {
-    id3_track_controller__classCallCheck(this, ID3TrackController);
-
-    var _this = id3_track_controller__possibleConstructorReturn(this, _EventHandler.call(this, hls, events["a" /* default */].MEDIA_ATTACHED, events["a" /* default */].MEDIA_DETACHING, events["a" /* default */].FRAG_PARSING_METADATA));
-
-    _this.id3Track = undefined;
-    _this.media = undefined;
-    return _this;
-  }
-
-  ID3TrackController.prototype.destroy = function destroy() {
-    event_handler.prototype.destroy.call(this);
-  };
-
-  // Add ID3 metatadata text track.
-
-
-  ID3TrackController.prototype.onMediaAttached = function onMediaAttached(data) {
-    this.media = data.media;
-    if (!this.media) {
-      return;
-    }
-  };
-
-  ID3TrackController.prototype.onMediaDetaching = function onMediaDetaching() {
-    this.media = undefined;
-  };
-
-  ID3TrackController.prototype.onFragParsingMetadata = function onFragParsingMetadata(data) {
-    var fragment = data.frag;
-    var samples = data.samples;
-
-    // create track dynamically
-    if (!this.id3Track) {
-      this.id3Track = this.media.addTextTrack('metadata', 'id3');
-      this.id3Track.mode = 'hidden';
-    }
-
-    // Attempt to recreate Safari functionality by creating
-    // WebKitDataCue objects when available and store the decoded
-    // ID3 data in the value property of the cue
-    var Cue = window.WebKitDataCue || window.VTTCue || window.TextTrackCue;
-
-    for (var i = 0; i < samples.length; i++) {
-      var frames = id3["a" /* default */].getID3Frames(samples[i].data);
-      if (frames) {
-        var startTime = samples[i].pts;
-        var endTime = i < samples.length - 1 ? samples[i + 1].pts : fragment.endPTS;
-
-        // Give a slight bump to the endTime if it's equal to startTime to avoid a SyntaxError in IE
-        if (startTime === endTime) {
-          endTime += 0.0001;
-        }
-
-        for (var j = 0; j < frames.length; j++) {
-          var frame = frames[j];
-          // Safari doesn't put the timestamp frame in the TextTrack
-          if (!id3["a" /* default */].isTimeStampFrame(frame)) {
-            var cue = new Cue(startTime, endTime, '');
-            cue.value = frame;
-            this.id3Track.addCue(cue);
-          }
-        }
-      }
-    }
-  };
-
-  return ID3TrackController;
-}(event_handler);
-
-/* harmony default export */ var id3_track_controller = (id3_track_controller_ID3TrackController);
 // CONCATENATED MODULE: ./src/utils/ewma.js
 function ewma__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -9342,8 +9475,8 @@ var ewma_bandwidth_estimator_EwmaBandWidthEstimator = function () {
     this.defaultEstimate_ = defaultEstimate;
     this.minWeight_ = 0.001;
     this.minDelayMs_ = 50;
-    this.slow_ = new ewma(slow);
-    this.fast_ = new ewma(fast);
+    this.slow_ = new abr_controller(slow);
+    this.fast_ = new abr_controller(fast);
   }
 
   EwmaBandWidthEstimator.prototype.sample = function sample(durationMs, numBytes) {
@@ -9447,7 +9580,7 @@ var abr_controller_AbrController = function (_EventHandler) {
           ewmaFast = config.abrEwmaFastVoD;
           ewmaSlow = config.abrEwmaSlowVoD;
         }
-        this._bwEstimator = new ewma_bandwidth_estimator(hls, ewmaSlow, ewmaFast, config.abrEwmaDefaultEstimate);
+        this._bwEstimator = new buffer_controller(hls, ewmaSlow, ewmaFast, config.abrEwmaDefaultEstimate);
       }
       this.fragCurrent = frag;
     }
@@ -12226,7 +12359,7 @@ function parseOptions(input, callback, keyValueDelim, groupDelim) {
   }
 }
 
-var defaults = new vttcue(0, 0, 0);
+var defaults = new /* Cannot get final name for export "default" in "./src/utils/cues.js" (known exports: createCues, known reexports: ) */ undefined(0, 0, 0);
 // 'middle' was changed to 'center' in the spec: https://github.com/w3c/webvtt/pull/244
 //  Safari doesn't yet support this change, but FF and Chrome do.
 var center = defaults.align === 'middle' ? 'middle' : 'center';
@@ -12442,7 +12575,7 @@ VTTParser.prototype = {
             if (!line) {
               continue;
             }
-            self.cue = new vttcue(0, 0, '');
+            self.cue = new /* Cannot get final name for export "default" in "./src/utils/cues.js" (known exports: createCues, known reexports: ) */ undefined(0, 0, '');
             self.state = 'CUE';
             // 30-39 - Check if self line contains an optional identifier or timing data.
             if (line.indexOf('-->') === -1) {
@@ -12573,7 +12706,7 @@ function createCues(startTime, endTime, captionScreen) {
         endTime += 0.0001;
       }
 
-      cue = new vttcue(startTime, endTime, fixLineBreaks(text.trim()));
+      cue = new /* Cannot get final name for export "default" in "./src/utils/cues.js" (known exports: createCues, known reexports: ) */ undefined(startTime, endTime, /* Cannot get final name for export "fixLineBreaks" in "./src/utils/cea-608-parser.js" (known exports: default, known reexports: ) */ undefined(text.trim()));
 
       if (indent >= 16) {
 
@@ -13830,6 +13963,9 @@ var Cea608Parser = function () {
 }();
 
 /* harmony default export */ var cea_608_parser = (Cea608Parser);
+// EXTERNAL MODULE: ./src/demux/id3.js
+var id3 = __webpack_require__(3);
+
 // CONCATENATED MODULE: ./src/utils/webvtt-parser.js
 
 
@@ -13894,7 +14030,7 @@ var WebVTTParser = {
     parse: function parse(vttByteArray, syncPTS, vttCCs, cc, callBack, errorCallBack) {
         // Convert byteArray into string, replacing any somewhat exotic linefeeds with "\n", then split on that character.
         var re = /\r\n|\n\r|\n|\r/g;
-        var vttLines = Object(id3["b" /* utf8ArrayToStr */])(new Uint8Array(vttByteArray)).trim().replace(re, '\n').split('\n');
+        var vttLines = /* Cannot get final name for export "utf8ArrayToStr" in "./src/utils/ewma.js" (known exports: default, known reexports: ) */ undefined(new Uint8Array(vttByteArray)).trim().replace(re, '\n').split('\n');
         var cueTime = '00:00.000';
         var mpegTs = 0;
         var localTime = 0;
@@ -13905,7 +14041,7 @@ var WebVTTParser = {
         // let VTTCue = VTTCue || window.TextTrackCue;
 
         // Create parser object using VTTCue with TextTrackCue fallback on certain browsers.
-        var parser = new vttparser();
+        var parser = new cea_608_parser();
 
         parser.oncue = function (cue) {
             // Adjust cue timing; clamp cues to start no earlier than - and drop cues that don't end after - 0 on timeline.
@@ -14125,7 +14261,7 @@ var timeline_controller_TimelineController = function (_EventHandler) {
         }
       };
 
-      _this.cea608Parser = new cea_608_parser(0, channel1, channel2);
+      _this.cea608Parser = new webvtt_parser(0, channel1, channel2);
     }
     return _this;
   }
@@ -14347,7 +14483,7 @@ var timeline_controller_TimelineController = function (_EventHandler) {
           var tracks = this.config.renderNatively ? this.textTracks : this.tracks;
 
           // Parse the WebVTT file contents.
-          webvtt_parser.parse(payload, this.initPTS, vttCCs, frag.cc, function (cues) {
+          timeline_controller.parse(payload, this.initPTS, vttCCs, frag.cc, function (cues) {
             var currentTrack = tracks[frag.trackId];
             var newCues = cues.filter(function (cue) {
               return !currentTrack.cues.getCueById(cue.id);
@@ -14847,16 +14983,16 @@ var hlsDefaultConfig = {
   fpsDroppedMonitoringPeriod: 5000, // used by fps-controller
   fpsDroppedMonitoringThreshold: 0.2, // used by fps-controller
   appendErrorMaxRetry: 3, // used by buffer-controller
-  loader: xhr_loader,
+  loader: audio_stream_controller,
   //loader: FetchLoader,
   fLoader: undefined,
   pLoader: undefined,
   xhrSetup: undefined,
   fetchSetup: undefined,
-  abrController: abr_controller,
-  bufferController: buffer_controller,
-  capLevelController: cap_level_controller,
-  fpsController: fps_controller,
+  abrController: cap_level_controller,
+  bufferController: fps_controller,
+  capLevelController: xhr_loader,
+  fpsController: audio_track_controller,
   stretchShortVideoTrack: false, // used by mp4-remuxer
   maxAudioFramesDrift: 1, // used by mp4-remuxer
   forceKeyFrameOnDiscontinuity: true, // used by ts-demuxer
@@ -14874,10 +15010,10 @@ var hlsDefaultConfig = {
 };
 
 if (true) {
-  hlsDefaultConfig.subtitleStreamController = subtitle_stream_controller;
-  hlsDefaultConfig.subtitleTrackController = subtitle_track_controller;
-  hlsDefaultConfig.timelineController = timeline_controller;
-  hlsDefaultConfig.cueHandler = cues_namespaceObject;
+  hlsDefaultConfig.subtitleStreamController = /* Cannot get final name for export "default" in "./src/config.js" (known exports: hlsDefaultConfig, known reexports: ) */ undefined;
+  hlsDefaultConfig.subtitleTrackController = subtitle_stream_controller;
+  hlsDefaultConfig.timelineController = subtitle_track_controller;
+  hlsDefaultConfig.cueHandler = id3;
   hlsDefaultConfig.enableCEA708Captions = true; // used by timeline-controller
   hlsDefaultConfig.enableWebVTT = true; // used by timeline-controller
   hlsDefaultConfig.captionsTextTrack1Label = 'English'; // used by timeline-controller
@@ -14887,8 +15023,8 @@ if (true) {
 }
 
 if (true) {
-  hlsDefaultConfig.audioStreamController = audio_stream_controller;
-  hlsDefaultConfig.audioTrackController = audio_track_controller;
+  hlsDefaultConfig.audioStreamController = vttparser;
+  hlsDefaultConfig.audioTrackController = vttcue;
 }
 // CONCATENATED MODULE: ./src/hls.js
 var hls__createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -14898,7 +15034,6 @@ function hls__classCallCheck(instance, Constructor) { if (!(instance instanceof 
 /**
  * HLS interface
  */
-
 
 
 
@@ -15018,7 +15153,6 @@ var hls_Hls = function () {
     var playListLoader = new playlist_loader(this);
     var fragmentLoader = new fragment_loader(this);
     var keyLoader = new key_loader(this);
-    var id3TrackController = new id3_track_controller(this);
 
     // network controllers
     var levelController = this.levelController = new level_controller(this);
@@ -15032,7 +15166,7 @@ var hls_Hls = function () {
     }
     this.networkControllers = networkControllers;
 
-    var coreComponents = [playListLoader, fragmentLoader, keyLoader, abrController, bufferController, capLevelController, fpsController, id3TrackController];
+    var coreComponents = [playListLoader, fragmentLoader, keyLoader, abrController, bufferController, capLevelController, fpsController];
 
     // optional audio track and subtitle controller
     Controller = config.audioTrackController;
@@ -15380,233 +15514,6 @@ var hls_Hls = function () {
 }();
 
 /* harmony default export */ var src_hls = __webpack_exports__["default"] = (hls_Hls);
-
-/***/ }),
-/* 8 */
-/***/ (function(module, exports, __webpack_require__) {
-
-function webpackBootstrapFunc (modules) {
-/******/  // The module cache
-/******/  var installedModules = {};
-
-/******/  // The require function
-/******/  function __webpack_require__(moduleId) {
-
-/******/    // Check if module is in cache
-/******/    if(installedModules[moduleId])
-/******/      return installedModules[moduleId].exports;
-
-/******/    // Create a new module (and put it into the cache)
-/******/    var module = installedModules[moduleId] = {
-/******/      i: moduleId,
-/******/      l: false,
-/******/      exports: {}
-/******/    };
-
-/******/    // Execute the module function
-/******/    modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-
-/******/    // Flag the module as loaded
-/******/    module.l = true;
-
-/******/    // Return the exports of the module
-/******/    return module.exports;
-/******/  }
-
-/******/  // expose the modules object (__webpack_modules__)
-/******/  __webpack_require__.m = modules;
-
-/******/  // expose the module cache
-/******/  __webpack_require__.c = installedModules;
-
-/******/  // identity function for calling harmony imports with the correct context
-/******/  __webpack_require__.i = function(value) { return value; };
-
-/******/  // define getter function for harmony exports
-/******/  __webpack_require__.d = function(exports, name, getter) {
-/******/    if(!__webpack_require__.o(exports, name)) {
-/******/      Object.defineProperty(exports, name, {
-/******/        configurable: false,
-/******/        enumerable: true,
-/******/        get: getter
-/******/      });
-/******/    }
-/******/  };
-
-/******/  // getDefaultExport function for compatibility with non-harmony modules
-/******/  __webpack_require__.n = function(module) {
-/******/    var getter = module && module.__esModule ?
-/******/      function getDefault() { return module['default']; } :
-/******/      function getModuleExports() { return module; };
-/******/    __webpack_require__.d(getter, 'a', getter);
-/******/    return getter;
-/******/  };
-
-/******/  // Object.prototype.hasOwnProperty.call
-/******/  __webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
-
-/******/  // __webpack_public_path__
-/******/  __webpack_require__.p = "/";
-
-/******/  // on error function for async loading
-/******/  __webpack_require__.oe = function(err) { console.error(err); throw err; };
-
-  var f = __webpack_require__(__webpack_require__.s = ENTRY_MODULE)
-  return f.default || f // try to call default if defined to also support babel esmodule exports
-}
-
-// http://stackoverflow.com/a/2593661/130442
-function quoteRegExp (str) {
-  return (str + '').replace(/[.?*+^$[\]\\(){}|-]/g, '\\$&')
-}
-
-function getModuleDependencies (module) {
-  var retval = []
-  var fnString = module.toString()
-  var wrapperSignature = fnString.match(/^function\s?\(\w+,\s*\w+,\s*(\w+)\)/)
-  if (!wrapperSignature) return retval
-
-  var webpackRequireName = wrapperSignature[1]
-  var re = new RegExp('(\\\\n|\\W)' + quoteRegExp(webpackRequireName) + '\\((\/\\*.*?\\*\/)?\s?.*?([\\.|\\-|\\w|\/|@]+).*?\\)', 'g') // additional chars when output.pathinfo is true
-  var match
-  while ((match = re.exec(fnString))) {
-    retval.push(match[3])
-  }
-  return retval
-}
-
-function getRequiredModules (sources, moduleId) {
-  var modulesQueue = [moduleId]
-  var requiredModules = []
-  var seenModules = {}
-
-  while (modulesQueue.length) {
-    var moduleToCheck = modulesQueue.pop()
-    if (seenModules[moduleToCheck] || !sources[moduleToCheck]) continue
-    seenModules[moduleToCheck] = true
-    requiredModules.push(moduleToCheck)
-    var newModules = getModuleDependencies(sources[moduleToCheck])
-    modulesQueue = modulesQueue.concat(newModules)
-  }
-
-  return requiredModules
-}
-
-module.exports = function (moduleId, options) {
-  options = options || {}
-  var sources = __webpack_require__.m
-
-  var requiredModules = options.all ? Object.keys(sources) : getRequiredModules(sources, moduleId)
-  var src = '(' + webpackBootstrapFunc.toString().replace('ENTRY_MODULE', JSON.stringify(moduleId)) + ')({' + requiredModules.map(function (id) { return '' + JSON.stringify(id) + ': ' + sources[id].toString() }).join(',') + '})(self);'
-
-  var blob = new window.Blob([src], { type: 'text/javascript' })
-  if (options.bare) { return blob }
-
-  var URL = window.URL || window.webkitURL || window.mozURL || window.msURL
-
-  var workerUrl = URL.createObjectURL(blob)
-  var worker = new window.Worker(workerUrl)
-  worker.objectURL = workerUrl
-
-  return worker
-}
-
-
-/***/ }),
-/* 9 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__demux_demuxer_inline__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__events__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__utils_logger__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_events__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_events___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_events__);
-/* demuxer web worker.
- *  - listen to worker message, and trigger DemuxerInline upon reception of Fragments.
- *  - provides MP4 Boxes back to main thread using [transferable objects](https://developers.google.com/web/updates/2011/12/Transferable-Objects-Lightning-Fast) in order to minimize message passing overhead.
- */
-
-
-
-
-
-
-var DemuxerWorker = function DemuxerWorker(self) {
-  // observer setup
-  var observer = new __WEBPACK_IMPORTED_MODULE_3_events___default.a();
-  observer.trigger = function trigger(event) {
-    for (var _len = arguments.length, data = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-      data[_key - 1] = arguments[_key];
-    }
-
-    observer.emit.apply(observer, [event, event].concat(data));
-  };
-
-  observer.off = function off(event) {
-    for (var _len2 = arguments.length, data = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
-      data[_key2 - 1] = arguments[_key2];
-    }
-
-    observer.removeListener.apply(observer, [event].concat(data));
-  };
-
-  var forwardMessage = function forwardMessage(ev, data) {
-    self.postMessage({ event: ev, data: data });
-  };
-
-  self.addEventListener('message', function (ev) {
-    var data = ev.data;
-    //console.log('demuxer cmd:' + data.cmd);
-    switch (data.cmd) {
-      case 'init':
-        var config = JSON.parse(data.config);
-        self.demuxer = new __WEBPACK_IMPORTED_MODULE_0__demux_demuxer_inline__["a" /* default */](observer, data.typeSupported, config, data.vendor);
-        try {
-          Object(__WEBPACK_IMPORTED_MODULE_2__utils_logger__["a" /* enableLogs */])(config.debug === true);
-        } catch (err) {
-          console.warn('demuxerWorker: unable to enable logs');
-        }
-        // signal end of worker init
-        forwardMessage('init', null);
-        break;
-      case 'demux':
-        self.demuxer.push(data.data, data.decryptdata, data.initSegment, data.audioCodec, data.videoCodec, data.timeOffset, data.discontinuity, data.trackSwitch, data.contiguous, data.duration, data.accurateTimeOffset, data.defaultInitPTS);
-        break;
-      default:
-        break;
-    }
-  });
-
-  // forward events to main thread
-  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_DECRYPTED, forwardMessage);
-  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSING_INIT_SEGMENT, forwardMessage);
-  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSED, forwardMessage);
-  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].ERROR, forwardMessage);
-  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSING_METADATA, forwardMessage);
-  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSING_USERDATA, forwardMessage);
-  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].INIT_PTS_FOUND, forwardMessage);
-
-  // special case for FRAG_PARSING_DATA: pass data1/data2 as transferable object (no copy)
-  observer.on(__WEBPACK_IMPORTED_MODULE_1__events__["a" /* default */].FRAG_PARSING_DATA, function (ev, data) {
-    var transferable = [];
-    var message = { event: ev, data: data };
-    if (data.data1) {
-      message.data1 = data.data1.buffer;
-      transferable.push(data.data1.buffer);
-      delete data.data1;
-    }
-    if (data.data2) {
-      message.data2 = data.data2.buffer;
-      transferable.push(data.data2.buffer);
-      delete data.data2;
-    }
-    self.postMessage(message, transferable);
-  });
-};
-
-/* harmony default export */ __webpack_exports__["default"] = (DemuxerWorker);
 
 /***/ })
 /******/ ])["default"];

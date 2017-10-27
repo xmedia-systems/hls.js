@@ -102,7 +102,6 @@ export default class Hls {
     const playListLoader = new PlaylistLoader(this);
     const fragmentLoader = new FragmentLoader(this);
     const keyLoader = new KeyLoader(this);
-    // const id3TrackController = new ID3TrackController(this);
 
     // network controllers
     const levelController = this.levelController = new LevelController(this);
