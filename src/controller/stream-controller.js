@@ -555,12 +555,15 @@ class StreamController extends EventHandler {
 
   getBufferedFrag(position) {
     return BinarySearch.search(this._bufferedFrags, function(frag) {
-      if (position < frag.startPTS) {
-        return -1;
-      } else if (position > frag.endPTS) {
-        return 1;
+      if (position && frag) {
+        if (parseFloat(position.toFixed(3)) < parseFloat(frag.startPTS.toFixed(3))) {
+          return -1;
+        } else if (parseFloat(position.toFixed(3)) > parseFloat(frag.endPTS.toFixed(3))) {
+          return 1;
+        }
       }
       return 0;
+
     });
   }
 
