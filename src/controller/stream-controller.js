@@ -555,10 +555,10 @@ class StreamController extends EventHandler {
 
   getBufferedFrag(position) {
     return BinarySearch.search(this._bufferedFrags, function(frag) {
-      if (position && frag.startPTS) {
-        const startPTS = parseFloat(frag.startPTS).toFixed(3);
-        const endPTS = parseFloat(frag.endPTS).toFixed(3);
-        position = parseFloat(position).toFixed(3);
+      if (position && frag.startPTS && frag.endPTS) {
+        const startPTS = frag.startPTS.toFixed(3);
+        const endPTS = frag.endPTS.toFixed(3);
+        position = position.toFixed(3);
 
         if (position < startPTS) {
           return -1;
