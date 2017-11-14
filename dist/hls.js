@@ -11834,7 +11834,7 @@ var audio_stream_controller_AudioStreamController = function (_EventHandler) {
     var _lineAlign = 'start';
     var _position = autoKeyword;
     var _size = 100;
-    var _align = 'center';
+    var _align = 'middle';
 
     Object.defineProperty(cue, 'id', extend({}, baseObj, {
       get: function get() {
