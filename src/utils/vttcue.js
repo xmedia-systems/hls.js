@@ -100,11 +100,11 @@ export default (function() {
     var _region = null;
     var _vertical = '';
     var _snapToLines = true;
-    var _line = 'auto';
+    var _line = autoKeyword;
     var _lineAlign = 'start';
-    var _position = 50;
-    var _size = 50;
-    var _align = 'middle';
+    var _position = autoKeyword;
+    var _size = 100;
+    var _align = 'center';
 
     Object.defineProperty(cue, 'id', extend({}, baseObj, {
       get: function () {
