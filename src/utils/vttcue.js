@@ -104,7 +104,7 @@ export default (function() {
     var _lineAlign = 'start';
     var _position = autoKeyword;
     var _size = 100;
-    var _align = 'center';
+    var _align = 'middle';
 
     Object.defineProperty(cue, 'id', extend({}, baseObj, {
       get: function () {
