@@ -563,11 +563,12 @@ class StreamController extends EventHandler {
       return;
     }
 
+    const truncPos = trunc(position);
     return BinarySearch.search(this._bufferedFrags, function(frag) {
       if (isDefined(frag.startPTS) && isDefined(frag.endPTS)) {
-        if (position < trunc(frag.startPTS)) {
+        if (truncPos < trunc(frag.startPTS)) {
           return -1;
-        } else if (position > trunc(frag.endPTS)) {
+        } else if (truncPos > trunc(frag.endPTS)) {
           return 1;
         }
       }
