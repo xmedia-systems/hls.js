@@ -359,11 +359,23 @@ class BufferController extends EventHandler {
 
   // https://github.com/video-dev/hls.js/issues/355
   updateMediaElementDuration() {
+<<<<<<< HEAD
     let media = this.media,
         mediaSource = this.mediaSource,
         sourceBuffer = this.sourceBuffer,
         levelDuration = this._levelDuration;
     if (levelDuration === null || !media || !mediaSource || !sourceBuffer || media.readyState === 0 || mediaSource.readyState !== 'open') {
+=======
+    let {config} = this.hls;
+    let duration;
+
+    if (this._levelDuration === null ||
+      !this.media ||
+      !this.mediaSource ||
+      !this.sourceBuffer ||
+      this.media.readyState === 0 ||
+      this.mediaSource.readyState !== 'open') {
+>>>>>>> f4a86a16... Merge pull request #1452 from NicolasSiver/add-level-manifest-recovery
       return;
     }
     for (let type in sourceBuffer) {
@@ -376,6 +388,7 @@ class BufferController extends EventHandler {
       // initialise to the value that the media source is reporting
       this._msDuration = mediaSource.duration;
     }
+<<<<<<< HEAD
     let duration = media.duration;
     // levelDuration was the last value we set.
     // not using mediaSource.duration as the browser may tweak this value
@@ -384,6 +397,21 @@ class BufferController extends EventHandler {
     if ((levelDuration > this._msDuration && levelDuration > duration) || (duration === Infinity || isNaN(duration) )) {
       logger.log(`Updating mediasource duration to ${levelDuration.toFixed(3)}`);
       this._msDuration = mediaSource.duration = levelDuration;
+=======
+
+    if (this._live === true && config.liveDurationInfinity === true) {
+      // Override duration to Infinity
+      logger.log('Media Source duration is set to Infinity');
+      this._msDuration = this.mediaSource.duration = Infinity;
+    } else if ((this._levelDuration > this._msDuration && this._levelDuration > duration) ||
+      (duration === Infinity || isNaN(duration) )) {
+      // levelDuration was the last value we set.
+      // not using mediaSource.duration as the browser may tweak this value
+      // only update Media Source duration if its value increase, this is to avoid
+      // flushing already buffered portion when switching between quality level
+      logger.log(`Updating Media Source duration to ${this._levelDuration.toFixed(3)}`);
+      this._msDuration = this.mediaSource.duration = this._levelDuration;
+>>>>>>> f4a86a16... Merge pull request #1452 from NicolasSiver/add-level-manifest-recovery
     }
   }
 
