@@ -63,7 +63,6 @@ const WebVTTParser = {
         let re = /\r\n|\n\r|\n|\r/g;
         // Uint8Array.prototype.reduce is not implemented in IE11
         let vttLines = utf8ArrayToStr(new Uint8Array(vttByteArray)).trim().replace(re, '\n').split('\n');
-
         let cueTime = '00:00.000';
         let mpegTs = 0;
         let localTime = 0;
