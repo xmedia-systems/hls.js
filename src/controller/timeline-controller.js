@@ -353,8 +353,9 @@ class TimelineController extends EventHandler {
       this.prevCC = frag.cc;
     }
 
-    let hls = this.hls;
-    let tracks = this.config.renderNatively ? this.textTracks : this.tracks;
+    const self = this;
+    const hls = this.hls;
+    const tracks = this.config.renderNatively ? this.textTracks : this.tracks;
 
     // Parse the WebVTT file contents.
     WebVTTParser.parse(payload, this.initPTS, vttCCs, frag.cc, function (cues) {
