@@ -6,6 +6,5 @@
     "test": {
       "presets": ["es2015"]
     }
-  },
-  "plugins": []
+  }
 }

@@ -8,4 +8,3 @@ npm-debug.log
 coverage/
 # ignore JetBrains
 .idea/*
-dist/bundle-analyzer-report.*

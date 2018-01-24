@@ -1,5 +1,5 @@
 /**
- * Fetch based loader
+ * Fetch based logger
  * timeout / abort / onprogress not supported for now
  * timeout / abort : some ideas here : https://github.com/whatwg/fetch/issues/20#issuecomment-196113354
  * but still it is not bullet proof as it fails to avoid data waste....
@@ -11,32 +11,23 @@ class FetchLoader {
     this.fetchSetup = config.fetchSetup;
   }
 
-  destroy() {}
+  destroy() {
+  }
 
-  abort() {}
+  abort() {
+  }
+
 
   load(context, config, callbacks) {
-    let stats = {
-      trequest: performance.now(),
-      retry: 0
-    };
-
-    let targetURL = context.url;
-    let request;
-
-    const initParams = {
-          method: 'GET',
-          mode: 'cors',
-          credentials: 'same-origin'
-        };
-
-    const headersObj = {};
+    let stats = {trequest: performance.now(), retry: 0}, targetURL = context.url, request,
+        initParams = { method: 'GET',
+                       mode: 'cors',
+                       credentials: 'same-origin'
+                     };
 
     if (context.rangeEnd) {
-      headersObj['Range'] = 'bytes=' + context.rangeStart + '-' + String(context.rangeEnd - 1); /* jshint ignore:line */
+      initParams.headers = new Headers({ 'Range' :  'bytes=' + context.rangeStart + '-' + (context.rangeEnd-1)});
     }
-
-    initParams.headers = new Headers(headersObj);
 
     if (this.fetchSetup) {
       request = this.fetchSetup(context,initParams);
@@ -81,5 +72,4 @@ class FetchLoader {
     });
   }
 }
-
 export default FetchLoader;

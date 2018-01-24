@@ -6,7 +6,7 @@ npm install
 if [ "${TRAVIS_MODE}" = "build" ]; then
 	npm run build
 elif [ "${TRAVIS_MODE}" = "unitTests" ]; then
-	npm run test:unit
+	npm run test
 elif [ "${TRAVIS_MODE}" = "funcTests" ]; then
 	npm run build
 	n=0
@@ -19,7 +19,7 @@ elif [ "${TRAVIS_MODE}" = "funcTests" ]; then
 			echo "Waiting ${delay} seconds..."
 			sleep $delay
 		fi
-		npm run test:func && break
+		npm run testfunc && break
 		n=$[$n+1]
 	done
 	if [ ${n} = ${maxRetries} ]; then

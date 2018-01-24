@@ -60,10 +60,9 @@ class DemuxerInline {
   pushDecrypted(data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS) {
     var demuxer = this.demuxer;
     if (!demuxer ||
-      // in case of continuity change, or track switch
-      // we might switch from content type (AAC container to TS container, or TS to fmp4 for example)
+      // in case of continuity change, we might switch from content type (AAC container to TS container for example)
       // so let's check that current demuxer is still valid
-      ((discontinuity || trackSwitch) && !this.probe(data))) {
+      (discontinuity && !this.probe(data))) {
       const observer = this.observer;
       const typeSupported = this.typeSupported;
       const config = this.config;

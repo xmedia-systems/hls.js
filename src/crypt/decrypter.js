@@ -8,18 +8,14 @@ import {logger} from '../utils/logger';
 /*globals self: false */
 
 class Decrypter {
-  constructor(observer, config, { removePKCS7Padding = true } = {}) {
-    this.logEnabled = true;
+  constructor(observer,config) {
     this.observer = observer;
     this.config = config;
-    this.removePKCS7Padding = removePKCS7Padding;
-    // built in decryptor expects PKCS7 padding
-    if (removePKCS7Padding) {
-      try {
-        const browserCrypto = crypto ? crypto : self.crypto;
-        this.subtle = browserCrypto.subtle || browserCrypto.webkitSubtle;
-      } catch (e) {}
-    }
+    this.logEnabled = true;
+    try {
+      const browserCrypto = crypto ? crypto : self.crypto;
+      this.subtle = browserCrypto.subtle || browserCrypto.webkitSubtle;
+    } catch (e) {}
     this.disableWebCrypto = !this.subtle;
   }
 
@@ -38,7 +34,7 @@ class Decrypter {
         this.decryptor = decryptor = new AESDecryptor();
       }
       decryptor.expandKey(key);
-      callback(decryptor.decrypt(data, 0, iv, this.removePKCS7Padding));
+      callback(decryptor.decrypt(data, 0, iv));
     }
     else {
       if (this.logEnabled) {
