@@ -65,7 +65,7 @@ const WebVTTParser = {
         let vttLines = utf8ArrayToStr(new Uint8Array(vttByteArray)).trim().replace(re, '\n').split('\n');
         let cueTime = '00:00.000';
         let mpegTs = 0;
-        let localTime = undefined;
+        let localTime;
         let presentationTime = 0;
         let cues = [];
         let parsingError;
