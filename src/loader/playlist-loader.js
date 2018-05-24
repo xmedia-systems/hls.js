@@ -128,8 +128,9 @@ class PlaylistLoader extends EventHandler {
   }
 
   resetInternalLoader (contextType) {
-    if (this.loaders[contextType])
+    if (this.loaders[contextType]) {
       delete this.loaders[contextType];
+    }
   }
 
   /**
@@ -138,8 +139,9 @@ class PlaylistLoader extends EventHandler {
   destroyInternalLoaders () {
     for (let contextType in this.loaders) {
       let loader = this.loaders[contextType];
-      if (loader)
+      if (loader) {
         loader.destroy();
+      }
 
       this.resetInternalLoader(contextType);
     }
@@ -257,10 +259,11 @@ class PlaylistLoader extends EventHandler {
     }
 
     // Check if chunk-list or master. handle empty chunk list case (first EXTINF not signaled, but TARGETDURATION present)
-    if (string.indexOf('#EXTINF:') > 0 || string.indexOf('#EXT-X-TARGETDURATION:') > 0)
+    if (string.indexOf('#EXTINF:') > 0 || string.indexOf('#EXT-X-TARGETDURATION:') > 0) {
       this._handleTrackOrLevelPlaylist(response, stats, context, networkDetails);
-    else
+    } else {
       this._handleMasterPlaylist(response, stats, context, networkDetails);
+    }
   }
 
   loaderror (response, context, networkDetails = null) {
@@ -298,8 +301,9 @@ class PlaylistLoader extends EventHandler {
       // check if we have found an audio track embedded in main playlist (audio track without URI attribute)
       let embeddedAudioFound = false;
       audioTracks.forEach(audioTrack => {
-        if (!audioTrack.url)
+        if (!audioTrack.url) {
           embeddedAudioFound = true;
+        }
       });
 
       // if no embedded audio track defined, but audio codec signaled in quality level,
@@ -333,10 +337,11 @@ class PlaylistLoader extends EventHandler {
 
     const url = PlaylistLoader.getResponseUrl(response, context);
 
-    const levelId = !isNaN(level) ? level : !isNaN(id) ? id : 0; // level -> id -> 0
+    const levelUrlId = isNaN(id) ? 0 : id;
+    const levelId = isNaN(level) ? levelUrlId : level; // level -> id -> 0
     const levelType = PlaylistLoader.mapContextToLevelType(context);
 
-    const levelDetails = M3U8Parser.parseLevelPlaylist(response.data, url, levelId, levelType);
+    const levelDetails = M3U8Parser.parseLevelPlaylist(response.data, url, levelId, levelType, levelUrlId);
     // set stats on level structure
     levelDetails.tload = stats.tload;
 
@@ -404,8 +409,9 @@ class PlaylistLoader extends EventHandler {
       const segRefInfo = segmentRef.info;
       const frag = context.levelDetails.fragments[index];
 
-      if (frag.byteRange.length === 0)
+      if (frag.byteRange.length === 0) {
         frag.rawByteRange = String(1 + segRefInfo.end - segRefInfo.start) + '@' + String(segRefInfo.start);
+      }
     });
 
     context.levelDetails.initSegment.rawByteRange = String(sidxInfo.moovEndOffset) + '@0';

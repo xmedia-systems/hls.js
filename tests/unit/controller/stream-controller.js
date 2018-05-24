@@ -2,10 +2,11 @@ import assert from 'assert';
 import sinon from 'sinon';
 import Hls from '../../../src/hls';
 import Event from '../../../src/events';
-import { FragmentTracker } from '../../../src/helper/fragment-tracker';
+import { FragmentTracker, FragmentState } from '../../../src/controller/fragment-tracker';
 import StreamController, { State } from '../../../src/controller/stream-controller';
 import M3U8Parser from '../../../src/loader/m3u8-parser';
 import { mockFragments } from '../../mocks/data';
+import Fragment from '../../../src/loader/fragment';
 
 describe('StreamController tests', function () {
   let hls;
@@ -105,6 +106,7 @@ describe('StreamController tests', function () {
       assert.equal(foundFragment, mockFragments[3], 'Expected sn 3, found sn segment ' + resultSN);
     });
 
+    // TODO: This test fails if using a real instance of Hls
     it('SN search choosing the right segment if fragPrevious is not available', function () {
       levelDetails.programDateTime = null;
 
@@ -148,6 +150,61 @@ describe('StreamController tests', function () {
       const expected = fragments[2];
       const actual = streamController._findFragment(0, fragments[1], fragments.length, fragments, bufferEnd, end, levelDetails);
       assert.strictEqual(expected, actual);
+    });
+  });
+
+  describe('fragment loading', function () {
+    function fragStateStub (state) {
+      return sinon.stub(fragmentTracker, 'getState').callsFake(() => state);
+    }
+
+    let triggerSpy;
+    let frag;
+    beforeEach(function () {
+      triggerSpy = sinon.spy(hls, 'trigger');
+      frag = new Fragment();
+    });
+
+    function assertLoadingState (frag) {
+      assert(triggerSpy.calledWith(Event.FRAG_LOADING, { frag }),
+        `Was expecting trigger to be called with FRAG_LOADING, but received ${triggerSpy.notCalled ? 'no calls' : triggerSpy.getCalls()}`);
+      assert.strictEqual(streamController.state, State.FRAG_LOADING);
+    }
+
+    function assertNotLoadingState () {
+      assert(triggerSpy.notCalled);
+      assert(hls.state !== State.FRAG_LOADING);
+    }
+
+    it('should load a complete fragment which has not been previously appended', function () {
+      fragStateStub(FragmentState.NOT_LOADED);
+      streamController._loadFragment(frag);
+      assertLoadingState(frag);
+    });
+
+    it('should load a partial fragment', function () {
+      fragStateStub(FragmentState.PARTIAL);
+      streamController._loadFragment(frag);
+      assertLoadingState(frag);
+    });
+
+    it('should load a frag which has backtracked', function () {
+      fragStateStub(FragmentState.OK);
+      frag.backtracked = true;
+      streamController._loadFragment(frag);
+      assertLoadingState(frag);
+    });
+
+    it('should not load a fragment which has completely & successfully loaded', function () {
+      fragStateStub(FragmentState.OK);
+      streamController._loadFragment(frag);
+      assertNotLoadingState();
+    });
+
+    it('should not load a fragment while it is appending', function () {
+      fragStateStub(FragmentState.APPENDING);
+      streamController._loadFragment(frag);
+      assertNotLoadingState();
     });
   });
 });

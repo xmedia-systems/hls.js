@@ -1,7 +1,7 @@
 import assert from 'assert';
 import sinon from 'sinon';
 import StreamController from '../../../src/controller/stream-controller';
-import { FragmentTracker } from '../../../src/helper/fragment-tracker';
+import { FragmentTracker } from '../../../src/controller/fragment-tracker';
 import Hls from '../../../src/hls';
 import Event from '../../../src/events';
 import { ErrorTypes, ErrorDetails } from '../../../src/errors';
@@ -32,7 +32,7 @@ describe('checkBuffer', function () {
       for (let i = 1; i < config.nudgeMaxRetry; i++) {
         let expected = media.currentTime + (i * config.nudgeOffset);
         streamController._tryNudgeBuffer();
-        assert.equal(expected, media.currentTime);
+        assert.strictEqual(expected, media.currentTime);
       }
       assert(triggerSpy.alwaysCalledWith(Event.ERROR, {
         type: ErrorTypes.MEDIA_ERROR,
@@ -44,7 +44,7 @@ describe('checkBuffer', function () {
     it('should not increment the currentTime if the max amount of nudges has been attempted', function () {
       config.nudgeMaxRetry = 0;
       streamController._tryNudgeBuffer();
-      assert.equal(0, media.currentTime);
+      assert.strictEqual(0, media.currentTime);
       assert(triggerSpy.calledWith(Event.ERROR, {
         type: ErrorTypes.MEDIA_ERROR,
         details: ErrorDetails.BUFFER_STALLED_ERROR,
@@ -175,7 +175,7 @@ describe('checkBuffer', function () {
       mockMedia.buffered.length = 0;
       streamController._checkBuffer();
       assert(seekStub.notCalled);
-      assert.equal(streamController.loadedmetadata, undefined);
+      assert.strictEqual(streamController.loadedmetadata, undefined);
     });
 
     it('should complete the immediate switch if signalled', function () {
@@ -191,12 +191,12 @@ describe('checkBuffer', function () {
       setExpectedPlaying();
       streamController._checkBuffer();
 
-      // The first _checkBuffer call made while stalling just sets the stall time
-      assert.equal(typeof streamController.stalled, 'number');
+      // The first _checkBuffer call made while stalling just sets stall flags
+      assert.strictEqual(typeof streamController.stalled, 'number');
       assert.equal(streamController.stallReported, false);
 
       streamController._checkBuffer();
-      assert.ok(fixStallStub.calledOnce);
+      assert(fixStallStub.calledOnce);
     });
 
     it('should reset stall flags when no longer stalling', function () {
@@ -208,13 +208,13 @@ describe('checkBuffer', function () {
       const fixStallStub = sandbox.stub(streamController, '_tryFixBufferStall');
       streamController._checkBuffer();
 
-      assert.equal(streamController.stalled, null);
-      assert.equal(streamController.nudgeRetry, 0);
-      assert.equal(streamController.stallReported, false);
+      assert.strictEqual(streamController.stalled, null);
+      assert.strictEqual(streamController.nudgeRetry, 0);
+      assert.strictEqual(streamController.stallReported, false);
       assert(fixStallStub.notCalled);
     });
 
-    it.skip('should trigger reportStall when stalling for 1 second or longer', function () {
+    it('should trigger reportStall when stalling for 1 second or longer', function () {
       setExpectedPlaying();
       const clock = sandbox.useFakeTimers(0);
       clock.tick(1000);

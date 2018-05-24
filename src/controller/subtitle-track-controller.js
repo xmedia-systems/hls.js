@@ -11,8 +11,9 @@ function filterSubtitleTracks (textTrackList) {
   for (let i = 0; i < textTrackList.length; i++) {
     const track = textTrackList[i];
     // Edge adds a track without a label; we don't want to use it
-    if (track.kind === 'subtitles' && track.label)
+    if (track.kind === 'subtitles' && track.label) {
       tracks.push(textTrackList[i]);
+    }
   }
   return tracks;
 }
@@ -37,8 +38,9 @@ class SubtitleTrackController extends EventHandler {
 
   _onTextTracksChanged () {
     // Media is undefined when switching streams via loadSource()
-    if (!this.media || !this.hls.config.renderNatively)
+    if (!this.media || !this.hls.config.renderNatively) {
       return;
+    }
 
     let trackId = -1;
     let tracks = filterSubtitleTracks(this.media.textTracks);
@@ -63,8 +65,9 @@ class SubtitleTrackController extends EventHandler {
   // Listen for subtitle track change, then extract the current track ID.
   onMediaAttached (data) {
     this.media = data.media;
-    if (!this.media)
+    if (!this.media) {
       return;
+    }
 
     if (this.queuedDefaultTrack) {
       this.subtitleTrack = this.queuedDefaultTrack;
@@ -84,13 +87,15 @@ class SubtitleTrackController extends EventHandler {
   }
 
   onMediaDetaching () {
-    if (!this.media)
+    if (!this.media) {
       return;
+    }
 
-    if (this.useTextTrackPolling)
+    if (this.useTextTrackPolling) {
       clearInterval(this.subtitlePollingInterval);
-    else
+    } else {
       this.media.textTracks.removeEventListener('change', this.trackChangeListener);
+    }
 
     this.media = null;
   }
@@ -116,10 +121,11 @@ class SubtitleTrackController extends EventHandler {
         // if media has not been attached yet, it will fail
         // we keep a reference to the default track id
         // and we'll set subtitleTrack when onMediaAttached is triggered
-        if (this.media)
+        if (this.media) {
           this.subtitleTrack = track.id;
-        else
+        } else {
           this.queuedDefaultTrack = track.id;
+        }
       }
     });
   }
@@ -128,8 +134,9 @@ class SubtitleTrackController extends EventHandler {
   onTick () {
     const trackId = this.trackId;
     const subtitleTrack = this.tracks[trackId];
-    if (!subtitleTrack)
+    if (!subtitleTrack) {
       return;
+    }
 
     const details = subtitleTrack.details;
     // check if we need to load playlist for this subtitle Track
@@ -184,15 +191,17 @@ class SubtitleTrackController extends EventHandler {
    */
   setSubtitleTrackInternal (newId) {
     const { hls, tracks } = this;
-    if (typeof newId !== 'number' || newId < -1 || newId >= tracks.length)
+    if (typeof newId !== 'number' || newId < -1 || newId >= tracks.length) {
       return;
+    }
 
     this._stopTimer();
     this.trackId = newId;
     logger.log(`switching to subtitle track ${newId}`);
     hls.trigger(Event.SUBTITLE_TRACK_SWITCH, { id: newId });
-    if (newId === -1)
+    if (newId === -1) {
       return;
+    }
 
     // check if we need to load playlist for this subtitle Track
     const subtitleTrack = tracks[newId];
@@ -201,6 +210,44 @@ class SubtitleTrackController extends EventHandler {
       // track not retrieved yet, or live playlist we need to (re)load it
       logger.log(`(re)loading playlist for subtitle track ${newId}`);
       hls.trigger(Event.SUBTITLE_TRACK_LOADING, { url: subtitleTrack.url, id: newId });
+    }
+  }
+
+  _stopTimer () {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  /**
+   * Disables the old subtitleTrack and sets current mode on the next subtitleTrack.
+   * This operates on the DOM textTracks.
+   * A value of -1 will disable all subtitle tracks.
+   * @param newId - The id of the next track to enable
+   * @private
+   */
+  _toggleTrackModes (newId) {
+    const { media, subtitleDisplay, trackId } = this;
+    if (!media) {
+      return;
+    }
+
+    const textTracks = filterSubtitleTracks(media.textTracks);
+    if (newId === -1) {
+      [].slice.call(textTracks).forEach(track => {
+        track.mode = 'disabled';
+      });
+    } else {
+      const oldTrack = textTracks[trackId];
+      if (oldTrack) {
+        oldTrack.mode = 'disabled';
+      }
+    }
+
+    const nextTrack = textTracks[newId];
+    if (nextTrack) {
+      nextTrack.mode = subtitleDisplay ? 'showing' : 'hidden';
     }
   }
 
