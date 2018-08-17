@@ -170,11 +170,10 @@ class StreamController extends TaskLoop {
   // NOTE: Maybe we could rather schedule a check for buffer length after half of the currently
   //       played segment, or on pause/play/seek instead of naively checking every 100ms?
   _doTickIdle () {
-    const hls = this.hls,
-      config = hls.config,
-      media = this.media;
+    const { hls, media } = this;
+    const config = hls.config;
 
-    // if start level not parsed yet OR
+      // if start level not parsed yet OR
     // if video not attached AND start fragment already requested OR start frag prefetch disable
     // exit loop, as we either need more info (level not parsed) or we need media to be attached to load new fragment
     if (this.levelLastLoaded === undefined || (
@@ -189,18 +188,16 @@ class StreamController extends TaskLoop {
       pos = this.nextLoadPosition;
 
     // determine next load level
-    let level = hls.nextLoadLevel,
-      levelInfo = this.levels[level];
+    const level = hls.nextLoadLevel;
+    const levelInfo = this.levels[level];
 
     if (!levelInfo)
       return;
 
-    let levelBitrate = levelInfo.bitrate,
-      maxBufLen;
-
     // compute max Buffer Length that we could get from this load level, based on level bitrate. don't buffer more than 60 MB and more than 30s
-    if (levelBitrate)
-      maxBufLen = Math.max(8 * config.maxBufferSize / levelBitrate, config.maxBufferLength);
+    let maxBufLen;
+    if (levelInfo.bitrate)
+      maxBufLen = Math.max(8 * config.maxBufferSize / levelInfo.bitrate, config.maxBufferLength);
     else
       maxBufLen = config.maxBufferLength;
 
@@ -209,8 +206,8 @@ class StreamController extends TaskLoop {
     // determine next candidate fragment to be loaded, based on current position and end of buffer position
     // ensure up to `config.maxMaxBufferLength` of buffer upfront
 
-    const bufferInfo = BufferHelper.bufferInfo(this.mediaBuffer ? this.mediaBuffer : media, pos, config.maxBufferHole),
-      bufferLen = bufferInfo.len;
+    const bufferInfo = BufferHelper.bufferInfo(this.mediaBuffer ? this.mediaBuffer : media, pos, config.maxBufferHole);
+    const bufferLen = bufferInfo.len;
     // Stay idle if we are still with buffer margins
     if (bufferLen >= maxBufLen)
       return;
@@ -680,9 +677,8 @@ class StreamController extends TaskLoop {
     media.addEventListener('seeked', this.onvseeked);
     media.addEventListener('ended', this.onvended);
     let config = this.config;
-    if (this.levels && config.autoStartLoad) {
+    if (this.levels && config.autoStartLoad)
       this.hls.startLoad(config.startPosition);
-    }
 
     this.gapController = new GapController(config, media, this.fragmentTracker, this.hls);
   }
