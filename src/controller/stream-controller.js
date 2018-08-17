@@ -173,7 +173,7 @@ class StreamController extends TaskLoop {
     const { hls, media } = this;
     const config = hls.config;
 
-      // if start level not parsed yet OR
+    // if start level not parsed yet OR
     // if video not attached AND start fragment already requested OR start frag prefetch disable
     // exit loop, as we either need more info (level not parsed) or we need media to be attached to load new fragment
     if (this.levelLastLoaded === undefined || (
