@@ -173,7 +173,7 @@ class StreamController extends TaskLoop {
     const { hls, media } = this;
     const config = hls.config;
 
-    // if start level not parsed yet OR
+      // if start level not parsed yet OR
     // if video not attached AND start fragment already requested OR start frag prefetch disable
     // exit loop, as we either need more info (level not parsed) or we need media to be attached to load new fragment
     if (this.levelLastLoaded === undefined || (
@@ -206,7 +206,7 @@ class StreamController extends TaskLoop {
     // determine next candidate fragment to be loaded, based on current position and end of buffer position
     // ensure up to `config.maxMaxBufferLength` of buffer upfront
 
-    const bufferInfo = BufferHelper.bufferInfo(this.mediaBuffer ? this.mediaBuffer : media, pos, config.maxBufferHole);
+    const bufferInfo = BufferHelper.bufferInfo(media, pos, config.maxBufferHole);
     const bufferLen = bufferInfo.len;
     // Stay idle if we are still with buffer margins
     if (bufferLen >= maxBufLen)
