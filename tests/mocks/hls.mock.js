@@ -21,14 +21,14 @@ const publicMethods = [
 export default class HlsMock {
   // TODO: static properties
 
-  constructor (config) {
+  constructor (config, sandbox) {
     // Mock arguments can at will override the default config
     // and have to specify things that are not in the default config
     this.config = Object.assign({}, Hls.DefaultConfig, config);
 
     // stub public API with spies
     publicMethods.forEach((methodName) => {
-      this[methodName] = sinon.stub();
+      this[methodName] = sandbox ? sandbox.spy() : sinon.spy();
     });
   }
 
