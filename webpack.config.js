@@ -18,8 +18,7 @@ const baseConfig = {
   entry: './src/hls.js',
   node: false,
   optimization: {
-    splitChunks: false.valueOf(),
-
+    splitChunks: false
   },
   module: {
     strictExportPresence: true,
@@ -37,8 +36,8 @@ const baseConfig = {
                     // Output the babel targets/plugins used
                     // https://babeljs.io/docs/plugins/preset-env/#debug
                     // debug: true,
-                    modules: false,
                     loose: true,
+                    modules: 'commonjs',
                     targets: {
                         browsers: [
                             'chrome >= 55',
@@ -48,10 +47,7 @@ const baseConfig = {
                             'ios >= 8',
                             'android >= 4'
                         ]
-                    },
-                    plugins: [
-                        'transform-object-assign'
-                    ]
+                    }
                 }]
             ],
           plugins: [
@@ -62,7 +58,8 @@ const baseConfig = {
                     espath.node.callee = file.addImport(path.resolve('src/polyfills/number-isFinite'), 'isFiniteNumber');
                 }
               }
-            }
+            },
+            'transform-object-assign'
           ]
         }
       }
