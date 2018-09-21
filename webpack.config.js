@@ -2,8 +2,6 @@ const pkgJson = require('./package.json');
 const path = require('path');
 const webpack = require('webpack');
 
-const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
-
 const clone = (...args) => Object.assign({}, ...args);
 
 /* Allow to customise builds through env-vars */
@@ -12,7 +10,6 @@ const env = process.env;
 const addSubtitleSupport = !!env.SUBTITLE || !!env.USE_SUBTITLES;
 const addAltAudioSupport = !!env.ALT_AUDIO || !!env.USE_ALT_AUDIO;
 const addEMESupport = false;
-const runAnalyzer = !!env.ANALYZE;
 
 const uglifyJsOptions = {
   screwIE8: true,
@@ -77,12 +74,6 @@ function getPluginsForConfig (type, minify = false) {
 
   const defineConstants = getConstantsForConfig(type);
 
-  console.log(
-    `Building <${minify ? 'minified' : 'non-minified / debug'}> distro-type "${type}" with compile-time defined constants:`,
-    JSON.stringify(defineConstants, null, 4),
-    '\n'
-  );
-
   const plugins = [
     new webpack.BannerPlugin({ entryOnly: true, raw: true, banner: 'typeof window !== "undefined" &&' }), // SSR/Node.js guard
     new webpack.optimize.OccurrenceOrderPlugin(),
@@ -100,16 +91,7 @@ function getPluginsForConfig (type, minify = false) {
     ]);
   }
 
-  if (runAnalyzer && !minify) {
-    plugins.push(new BundleAnalyzerPlugin({
-      analyzerMode: 'static',
-      reportFilename: `bundle-analyzer-report.${type}.html`
-    }));
-  } else {
-    // https://github.com/webpack-contrib/webpack-bundle-analyzer/issues/115
-    plugins.push(new webpack.optimize.ModuleConcatenationPlugin());
-  }
-
+  plugins.push(new webpack.optimize.ModuleConcatenationPlugin());
   return plugins;
 }
 
@@ -231,10 +213,6 @@ module.exports = (envArgs) => {
   const enabledConfigName = Object.keys(envArgs).find(envName => envArgs[envName]);
   // Filter out config with name
   const enabledConfig = multiConfig.find(config => config.name === enabledConfigName);
-  if (!enabledConfig) {
-    console.error(`Couldn't find a valid config with the name "${enabledConfigName}". Known configs are: ${multiConfig.map(config => config.name).join(', ')}`);
-    return;
-  }
 
   return [enabledConfig, demoConfig];
 };
