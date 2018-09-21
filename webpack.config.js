@@ -10,11 +10,17 @@ const buildConstants = {
 };
 
 const plugins = [
-    new webpack.DefinePlugin(buildConstants)
+    new webpack.DefinePlugin(buildConstants),
+    new webpack.optimize.ModuleConcatenationPlugin()
 ];
 
 const baseConfig = {
   entry: './src/hls.js',
+  node: false,
+  optimization: {
+    splitChunks: false.valueOf(),
+
+  },
   module: {
     strictExportPresence: true,
     rules: [
@@ -25,6 +31,29 @@ const baseConfig = {
         ],
         loader: 'babel-loader',
         options: {
+            babelrc: false,
+            presets: [
+                ['env', {
+                    // Output the babel targets/plugins used
+                    // https://babeljs.io/docs/plugins/preset-env/#debug
+                    // debug: true,
+                    modules: false,
+                    loose: true,
+                    targets: {
+                        browsers: [
+                            'chrome >= 55',
+                            'firefox >= 51',
+                            'ie >= 11',
+                            'safari >= 8',
+                            'ios >= 8',
+                            'android >= 4'
+                        ]
+                    },
+                    plugins: [
+                        'transform-object-assign'
+                    ]
+                }]
+            ],
           plugins: [
             {
               visitor: {
