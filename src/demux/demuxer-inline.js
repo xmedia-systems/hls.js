@@ -1,5 +1,3 @@
-/* global self */
-
 import Event from '../events';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import Decrypter from '../crypt/decrypter';

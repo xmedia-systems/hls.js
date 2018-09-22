@@ -1,5 +1,3 @@
-/* global self */
-
 import AESCrypto from './aes-crypto';
 import FastAESKey from './fast-aes-key';
 import AESDecryptor from './aes-decryptor';

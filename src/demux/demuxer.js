@@ -1,5 +1,3 @@
-/* global self */
-
 import EventEmitter from 'events';
 import work from 'webworkify-webpack';
 

@@ -1,4 +1,4 @@
-/* global self */
+/* eslint-env worker */
 
 function noop () {}
 
