@@ -1,5 +1,4 @@
 /* global self */
-// This module may run in a webworker. In a worker 'window' is undefined; 'self' must be used
 
 import AESCrypto from './aes-crypto';
 import FastAESKey from './fast-aes-key';
