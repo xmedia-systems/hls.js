@@ -7,11 +7,6 @@ import { logger } from '../utils/logger';
 
 import Event from '../events';
 
-import { getSelfScope } from '../utils/get-self-scope';
-
-// see https://stackoverflow.com/a/11237259/589493
-const global = getSelfScope(); // safeguard for code that might run both on worker and main thread
-
 class Decrypter {
   constructor (observer, config, { removePKCS7Padding = true } = {}) {
     this.logEnabled = true;
@@ -21,7 +16,7 @@ class Decrypter {
     // built in decryptor expects PKCS7 padding
     if (removePKCS7Padding) {
       try {
-        const browserCrypto = global.crypto;
+        const browserCrypto = self.crypto;
         if (browserCrypto) {
           this.subtle = browserCrypto.subtle || browserCrypto.webkitSubtle;
         }

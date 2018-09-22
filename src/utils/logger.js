@@ -1,5 +1,3 @@
-import { getSelfScope } from './get-self-scope';
-
 function noop () {}
 
 const fakeLogger = {
@@ -27,17 +25,15 @@ function formatMsg (type, msg) {
   return msg;
 }
 
-const global = getSelfScope();
-
 function consolePrintFn (type) {
-  const func = global.console[type];
+  const func = self.console[type];
   if (func) {
     return function (...args) {
       if (args[0]) {
         args[0] = formatMsg(type, args[0]);
       }
 
-      func.apply(global.console, args);
+      func.apply(self.console, args);
     };
   }
   return noop;

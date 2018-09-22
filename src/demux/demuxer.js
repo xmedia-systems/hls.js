@@ -6,10 +6,7 @@ import DemuxerInline from '../demux/demuxer-inline';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { getMediaSource } from '../utils/mediasource-helper';
-import { getSelfScope } from '../utils/get-self-scope';
 
-// see https://stackoverflow.com/a/11237259/589493
-const global = getSelfScope(); // safeguard for code that might run both on worker and main thread
 const MediaSource = getMediaSource();
 
 class Demuxer {
@@ -67,7 +64,7 @@ class Demuxer {
         logger.error('error while initializing DemuxerWorker, fallback on DemuxerInline');
         if (w) {
           // revoke the Object URL that was used to create demuxer worker, so as not to leak it
-          global.URL.revokeObjectURL(w.objectURL);
+          self.URL.revokeObjectURL(w.objectURL);
         }
         this.demuxer = new DemuxerInline(observer, typeSupported, config, vendor);
         this.w = undefined;
