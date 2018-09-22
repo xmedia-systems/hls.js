@@ -37,7 +37,7 @@ const baseConfig = {
                     // https://babeljs.io/docs/plugins/preset-env/#debug
                     // debug: true,
                     loose: true,
-                    modules: 'commonjs',
+                    modules: false,
                     targets: {
                         browsers: [
                             'chrome >= 55',
