@@ -1,3 +1,6 @@
+/* global self */
+// This module may run in a webworker. In a worker 'window' is undefined; 'self' must be used
+
 import EventEmitter from 'events';
 import work from 'webworkify-webpack';
 

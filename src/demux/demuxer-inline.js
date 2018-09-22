@@ -1,9 +1,5 @@
-/**
- *
- * inline demuxer: probe fragments and instantiate
- * appropriate demuxer depending on content type (TSDemuxer, AACDemuxer, ...)
- *
- */
+/* global self */
+// This module may run in a webworker. In a worker 'window' is undefined; 'self' must be used
 
 import Event from '../events';
 import { ErrorTypes, ErrorDetails } from '../errors';
@@ -14,7 +10,6 @@ import TSDemuxer from '../demux/tsdemuxer';
 import MP3Demuxer from '../demux/mp3demuxer';
 import MP4Remuxer from '../remux/mp4-remuxer';
 import PassThroughRemuxer from '../remux/passthrough-remuxer';
-
 
 const performance = self.performance;
 
