@@ -22,7 +22,6 @@
     "test:watch": "karma start karma.conf.js --auto-watch --no-single-run"
   },
   "dependencies": {
-    "babel-preset-es2015": "^6.24.1",
     "url-toolkit": "^2.1.2"
   },
   "devDependencies": {
