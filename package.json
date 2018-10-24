@@ -70,6 +70,7 @@
     "sinon": "^4.1.3",
     "webpack": "^4.19.1",
     "webpack-bundle-analyzer": "^2.9.1",
+    "webpack-cli": "^3.1.2",
     "webpack-dev-server": "^2.7.1",
     "webworkify-webpack": "git+ssh://git@github.com:johnBartos/webworkify-webpack.git#refs/heads/master"
   }
