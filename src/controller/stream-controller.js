@@ -92,11 +92,11 @@ class StreamController extends TaskLoop {
           } else {
             startLevel = hls.nextAutoLevel;
           }
-          // set new level to playlist loader : this will trigger start level load
-          // hls.nextLoadLevel remains until it is set to a new value or until a new frag is successfully loaded
-          this.level = hls.nextLoadLevel = startLevel;
-          this.loadedmetadata = false;
         }
+        // set new level to playlist loader : this will trigger start level load
+        // hls.nextLoadLevel remains until it is set to a new value or until a new frag is successfully loaded
+        this.level = hls.nextLoadLevel = startLevel;
+        this.loadedmetadata = false;
       }
       // if startPosition undefined but lastCurrentTime set, set startPosition to last currentTime
       if (lastCurrentTime > 0 && startPosition === -1) {
