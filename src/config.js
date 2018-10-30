@@ -90,7 +90,7 @@ export var hlsDefaultConfig = {
   emeEnabled: false, // used by eme-controller
   widevineLicenseUrl: undefined, // used by eme-controller
   requestMediaKeySystemAccessFunc: requestMediaKeySystemAccess, // used by eme-controller
-  testBitrate: true
+  testBandwidth: true
 };
 
 if (__USE_SUBTITLES__) {

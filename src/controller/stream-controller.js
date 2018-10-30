@@ -85,7 +85,7 @@ class StreamController extends TaskLoop {
         // determine load level
         let startLevel = hls.startLevel;
         if (startLevel === -1) {
-          if (hls.config.testBitrate) {
+          if (hls.config.testBandwidth) {
             // -1 : guess start Level by doing a bitrate test by loading first fragment of lowest quality level
             startLevel = 0;
             this.bitrateTest = true;
