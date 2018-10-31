@@ -55,12 +55,13 @@ class StreamController extends TaskLoop {
       Event.LEVELS_UPDATED
     );
 
-    this.fragmentTracker = fragmentTracker;
-    this.config = hls.config;
     this.audioCodecSwap = false;
-    this._state = State.STOPPED;
-    this.stallReported = false;
+    this.bitrateTest = false;
+    this.config = hls.config;
+    this.fragmentTracker = fragmentTracker;
     this.gapController = null;
+    this.stallReported = false;
+    this._state = State.STOPPED;
   }
 
   onHandlerDestroying () {
