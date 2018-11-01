@@ -1,11 +1,11 @@
 import SubtitleTrackController from '../../../src/controller/subtitle-track-controller';
 import Hls from '../../../src/hls';
 
-describe('SubtitleTrackController', () => {
+describe('SubtitleTrackController', function () {
   let subtitleTrackController;
   let videoElement;
 
-  beforeEach(() => {
+  beforeEach(function () {
     const hls = new Hls({
       renderNatively: true
     });
@@ -23,8 +23,8 @@ describe('SubtitleTrackController', () => {
     textTrack2.mode = 'disabled';
   });
 
-  describe('onTextTrackChanged', () => {
-    it('should set subtitleTrack to -1 if disabled', () => {
+  describe('onTextTrackChanged', function () {
+    it('should set subtitleTrack to -1 if disabled', function () {
       expect(subtitleTrackController.subtitleTrack).to.equal(-1);
 
       videoElement.textTracks[0].mode = 'disabled';
@@ -33,7 +33,7 @@ describe('SubtitleTrackController', () => {
       expect(subtitleTrackController.subtitleTrack).to.equal(-1);
     });
 
-    it('should set subtitleTrack to 0 if hidden', () => {
+    it('should set subtitleTrack to 0 if hidden', function () {
       expect(subtitleTrackController.subtitleTrack).to.equal(-1);
 
       videoElement.textTracks[0].mode = 'hidden';
@@ -42,7 +42,7 @@ describe('SubtitleTrackController', () => {
       expect(subtitleTrackController.subtitleTrack).to.equal(0);
     });
 
-    it('should set subtitleTrack to 0 if showing', () => {
+    it('should set subtitleTrack to 0 if showing', function () {
       expect(subtitleTrackController.subtitleTrack).to.equal(-1);
 
       videoElement.textTracks[0].mode = 'showing';
@@ -52,8 +52,8 @@ describe('SubtitleTrackController', () => {
     });
   });
 
-  describe('set subtitleTrack', () => {
-    it('should set active text track mode to showing', () => {
+  describe('set subtitleTrack', function () {
+    it('should set active text track mode to showing', function () {
       videoElement.textTracks[0].mode = 'disabled';
 
       subtitleTrackController.subtitleDisplay = true;
@@ -62,7 +62,7 @@ describe('SubtitleTrackController', () => {
       expect(videoElement.textTracks[0].mode).to.equal('showing');
     });
 
-    it('should set active text track mode to hidden', () => {
+    it('should set active text track mode to hidden', function () {
       videoElement.textTracks[0].mode = 'disabled';
       subtitleTrackController.subtitleDisplay = false;
       subtitleTrackController.subtitleTrack = 0;
@@ -70,7 +70,7 @@ describe('SubtitleTrackController', () => {
       expect(videoElement.textTracks[0].mode).to.equal('hidden');
     });
 
-    it('should disable previous track', () => {
+    it('should disable previous track', function () {
       // Change active track without triggering setSubtitleTrackInternal
       subtitleTrackController.trackId = 0;
       // Change active track and trigger setSubtitleTrackInternal

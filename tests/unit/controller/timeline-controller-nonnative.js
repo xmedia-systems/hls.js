@@ -4,11 +4,11 @@ const sinon = require('sinon');
 
 const assert = require('assert');
 
-describe('Non-Native TimelineController functions', () => {
+describe('Non-Native TimelineController functions', function () {
   let timelineController;
   let hls;
 
-  beforeEach(() => {
+  beforeEach(function () {
     hls = new Hls();
     hls.config.renderNatively = false;
     hls.config.enableWebVTT = true;

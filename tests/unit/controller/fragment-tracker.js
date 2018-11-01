@@ -39,8 +39,8 @@ function loadFragmentAndBuffered (hls, fragment) {
   loadFragment(hls, fragment);
   hls.trigger(Event.FRAG_BUFFERED, { frag: fragment });
 }
-describe('FragmentTracker', () => {
-  describe('getPartialFragment', () => {
+describe('FragmentTracker', function () {
+  describe('getPartialFragment', function () {
     let hls, fragmentTracker, fragment, buffered, partialFragment, timeRanges;
 
     hls = new Hls({});
@@ -70,7 +70,7 @@ describe('FragmentTracker', () => {
 
     hls.trigger(Event.FRAG_BUFFERED, { stats: { aborted: true }, id: 'main', frag: fragment });
 
-    it('detects fragments that partially loaded', () => {
+    it('detects fragments that partially loaded', function () {
       // Get the partial fragment at a time
       partialFragment = fragmentTracker.getPartialFragment(0);
       expect(partialFragment).to.equal(fragment);
@@ -79,19 +79,19 @@ describe('FragmentTracker', () => {
       partialFragment = fragmentTracker.getPartialFragment(1);
       expect(partialFragment).to.equal(fragment);
     });
-    it('returns null when time is not inside partial fragment', () => {
+    it('returns null when time is not inside partial fragment', function () {
       partialFragment = fragmentTracker.getPartialFragment(1.5);
       expect(partialFragment).to.not.exist;
     });
   });
 
-  describe('getState', () => {
+  describe('getState', function () {
     let hls, fragmentTracker, fragment, buffered, timeRanges;
 
     hls = new Hls({});
     fragmentTracker = new FragmentTracker(hls);
 
-    let addFragment = () => {
+    let addFragment = function () {
       fragment = createMockFragment({
         startPTS: 0,
         endPTS: 1,
@@ -102,12 +102,12 @@ describe('FragmentTracker', () => {
       hls.trigger(Event.FRAG_LOADED, { frag: fragment });
     };
 
-    it('detects fragments that never loaded', () => {
+    it('detects fragments that never loaded', function () {
       addFragment();
       expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.APPENDING);
     });
 
-    it('detects fragments that loaded properly', () => {
+    it('detects fragments that loaded properly', function () {
       addFragment();
       buffered = createMockBuffer([
         {
@@ -126,7 +126,7 @@ describe('FragmentTracker', () => {
       expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.OK);
     });
 
-    it('detects partial fragments', () => {
+    it('detects partial fragments', function () {
       addFragment();
       buffered = createMockBuffer([
         {
@@ -144,7 +144,7 @@ describe('FragmentTracker', () => {
       expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.PARTIAL);
     });
 
-    it('removes evicted partial fragments', () => {
+    it('removes evicted partial fragments', function () {
       addFragment();
       buffered = createMockBuffer([
         {
@@ -181,7 +181,7 @@ describe('FragmentTracker', () => {
     let hls;
     /** @type {FragmentTracker} */
     let fragmentTracker;
-    beforeEach(() => {
+    beforeEach(function () {
       hls = new Hls({});
       fragmentTracker = new FragmentTracker(hls);
     });
@@ -288,13 +288,13 @@ describe('FragmentTracker', () => {
     });
   });
 
-  describe('onFragBuffered', () => {
+  describe('onFragBuffered', function () {
     let hls, fragmentTracker, fragment, timeRanges;
 
     hls = new Hls({});
     fragmentTracker = new FragmentTracker(hls);
 
-    it('supports audio buffer', () => {
+    it('supports audio buffer', function () {
       fragment = createMockFragment({
         startPTS: 0,
         endPTS: 1,
@@ -324,7 +324,7 @@ describe('FragmentTracker', () => {
       expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.PARTIAL);
     });
 
-    it('supports video buffer', () => {
+    it('supports video buffer', function () {
       fragment = createMockFragment({
         startPTS: 0,
         endPTS: 1,
@@ -354,7 +354,7 @@ describe('FragmentTracker', () => {
       expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.PARTIAL);
     });
 
-    it('supports audio only buffer', () => {
+    it('supports audio only buffer', function () {
       fragment = createMockFragment({
         startPTS: 0,
         endPTS: 1,
@@ -385,16 +385,16 @@ describe('FragmentTracker', () => {
     });
   });
 
-  describe('removeFragment', () => {
+  describe('removeFragment', function () {
     /** @type {Hls} */
     let hls;
     /** @type {FragmentTracker} */
     let fragmentTracker;
-    beforeEach(() => {
+    beforeEach(function () {
       hls = new Hls({});
       fragmentTracker = new FragmentTracker(hls);
     });
-    it('should remove fragment', () => {
+    it('should remove fragment', function () {
       const fragment = createMockFragment({
         startPTS: 0,
         endPTS: 1,
@@ -411,16 +411,16 @@ describe('FragmentTracker', () => {
       expect(fragmentTracker.hasFragment(fragment)).to.be.false;
     });
   });
-  describe('removeAllFragments', () => {
+  describe('removeAllFragments', function () {
     /** @type {Hls} */
     let hls;
     /** @type {FragmentTracker} */
     let fragmentTracker;
-    beforeEach(() => {
+    beforeEach(function () {
       hls = new Hls({});
       fragmentTracker = new FragmentTracker(hls);
     });
-    it('should remove all fragments', () => {
+    it('should remove all fragments', function () {
       const fragments = [
         // 0-1
         createMockFragment({

@@ -3,25 +3,25 @@ import HlsMock from '../../mocks/hls.mock';
 import Event from '../../../src/events';
 import { ErrorTypes, ErrorDetails } from '../../../src/errors';
 
-describe('LevelController', () => {
+describe('LevelController', function () {
   const sandbox = sinon.createSandbox();
   let hls;
   let levelController;
   let triggerSpy;
 
-  beforeEach(() => {
+  beforeEach(function () {
     hls = new HlsMock({}, sandbox);
     levelController = new LevelController(hls);
     triggerSpy = hls.trigger;
   });
 
-  afterEach(() => {
+  afterEach(function () {
     hls = null;
     levelController = null;
     sandbox.restore();
   });
 
-  it('should trigger level switch when level is manually set', () => {
+  it('should trigger level switch when level is manually set', function () {
     let data = {
       audioTracks: [],
       levels: [
@@ -55,7 +55,7 @@ describe('LevelController', () => {
   });
 
   describe('onManifestLoaded handler', function () {
-    it('should trigger an error when no levels are found in the manifest', () => {
+    it('should trigger an error when no levels are found in the manifest', function () {
       levelController.onManifestLoaded({
         audioTracks: [],
         levels: [],
@@ -73,7 +73,7 @@ describe('LevelController', () => {
       });
     });
 
-    it('should trigger hlsManifestParsed when levels are found in the manifest', () => {
+    it('should trigger hlsManifestParsed when levels are found in the manifest', function () {
       let data = {
         audioTracks: [],
         levels: [

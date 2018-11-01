@@ -179,7 +179,7 @@ describe('StreamController tests', function () {
 
     beforeEach(function () {
       streamController.gapController = {
-        poll: () => {}
+        poll: function () {}
       };
       streamController.media = {
         buffered: {

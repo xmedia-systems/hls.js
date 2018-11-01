@@ -1,7 +1,7 @@
 import AudioTrackController from '../../../src/controller/audio-track-controller';
 import Hls from '../../../src/hls';
 
-describe('AudioTrackController', () => {
+describe('AudioTrackController', function () {
   const tracks = [{
     groupId: '1',
     id: 0,
@@ -35,24 +35,24 @@ describe('AudioTrackController', () => {
   let hls;
   let audioTrackController;
 
-  beforeEach(() => {
+  beforeEach(function () {
     hls = new Hls();
     audioTrackController = new AudioTrackController(hls);
   });
 
-  afterEach(() => {
+  afterEach(function () {
     hls.destroy();
   });
 
-  describe('onManifestLoading', () => {
-    it('should reset the tracks list and current trackId', () => {
+  describe('onManifestLoading', function () {
+    it('should reset the tracks list and current trackId', function () {
       audioTrackController.tracks = tracks;
       audioTrackController.onManifestLoading();
       expect(audioTrackController.tracks).to.be.empty;
     });
   });
 
-  describe('onManifestParsed', () => {
+  describe('onManifestParsed', function () {
     it('should set the audioTracks contained in the event data and trigger AUDIO_TRACKS_UPDATED', (done) => {
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (event, data) => {
         expect(data.audioTracks).to.equal(tracks);
@@ -78,8 +78,8 @@ describe('AudioTrackController', () => {
     });
   });
 
-  describe('onAudioTrackLoaded', () => {
-    it('should set the track details from the event data but not set the interval for a non-live track', () => {
+  describe('onAudioTrackLoaded', function () {
+    it('should set the track details from the event data but not set the interval for a non-live track', function () {
       const details = {
         live: false,
         targetduration: 100
@@ -96,7 +96,7 @@ describe('AudioTrackController', () => {
       expect(audioTrackController.hasInterval()).to.be.false;
     });
 
-    it('should set the track details from the event data and set the interval for a live track', () => {
+    it('should set the track details from the event data and set the interval for a live track', function () {
       const details = {
         live: true,
         targetduration: 100
@@ -114,8 +114,8 @@ describe('AudioTrackController', () => {
     });
   });
 
-  describe('onAudioTrackSwitched', () => {
-    it('should update the current audioGroupId', () => {
+  describe('onAudioTrackSwitched', function () {
+    it('should update the current audioGroupId', function () {
       audioTrackController.tracks = tracks;
       audioTrackController.audioGroupId = '2';
       audioTrackController.onAudioTrackSwitched({
@@ -126,7 +126,7 @@ describe('AudioTrackController', () => {
     });
   });
 
-  describe('onLevelLoaded', () => {
+  describe('onLevelLoaded', function () {
     it('should reselect the current track and trigger AUDIO_TRACK_SWITCHING eventually', (done) => {
       hls.on(Hls.Events.AUDIO_TRACK_SWITCHING, (event, data) => {
         done();
@@ -165,7 +165,7 @@ describe('AudioTrackController', () => {
       expect(tracks[audioTrackController.audioTrack].name).to.equal(audioTrackName);
     });
 
-    it('should load audio tracks with a url', () => {
+    it('should load audio tracks with a url', function () {
       const needsTrackLoading = sinon.spy(audioTrackController, '_needsTrackLoading');
       const audioTrackLoadingCallback = sinon.spy();
       const trackWithUrl = {
@@ -197,7 +197,7 @@ describe('AudioTrackController', () => {
       expect(audioTrackLoadingCallback).to.have.been.calledOnce;
     });
 
-    it('should not attempt to load audio tracks without a url', () => {
+    it('should not attempt to load audio tracks without a url', function () {
       const needsTrackLoading = sinon.spy(audioTrackController, '_needsTrackLoading');
       const audioTrackLoadingCallback = sinon.spy();
       const trackWithOutUrl = tracks[0];
@@ -224,8 +224,8 @@ describe('AudioTrackController', () => {
     });
   });
 
-  describe('onError', () => {
-    it('should clear interval (only) on fatal network errors', () => {
+  describe('onError', function () {
+    it('should clear interval (only) on fatal network errors', function () {
       audioTrackController.setInterval(1000);
 
       audioTrackController.onError({
@@ -254,7 +254,7 @@ describe('AudioTrackController', () => {
       expect(audioTrackController.hasInterval()).to.be.false;
     });
 
-    it('should blacklist current track on fatal network error, and find a backup track (fallback mechanism)', () => {
+    it('should blacklist current track on fatal network error, and find a backup track (fallback mechanism)', function () {
       const currentTrackId = 4;
       audioTrackController._trackId = currentTrackId;
       audioTrackController.tracks = tracks;

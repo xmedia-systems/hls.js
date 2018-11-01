@@ -1,62 +1,62 @@
 import AttrList from '../../../src/utils/attr-list';
 
-describe('AttrList', () => {
-  it('constructor() supports empty arguments', () => {
+describe('AttrList', function () {
+  it('constructor() supports empty arguments', function () {
     expect(new AttrList()).to.deep.equal({});
     expect(new AttrList({})).to.deep.equal({});
     expect(new AttrList(undefined)).to.deep.equal({});
   });
-  it('constructor() supports object argument', () => {
+  it('constructor() supports object argument', function () {
     const obj = { VALUE: '42' };
     const list = new AttrList(obj);
     expect(list.decimalInteger('VALUE')).to.equal(42);
     expect(Object.keys(list).length).to.equal(1);
   });
 
-  it('parses valid decimalInteger attribute', () => {
+  it('parses valid decimalInteger attribute', function () {
     expect(new AttrList('INT=42').decimalInteger('INT')).to.equal(42);
     expect(new AttrList('INT=0').decimalInteger('INT')).to.equal(0);
     expect(new AttrList('INT="42"').decimalInteger('INT')).to.equal(42);
   });
 
-  it('parses attribute with leading space', () => {
+  it('parses attribute with leading space', function () {
     expect(new AttrList(' INT=42').decimalInteger('INT')).to.equal(42);
     expect(new AttrList(' INT=0').decimalInteger('INT')).to.equal(0);
     expect(new AttrList(' INT="42"').decimalInteger('INT')).to.equal(42);
   });
 
-  it('parses attribute with trailing space', () => {
+  it('parses attribute with trailing space', function () {
     expect(new AttrList('INT =42').decimalInteger('INT')).to.equal(42);
     expect(new AttrList('INT =0').decimalInteger('INT')).to.equal(0);
     expect(new AttrList('INT ="42"').decimalInteger('INT')).to.equal(42);
   });
 
-  it('parses valid hexadecimalInteger attribute', () => {
+  it('parses valid hexadecimalInteger attribute', function () {
     expect(new AttrList('HEX=0x42').hexadecimalIntegerAsNumber('HEX')).to.equal(0x42);
     expect(new AttrList('HEX=0X42').hexadecimalIntegerAsNumber('HEX')).to.equal(0x42);
     expect(new AttrList('HEX=0x0').hexadecimalIntegerAsNumber('HEX')).to.equal(0);
     expect(new AttrList('HEX="0x42"').hexadecimalIntegerAsNumber('HEX')).to.equal(0x42);
   });
-  it('parses valid decimalFloatingPoint attribute', () => {
+  it('parses valid decimalFloatingPoint attribute', function () {
     expect(new AttrList('FLOAT=0.42').decimalFloatingPoint('FLOAT')).to.equal(0.42);
     expect(new AttrList('FLOAT=-0.42').decimalFloatingPoint('FLOAT')).to.equal(-0.42);
     expect(new AttrList('FLOAT=0').decimalFloatingPoint('FLOAT')).to.equal(0);
     expect(new AttrList('FLOAT="0.42"').decimalFloatingPoint('FLOAT')).to.equal(0.42);
   });
-  it('parses valid quotedString attribute', () => {
+  it('parses valid quotedString attribute', function () {
     expect(new AttrList('STRING="hi"').STRING).to.equal('hi');
     expect(new AttrList('STRING=""').STRING).to.equal('');
   });
-  it('parses exotic quotedString attribute', () => {
+  it('parses exotic quotedString attribute', function () {
     const list = new AttrList('STRING="hi,ENUM=OK,RES=4x2"');
     expect(list.STRING).to.equal('hi,ENUM=OK,RES=4x2');
     expect(Object.keys(list).length).to.equal(1);
   });
-  it('parses valid enumeratedString attribute', () => {
+  it('parses valid enumeratedString attribute', function () {
     expect(new AttrList('ENUM=OK').enumeratedString('ENUM')).to.equal('OK');
     expect(new AttrList('ENUM="OK"').enumeratedString('ENUM')).to.equal('OK');
   });
-  it('parses exotic enumeratedString attribute', () => {
+  it('parses exotic enumeratedString attribute', function () {
     expect(new AttrList('ENUM=1').enumeratedString('ENUM')).to.equal('1');
     expect(new AttrList('ENUM=A=B').enumeratedString('ENUM')).to.equal('A=B');
     expect(new AttrList('ENUM=A=B=C').enumeratedString('ENUM')).to.equal('A=B=C');
@@ -64,12 +64,12 @@ describe('AttrList', () => {
     expect(list.enumeratedString('ENUM1')).to.equal('A=B=C');
     expect(list.enumeratedString('ENUM2')).to.equal('42');
   });
-  it('parses valid decimalResolution attribute', () => {
+  it('parses valid decimalResolution attribute', function () {
     expect(new AttrList('RES=400x200').decimalResolution('RES')).to.deep.equal({ width: 400, height: 200 });
     expect(new AttrList('RES=0x0').decimalResolution('RES')).to.deep.equal({ width: 0, height: 0 });
     expect(new AttrList('RES="400x200"').decimalResolution('RES')).to.deep.equal({ width: 400, height: 200 });
   });
-  it('handles invalid decimalResolution attribute', () => {
+  it('handles invalid decimalResolution attribute', function () {
     expect(new AttrList('RES=400x-200').decimalResolution('RES')).to.not.exist;
     expect(new AttrList('RES=400.5x200').decimalResolution('RES')).to.not.exist;
     expect(new AttrList('RES=400x200.5').decimalResolution('RES')).to.not.exist;
@@ -79,7 +79,7 @@ describe('AttrList', () => {
     expect(new AttrList('RES=x').decimalResolution('RES')).to.not.exist;
   });
 
-  it('parses multiple attributes', () => {
+  it('parses multiple attributes', function () {
     const list = new AttrList('INT=42,HEX=0x42,FLOAT=0.42,STRING="hi",ENUM=OK,RES=4x2');
     expect(list.decimalInteger('INT')).to.equal(42);
     expect(list.hexadecimalIntegerAsNumber('HEX')).to.equal(0x42);
@@ -90,7 +90,7 @@ describe('AttrList', () => {
     expect(Object.keys(list).length).to.equal(6);
   });
 
-  it('handles missing attributes', () => {
+  it('handles missing attributes', function () {
     const list = new AttrList();
     expect(list.decimalInteger('INT')).to.be.NaN;
     expect(list.hexadecimalIntegerAsNumber('HEX')).to.be.NaN;
@@ -101,7 +101,7 @@ describe('AttrList', () => {
     expect(Object.keys(list)).to.have.lengthOf(0);
   });
 
-  it('parses dashed attribute names', () => {
+  it('parses dashed attribute names', function () {
     const list = new AttrList('INT-VALUE=42,H-E-X=0x42,-FLOAT=0.42,STRING-="hi",ENUM=OK');
     expect(list.decimalInteger('INT-VALUE')).to.equal(42);
     expect(list.hexadecimalIntegerAsNumber('H-E-X')).to.equal(0x42);
@@ -111,14 +111,14 @@ describe('AttrList', () => {
     expect(Object.keys(list).length).to.equal(5);
   });
 
-  it('handles hexadecimalInteger conversions', () => {
+  it('handles hexadecimalInteger conversions', function () {
     const list = new AttrList('HEX1=0x0123456789abcdef0123456789abcdef,HEX2=0x123,HEX3=0x0');
     expect(list.hexadecimalInteger('HEX1').buffer).to.deep.equal(new Uint8Array([0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef]).buffer);
     expect(list.hexadecimalInteger('HEX2').buffer).to.deep.equal(new Uint8Array([0x01, 0x23]).buffer);
     expect(list.hexadecimalInteger('HEX3').buffer).to.deep.equal(new Uint8Array([0x0]).buffer);
   });
 
-  it('returns infinity on large number conversions', () => {
+  it('returns infinity on large number conversions', function () {
     const list = new AttrList('VAL=12345678901234567890,HEX=0x0123456789abcdef0123456789abcdef');
     expect(list.decimalInteger('VAL')).to.equal(Infinity);
     expect(list.hexadecimalIntegerAsNumber('HEX')).to.equal(Infinity);

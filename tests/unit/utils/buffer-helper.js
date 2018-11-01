@@ -49,7 +49,7 @@ describe('BufferHelper', function () {
       expect(BufferHelper.isBuffered(media, 2.1)).to.be.false;
     });
   });
-  describe('bufferInfo', () => {
+  describe('bufferInfo', function () {
     it('should return found buffer info when maxHoleDuration is 0', function () {
       // |////////|__________|////////////////|
       // 0       0.5         1               2.0

@@ -1,9 +1,9 @@
 import OutputFilter from '../../../src/utils/output-filter';
 
-describe('OutputFilter', () => {
+describe('OutputFilter', function () {
   const sandbox = sinon.createSandbox();
 
-  let createMockTimelineController = () => {
+  let createMockTimelineController = function () {
     return {
       addCues: sandbox.spy(),
       createCaptionsTrack: sandbox.spy()
@@ -17,13 +17,13 @@ describe('OutputFilter', () => {
     outputFilter = new OutputFilter(timelineController, 1);
   });
 
-  it('handles new cue without dispatching', () => {
+  it('handles new cue without dispatching', function () {
     outputFilter.newCue(0, 1, {});
     expect(timelineController.addCues).to.not.have.been.called;
     expect(timelineController.createCaptionsTrack).to.have.been.called;
   });
 
-  it('handles single cue and dispatch', () => {
+  it('handles single cue and dispatch', function () {
     let lastScreen = {};
     outputFilter.newCue(0, 1, lastScreen);
     outputFilter.dispatchCue();
@@ -31,7 +31,7 @@ describe('OutputFilter', () => {
     expect(timelineController.addCues).to.have.been.calledWith(1, 0, 1, lastScreen);
   });
 
-  it('handles multiple cues and dispatch', () => {
+  it('handles multiple cues and dispatch', function () {
     outputFilter.newCue(0, 1, {});
     outputFilter.newCue(1, 2, {});
     let lastScreen = {};
@@ -41,7 +41,7 @@ describe('OutputFilter', () => {
     expect(timelineController.addCues).to.have.been.calledWith(1, 0, 4, lastScreen);
   });
 
-  it('does not dispatch empty cues', () => {
+  it('does not dispatch empty cues', function () {
     outputFilter.newCue(0, 1, {});
     expect(timelineController.addCues).to.not.have.been.called;
     outputFilter.dispatchCue();
