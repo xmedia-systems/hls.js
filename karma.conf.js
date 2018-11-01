@@ -12,11 +12,11 @@ module.exports = function(config) {
 
 		// frameworks to use
 		// available frameworks: https://npmjs.org/browse/keyword/karma-adapter
-		frameworks: ['mocha', 'sinon'],
+		frameworks: ['mocha', 'sinon-chai'],
 
 		// list of files / patterns to load in the browser
 		files: [
-      'tests/unit/**/*.js'
+      'tests/index.js'
     ],
 
 		// list of files to exclude
@@ -24,8 +24,9 @@ module.exports = function(config) {
 
 		// preprocess matching files before serving them to the browser
 		// available preprocessors: https://npmjs.org/browse/keyword/karma-preprocessor
+    // node_modules must not be webpacked or else Karma will fail to load frameworks
 		preprocessors: {
-		  'tests/unit/**/*.js': ['webpack', 'sourcemap']
+		  'tests/index.js': ['webpack', 'sourcemap']
 		},
 
 		// test results reporter to use
@@ -39,6 +40,7 @@ module.exports = function(config) {
 		},
 
 		webpack: {
+      mode: 'development',
 			devtool: 'inline-source-map',
 			mode: 'development',
 			module: {
