@@ -43,7 +43,7 @@ describe('StreamController tests', function () {
       const spy = sinon.spy();
       hls.on(Event.STREAM_STATE_TRANSITION, spy);
       streamController.state = State.ENDED;
-      assert.deepEqual(spy.args[0][1], { previousState: State.STOPPED, nextState: State.ENDED });
+      expect(spy.args[0][1]).to.deep.equal({ previousState: State.STOPPED, nextState: State.ENDED });
     });
 
     it('should not trigger STREAM_STATE_TRANSITION when state is not updated', function () {
@@ -51,7 +51,7 @@ describe('StreamController tests', function () {
       hls.on(Event.STREAM_STATE_TRANSITION, spy);
       // no update
       streamController.state = State.STOPPED;
-      assert.equal(spy.called, false);
+      expect(spy.called).to.be.false;
     });
   });
 
@@ -256,18 +256,18 @@ describe('StreamController tests', function () {
       it('should start when controller have levels data', function () {
         streamController.startLoad(5);
         assertStreamControllerStarted(streamController);
-        assert.strictEqual(streamController.nextLoadPosition, 5);
-        assert.strictEqual(streamController.startPosition, 5);
-        assert.strictEqual(streamController.lastCurrentTime, 5);
+        expect(streamController.nextLoadPosition).to.equal(5);
+        expect(streamController.startPosition).to.equal(5);
+        expect(streamController.lastCurrentTime).to.equal(5);
       });
 
       it('should set startPosition to lastCurrentTime if unset', function () {
         streamController.lastCurrentTime = 5;
         streamController.startLoad(-1);
         assertStreamControllerStarted(streamController);
-        assert.strictEqual(streamController.nextLoadPosition, 5);
-        assert.strictEqual(streamController.startPosition, 5);
-        assert.strictEqual(streamController.lastCurrentTime, 5);
+        expect(streamController.nextLoadPosition).to.equal(5);
+        expect(streamController.startPosition).to.equal(5);
+        expect(streamController.lastCurrentTime).to.equal(5);
       });
 
       it('sets up for a bandwidth test if starting at auto', function () {
@@ -275,8 +275,8 @@ describe('StreamController tests', function () {
         hls.startLevel = -1;
 
         streamController.startLoad();
-        assert.strictEqual(streamController.level, 0);
-        assert(streamController.bitrateTest);
+        expect(streamController.level).to.equal(0);
+        expect(streamController.bitrateTest).to.be.true;
       });
 
       it('should not signal a bandwidth test if config.testBandwidth is false', function () {
@@ -286,8 +286,8 @@ describe('StreamController tests', function () {
         hls.config.testBandwidth = false;
 
         streamController.startLoad();
-        assert.strictEqual(streamController.level, hls.nextAutoLevel);
-        assert.strictEqual(streamController.bitrateTest, false);
+        expect(streamController.level).to.equal(hls.nextAutoLevel);
+        expect(streamController.bitrateTest).to.be.false;
       });
     });
   });

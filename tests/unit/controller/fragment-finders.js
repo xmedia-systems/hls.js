@@ -98,8 +98,7 @@ describe('Fragment finders', function () {
   describe('findFragmentByPDT', function () {
     it('finds a fragment with endProgramDateTime greater than the reference PDT', function () {
       const foundFragment = findFragmentByPDT(mockFragments, fragPrevious.endProgramDateTime + 1);
-      const resultSN = foundFragment ? foundFragment.sn : -1;
-      assert.strictEqual(foundFragment, mockFragments[2], 'Expected sn 2, found sn segment ' + resultSN);
+      expect(foundFragment).to.equal(mockFragments[2]);
     });
 
     it('returns null when the reference pdt is outside of the pdt range of the fragment array', function () {

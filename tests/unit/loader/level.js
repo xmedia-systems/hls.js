@@ -1,5 +1,4 @@
 import Level from '../../../src/loader/level';
-const assert = require('assert');
 
 describe('Level Class tests', function () {
   it('sets programDateTime to true when the first fragment has valid pdt', function () {

@@ -1,5 +1,4 @@
 import Fragment from '../../../src/loader/fragment';
-const assert = require('assert');
 
 describe('Fragment class tests', function () {
   let frag;
