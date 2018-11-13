@@ -72,13 +72,14 @@ export function updateFragPTSDTS (details, frag, startPTS, endPTS, startDTS, end
     endDTS = Math.max(endDTS, frag.endDTS);
   }
 
-  const drift = startPTS - frag.start;
-  frag.start = frag.startPTS = startPTS;
+  const drift = startDTS - frag.start;
+  frag.start = startDTS;
+  frag.startPTS = startPTS;
   frag.maxStartPTS = maxStartPTS;
   frag.endPTS = endPTS;
   frag.startDTS = startDTS;
   frag.endDTS = endDTS;
-  frag.duration = endPTS - startPTS;
+  frag.duration = endDTS - startDTS;
 
   const sn = frag.sn;
   // exit if sn out of range
