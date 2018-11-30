@@ -66,8 +66,8 @@ export class FragmentTracker extends EventHandler {
    * Partial fragments effected by coded frame eviction will be removed
    * The browser will unload parts of the buffer to free up memory for new buffer data
    * Fragments will need to be reloaded when the buffer is freed up, removing partial fragments will allow them to reload(since there might be parts that are still playable)
-   * @param {String} elementaryStream The elementaryStream of media this is (eg. video/audio)
-   * @param {TimeRanges} timeRange TimeRange object from a sourceBuffer
+   * @param {String} elementaryStream - The type of buffer to be searched (audio or video)
+   * @param {TimeRanges} timeRange - TimeRange object from a sourceBuffer
    */
   detectEvictedFragments (elementaryStream, timeRange) {
     // Check if any flagged fragments have been unloaded

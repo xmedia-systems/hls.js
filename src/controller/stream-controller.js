@@ -1095,14 +1095,6 @@ class StreamController extends TaskLoop {
         data.endDTS = data.startDTS + fragCurrent.duration;
       }
 
-      if (data.hasAudio === true) {
-        frag.addElementaryStream(Fragment.ElementaryStreamTypes.AUDIO);
-      }
-
-      if (data.hasVideo === true) {
-        frag.addElementaryStream(Fragment.ElementaryStreamTypes.VIDEO);
-      }
-
       logger.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb},dropped:${data.dropped || 0}`);
 
       // Detect gaps in a fragment  and try to fix it by finding a keyframe in the previous fragment (see _findFragments)
@@ -1404,7 +1396,7 @@ class StreamController extends TaskLoop {
     const media = this.mediaBuffer ? this.mediaBuffer : this.media;
     if (media) {
       // filter fragments potentially evicted from buffer. this is to avoid memleak on live streams
-      this.fragmentTracker.detectEvictedFragments(Fragment.ElementaryStreamTypes.VIDEO, media.buffered);
+      this.fragmentTracker.detectEvictedFragments('video', media.buffered);
     }
     // move to IDLE once flush complete. this should trigger new fragment loading
     this.state = State.IDLE;

@@ -15,27 +15,6 @@ export default class Fragment {
       audio: {},
       video: {}
     };
-    this.estimatedStart = null;
-    this.estimatedEnd = null;
-    this.estimatedDuration = null;
-
-    // Holds the types of data this fragment supports
-    this._elementaryStreams = {
-      [Fragment.ElementaryStreamTypes.AUDIO]: false,
-      [Fragment.ElementaryStreamTypes.VIDEO]: false
-    };
-  }
-
-  /**
-   * `type` property for this._elementaryStreams
-   *
-   * @enum
-   */
-  static get ElementaryStreamTypes () {
-    return {
-      AUDIO: 'audio',
-      VIDEO: 'video'
-    };
   }
 
   get url () {
@@ -105,20 +84,6 @@ export default class Fragment {
 
   get encrypted () {
     return !!((this.decryptdata && this.decryptdata.uri !== null) && (this.decryptdata.key === null));
-  }
-
-  /**
-   * @param {ElementaryStreamType} type
-   */
-  addElementaryStream (type) {
-    this._elementaryStreams[type] = true;
-  }
-
-  /**
-   * @param {ElementaryStreamType} type
-   */
-  hasElementaryStream (type) {
-    return this._elementaryStreams[type] === true;
   }
 
   /**

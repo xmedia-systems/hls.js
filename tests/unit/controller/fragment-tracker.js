@@ -14,10 +14,10 @@ function createMockBuffer (buffered) {
 }
 
 function createMockFragment (data, types) {
-  data._elementaryStreams = new Set(types);
-  data.hasElementaryStream = (type) => {
-    return data._elementaryStreams.has(type) === true;
-  };
+  data.timing = {};
+  types.forEach(t => {
+    data.timing[t] = {};
+  });
   return data;
 }
 

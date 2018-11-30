@@ -225,10 +225,10 @@ export function mergeDetails (oldDetails, newDetails) {
   // if at least one fragment contains PTS info, recompute PTS information for all fragments
   if (PTSFrag) {
     const { audio, video } = PTSFrag.timing;
-    if (Object.keys(audio).length) {
+    if (Number.isFinite(audio.startPTS)) {
       updateFragPTSDTS(newDetails, PTSFrag, audio.startPTS, audio.endPTS, audio.startDTS, audio.endDTS, 'audio');
     }
-    if (Object.keys(video).length) {
+    if (Number.isFinite(video.startPTS)) {
       updateFragPTSDTS(newDetails, PTSFrag, video.startPTS, video.endPTS, video.startDTS, video.endDTS, 'video');
     }
   } else {

@@ -621,7 +621,6 @@ class AudioStreamController extends TaskLoop {
         this.state === State.PARSING) {
       const { audioSwitch, hls, media, pendingData, trackId } = this;
 
-      fragCurrent.addElementaryStream(Fragment.ElementaryStreamTypes.AUDIO);
       if (!Number.isFinite(data.endPTS)) {
         data.endPTS = data.startPTS + fragCurrent.duration;
         data.endDTS = data.startDTS + fragCurrent.duration;
