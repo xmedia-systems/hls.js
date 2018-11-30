@@ -171,12 +171,6 @@ describe('StreamController', function () {
       assertLoadingState(frag);
     });
 
-    it('should load a partial fragment', function () {
-      fragStateStub(FragmentState.PARTIAL);
-      streamController._loadFragment(frag);
-      assertLoadingState(frag);
-    });
-
     it('should load a frag which has backtracked', function () {
       fragStateStub(FragmentState.OK);
       frag.backtracked = true;

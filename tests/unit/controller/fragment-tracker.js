@@ -40,51 +40,6 @@ function loadFragmentAndBuffered (hls, fragment) {
   hls.trigger(Event.FRAG_BUFFERED, { frag: fragment });
 }
 describe('FragmentTracker', function () {
-  describe('getPartialFragment', function () {
-    let hls, fragmentTracker, fragment, buffered, partialFragment, timeRanges;
-
-    hls = new Hls({});
-    fragmentTracker = new FragmentTracker(hls);
-
-    fragment = createMockFragment({
-      startPTS: 0,
-      endPTS: 1,
-      sn: 1,
-      level: 1,
-      type: 'main'
-    }, ['audio', 'video']);
-
-    hls.trigger(Event.FRAG_LOADED, { frag: fragment });
-
-    buffered = createMockBuffer([
-      {
-        startPTS: 0,
-        endPTS: 0.5
-      }
-    ]);
-
-    timeRanges = {};
-    timeRanges['video'] = buffered;
-    timeRanges['audio'] = buffered;
-    hls.trigger(Event.BUFFER_APPENDED, { timeRanges });
-
-    hls.trigger(Event.FRAG_BUFFERED, { stats: { aborted: true }, id: 'main', frag: fragment });
-
-    it('detects fragments that partially loaded', function () {
-      // Get the partial fragment at a time
-      partialFragment = fragmentTracker.getPartialFragment(0);
-      expect(partialFragment).to.equal(fragment);
-      partialFragment = fragmentTracker.getPartialFragment(0.5);
-      expect(partialFragment).to.equal(fragment);
-      partialFragment = fragmentTracker.getPartialFragment(1);
-      expect(partialFragment).to.equal(fragment);
-    });
-    it('returns null when time is not inside partial fragment', function () {
-      partialFragment = fragmentTracker.getPartialFragment(1.5);
-      expect(partialFragment).to.not.exist;
-    });
-  });
-
   describe('getState', function () {
     let hls, fragmentTracker, fragment, buffered, timeRanges;
 
@@ -97,7 +52,11 @@ describe('FragmentTracker', function () {
         endPTS: 1,
         sn: 1,
         level: 0,
-        type: 'main'
+        type: 'main',
+        timing: {
+          audio: {},
+          video: {}
+        }
       }, ['audio', 'video']);
       hls.trigger(Event.FRAG_LOADED, { frag: fragment });
     };
@@ -126,7 +85,7 @@ describe('FragmentTracker', function () {
       expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.OK);
     });
 
-    it('detects partial fragments', function () {
+    it('removes evicted fragments', function () {
       addFragment();
       buffered = createMockBuffer([
         {
@@ -141,25 +100,7 @@ describe('FragmentTracker', function () {
 
       hls.trigger(Event.FRAG_BUFFERED, { stats: { aborted: true }, id: 'main', frag: fragment });
 
-      expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.PARTIAL);
-    });
-
-    it('removes evicted partial fragments', function () {
-      addFragment();
-      buffered = createMockBuffer([
-        {
-          startPTS: 0.5,
-          endPTS: 2
-        }
-      ]);
-      timeRanges = {};
-      timeRanges['video'] = buffered;
-      timeRanges['audio'] = buffered;
-      hls.trigger(Event.BUFFER_APPENDED, { timeRanges });
-
-      hls.trigger(Event.FRAG_BUFFERED, { stats: { aborted: true }, id: 'main', frag: fragment });
-
-      expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.PARTIAL);
+      expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.OK);
 
       // Trim the buffer
       buffered = createMockBuffer([
@@ -321,7 +262,7 @@ describe('FragmentTracker', function () {
 
       hls.trigger(Event.FRAG_BUFFERED, { stats: { aborted: true }, id: 'main', frag: fragment });
 
-      expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.PARTIAL);
+      expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.OK);
     });
 
     it('supports video buffer', function () {
@@ -351,7 +292,7 @@ describe('FragmentTracker', function () {
 
       hls.trigger(Event.FRAG_BUFFERED, { stats: { aborted: true }, id: 'main', frag: fragment });
 
-      expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.PARTIAL);
+      expect(fragmentTracker.getState(fragment)).to.equal(FragmentState.OK);
     });
 
     it('supports audio only buffer', function () {

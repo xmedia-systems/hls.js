@@ -11,6 +11,13 @@ export default class Fragment {
     this.tagList = [];
     this.programDateTime = null;
     this.rawProgramDateTime = null;
+    this.timing = {
+      audio: {},
+      video: {}
+    };
+    this.estimatedStart = null;
+    this.estimatedEnd = null;
+    this.estimatedDuration = null;
 
     // Holds the types of data this fragment supports
     this._elementaryStreams = {

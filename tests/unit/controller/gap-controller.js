@@ -92,20 +92,6 @@ describe('checkBuffer', function () {
       gapController._tryFixBufferStall(mockBufferInfo, mockStallDuration);
       expect(nudgeStub).to.have.not.been.called;
     });
-
-    it('should try to jump partial fragments when detected', function () {
-      sandbox.stub(gapController.fragmentTracker, 'getPartialFragment').returns({});
-      const skipHoleStub = sandbox.stub(gapController, '_trySkipBufferHole');
-      gapController._tryFixBufferStall({ len: 0 });
-      expect(skipHoleStub).to.have.been.calledOnce;
-    });
-
-    it('should not try to jump partial fragments when none are detected', function () {
-      sandbox.stub(gapController.fragmentTracker, 'getPartialFragment').returns(null);
-      const skipHoleStub = sandbox.stub(gapController, '_trySkipBufferHole');
-      gapController._tryFixBufferStall({ len: 0 });
-      expect(skipHoleStub).to.have.not.been.called;
-    });
   });
 
   describe('poll', function () {

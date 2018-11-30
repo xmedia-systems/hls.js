@@ -26,7 +26,7 @@ export function addGroupId (level, type, id) {
   }
 }
 
-export function updatePTS (fragments, fromIdx, toIdx) {
+export function updatePTS (fragments, fromIdx, toIdx, type) {
   let fragFrom = fragments[fromIdx], fragTo = fragments[toIdx], fragToPTS = fragTo.startPTS;
   // if we know startPTS[toIdx]
   if (Number.isFinite(fragToPTS)) {
@@ -45,10 +45,21 @@ export function updatePTS (fragments, fromIdx, toIdx) {
     }
   } else {
     // we dont know startPTS[toIdx]
+    const fromTiming = fragFrom.timing;
+    const toTiming = fragTo.timing;
+    const { startPTS, endPTS, startDTS, endDTS } = fromTiming[type];
     if (toIdx > fromIdx) {
       fragTo.start = fragFrom.start + fragFrom.duration;
+      toTiming[type].startPTS = endPTS;
+      toTiming[type].endPTS = endPTS + (endPTS - startPTS);
+      toTiming[type].startDTS = endDTS;
+      toTiming[type].endDTS = endDTS + (endDTS - startDTS);
     } else {
-      fragTo.start = Math.max(fragFrom.start - fragTo.duration, 0);
+      fragTo.start = fragFrom.start - fragFrom.duration;
+      toTiming[type].startPTS = startPTS - (endPTS - startPTS);
+      toTiming[type].endPTS = startPTS;
+      toTiming[type].startDTS = startDTS - (endDTS - startDTS);
+      toTiming[type].endDTS = startDTS;
     }
   }
 }
@@ -64,9 +75,11 @@ export function updatePTS (fragments, fromIdx, toIdx) {
  * @param endPTS - The end PTS of the fragment
  * @param startDTS - The start DTS (decode timestamp) of the fragment
  * @param endDTS - The end DTS of the fragment
+ * @param type - The type of elementary stream which the timing info corresponds to (either audio or video)
  * @returns {number}
  */
-export function updateFragPTSDTS (details, frag, startPTS, endPTS, startDTS, endDTS) {
+export function updateFragPTSDTS (details, frag, startPTS, endPTS, startDTS, endDTS, type) {
+  frag.timing[type] = { startPTS, endPTS, startDTS, endDTS };
   // update frag PTS/DTS
   let maxStartPTS = startPTS;
   // frag.startPTS will already be set in the case that a fragment contains both audio and video
@@ -153,12 +166,12 @@ export function updateFragPTSDTS (details, frag, startPTS, endPTS, startDTS, end
   fragments[fragIdx] = frag;
   // adjust fragment PTS/duration from seqnum-1 to frag 0
   for (let i = fragIdx; i > 0; i--) {
-    updatePTS(fragments, i, i - 1);
+    updatePTS(fragments, i, i - 1, type);
   }
 
   // adjust fragment PTS/duration from seqnum to last frag
   for (let i = fragIdx; i < fragments.length - 1; i++) {
-    updatePTS(fragments, i, i + 1);
+    updatePTS(fragments, i, i + 1, type);
   }
 
   details.PTSKnown = true;
@@ -193,6 +206,7 @@ export function mergeDetails (oldDetails, newDetails) {
       if (Number.isFinite(oldFrag.startPTS)) {
         newFrag.start = newFrag.startPTS = oldFrag.startPTS;
         newFrag.endPTS = oldFrag.endPTS;
+        newFrag.timing = oldFrag.timing;
         newFrag.duration = oldFrag.duration;
         newFrag.backtracked = oldFrag.backtracked;
         newFrag.dropped = oldFrag.dropped;
@@ -210,7 +224,13 @@ export function mergeDetails (oldDetails, newDetails) {
 
   // if at least one fragment contains PTS info, recompute PTS information for all fragments
   if (PTSFrag) {
-    updateFragPTSDTS(newDetails, PTSFrag, PTSFrag.startPTS, PTSFrag.endPTS, PTSFrag.startDTS, PTSFrag.endDTS);
+    const { audio, video } = PTSFrag.timing;
+    if (Object.keys(audio).length) {
+      updateFragPTSDTS(newDetails, PTSFrag, audio.startPTS, audio.endPTS, audio.startDTS, audio.endDTS, 'audio');
+    }
+    if (Object.keys(video).length) {
+      updateFragPTSDTS(newDetails, PTSFrag, video.startPTS, video.endPTS, video.startDTS, video.endDTS, 'video');
+    }
   } else {
     // ensure that delta is within oldfragments range
     // also adjust sliding in case delta is 0 (we could have old=[50-60] and new=old=[50-61])

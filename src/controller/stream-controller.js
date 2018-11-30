@@ -487,7 +487,7 @@ class StreamController extends TaskLoop {
     }
 
     // Allow backtracked fragments to load
-    if (frag.backtracked || fragState === FragmentState.NOT_LOADED || fragState === FragmentState.PARTIAL) {
+    if (frag.backtracked || fragState === FragmentState.NOT_LOADED) {
       frag.autoLevel = this.hls.autoLevelEnabled;
       frag.bitrateTest = this.bitrateTest;
 
@@ -1135,7 +1135,7 @@ class StreamController extends TaskLoop {
         }
       }
 
-      let drift = LevelHelper.updateFragPTSDTS(level.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS),
+      let drift = LevelHelper.updateFragPTSDTS(level.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS, data.type),
         hls = this.hls;
       hls.trigger(Event.LEVEL_PTS_UPDATED, { details: level.details, level: this.level, drift: drift, type: data.type, start: data.startPTS, end: data.endPTS });
       // has remuxer dropped video frames located before first keyframe ?
@@ -1229,6 +1229,7 @@ class StreamController extends TaskLoop {
         if (type === 'video') {
           this.videoBuffer = tracks[type].buffer;
         }
+        this.gapController.sourceBuffers[type] = tracks[type].buffer;
       } else {
         alternate = true;
       }

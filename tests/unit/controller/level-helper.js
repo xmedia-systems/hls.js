@@ -9,7 +9,8 @@ describe('level-helper', function () {
         fragments: []
       };
       frag = {
-        sn: 0
+        sn: 0,
+        timing: {}
       };
     });
 
@@ -30,7 +31,7 @@ describe('level-helper', function () {
         const startDTS = 1;
         const endDTS = 11;
 
-        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS);
+        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 2, 12, 1, 11, 2);
       });
 
@@ -45,7 +46,7 @@ describe('level-helper', function () {
         frag.startDTS = 2;
         frag.endDTS = 12;
 
-        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS);
+        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 3, 12, 2, 11, 3);
         expect(frag.deltaPTS).to.equal(1);
 
@@ -54,7 +55,7 @@ describe('level-helper', function () {
         frag.startDTS = 0;
         frag.endDTS = 10;
 
-        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS);
+        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 2, 10, 1, 10, 2);
         expect(frag.deltaPTS).to.equal(2);
       });
@@ -70,7 +71,7 @@ describe('level-helper', function () {
         frag.startDTS = 2;
         frag.endDTS = 12;
 
-        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS);
+        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 3, 24, 1, 12, 14);
         expect(frag.deltaPTS).to.equal(11);
       });
@@ -90,7 +91,7 @@ describe('level-helper', function () {
         details.live = false;
         frag.sn = 5;
 
-        LevelHelper.updateFragPTSDTS(details, frag, startPTS, endPTS, startDTS, endDTS);
+        LevelHelper.updateFragPTSDTS(details, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 3, 13, 2, 12, 3);
         expect(frag.deltaPTS).to.equal(1);
       });

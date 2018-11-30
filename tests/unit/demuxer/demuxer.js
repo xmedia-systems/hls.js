@@ -78,7 +78,8 @@ describe('Demuxer tests', function () {
     let currentFrag = {
       cc: 100,
       sn: 5,
-      level: 1
+      level: 1,
+      timing: {}
     };
     // Config for push
     demux.frag = currentFrag;
@@ -88,8 +89,10 @@ describe('Demuxer tests', function () {
       cc: 100,
       sn: 6,
       level: 1,
-      startDTS: 1000,
-      start: undefined
+      start: undefined,
+      timing: {
+        video: { startDTS: 1000 }
+      }
     };
     let data = new ArrayBuffer(8),
       initSegment = {},
@@ -106,7 +109,7 @@ describe('Demuxer tests', function () {
       expect(obj1.initSegment).to.equal(initSegment, 'initSegment');
       expect(obj1.audioCodec).to.equal(audioCodec, 'audioCodec');
       expect(obj1.videoCodec).to.equal(videoCodec, 'videoCodec');
-      expect(obj1.timeOffset).to.equal(newFrag.startDTS, 'timeOffset');
+      expect(obj1.timeOffset).to.equal(newFrag.timing.video.startDTS, 'timeOffset');
       expect(obj1.discontinuity).to.be.false;
       expect(obj1.trackSwitch).to.be.false;
       expect(obj1.contiguous).to.be.true;
@@ -131,7 +134,8 @@ describe('Demuxer tests', function () {
     let currentFrag = {
       cc: 100,
       sn: 5,
-      level: 1
+      level: 1,
+      timing: {}
     };
     // Config for push
     demux.frag = currentFrag;
@@ -142,7 +146,8 @@ describe('Demuxer tests', function () {
       sn: 5,
       level: 2,
       startDTS: undefined,
-      start: 1000
+      start: 1000,
+      timing: {}
     };
     let data = {},
       initSegment = {},
