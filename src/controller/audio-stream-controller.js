@@ -629,7 +629,7 @@ class AudioStreamController extends TaskLoop {
       logger.log(`parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb}`);
 
       const track = this.tracks[trackId];
-      LevelHelper.updateFragPTSDTS(track.details, fragCurrent, data.startPTS, data.endPTS, data.type);
+      LevelHelper.updateFragPTSDTS(track.details, fragCurrent, data.startPTS, data.endPTS, data.startDTS, data.endDTS, data.type);
 
       let appendOnBufferFlush = false;
       // Only flush audio from old audio tracks when PTS is known on new audio track
