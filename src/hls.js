@@ -12,7 +12,6 @@ import KeyLoader from './loader/key-loader';
 import { FragmentTracker } from './controller/fragment-tracker';
 import StreamController from './controller/stream-controller';
 import LevelController from './controller/level-controller';
-import ID3TrackController from './controller/id3-track-controller';
 
 import { isSupported } from './is-supported';
 import { logger, enableLogs } from './utils/logger';
@@ -126,7 +125,6 @@ export default class Hls extends Observer {
     const playListLoader = new PlaylistLoader(this);
     const fragmentLoader = new FragmentLoader(this);
     const keyLoader = new KeyLoader(this);
-    const id3TrackController = new ID3TrackController(this);
 
     // network controllers
 
@@ -170,7 +168,6 @@ export default class Hls extends Observer {
       bufferController,
       capLevelController,
       fpsController,
-      id3TrackController,
       fragmentTracker
     ];
 
@@ -315,6 +312,10 @@ export default class Hls extends Observer {
     this.attachMedia(media);
   }
 
+  removeLevel (levelIndex, urlId = 0) {
+    this.levelController.removeLevel(levelIndex, urlId);
+  }
+
   /**
    * @type {QualityLevel[]}
    */
@@ -405,6 +406,13 @@ export default class Hls extends Observer {
    */
   get firstLevel () {
     return Math.max(this.levelController.firstLevel, this.minAutoLevel);
+  }
+
+  /** Return Estimated Bandwidth
+   **/
+  get bandwidthEstimate () {
+    const bwEstimator = this.abrController._bwEstimator;
+    return bwEstimator ? bwEstimator.getEstimate() : NaN;
   }
 
   /**

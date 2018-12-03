@@ -1,12 +1,13 @@
 import { fixLineBreaks } from './vttparser';
+import VTTCue from './vttcue';
 
-export function newCue (track, startTime, endTime, captionScreen) {
+export function createCues (startTime, endTime, captionScreen) {
   let row;
   let cue;
   let indenting;
   let indent;
   let text;
-  let VTTCue = window.VTTCue || window.TextTrackCue;
+  const cues = [];
 
   for (let r = 0; r < captionScreen.rows.length; r++) {
     row = captionScreen.rows[r];
@@ -47,10 +48,19 @@ export function newCue (track, startTime, endTime, captionScreen) {
         cue.line = (r > 7 ? r - 2 : r + 1);
       }
 
-      cue.align = 'left';
-      // Clamp the position between 0 and 100 - if out of these bounds, Firefox throws an exception and captions break
-      cue.position = Math.max(0, Math.min(100, 100 * (indent / 32) + (navigator.userAgent.match(/Firefox\//) ? 50 : 0)));
-      track.addCue(cue);
+      // Assume that if there's the same amount of white space (indent) before and after cue.text,
+      // the text should be centered.
+      // Account for slight overflow by using a tolerance of 2 columns
+      if (Math.abs(32 - (cue.text.length + indent * 2)) > 2) {
+        // The column width is defined as 2.5% of the video width, because CEA-608 requires 32 columns of characters
+        // to be rendered on 80% of the video's width.
+        // https://dvcs.w3.org/hg/text-tracks/raw-file/default/608toVTT/608toVTT.html#positioning-in-cea-608
+        cue.align = 'left';
+        cue.position = Math.max(10, Math.min(90, 10 + 2.5 * indent));
+      }
+      cues.push(cue);
     }
   }
+
+  return cues;
 }

@@ -103,6 +103,6 @@ export class BufferHelper {
         break;
       }
     }
-    return { len: bufferLen, start: bufferStart, end: bufferEnd, nextStart: bufferStartNext };
+    return { len: bufferLen, start: bufferStart || 0, end: bufferEnd || 0, nextStart: bufferStartNext };
   }
 }

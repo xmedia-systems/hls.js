@@ -275,7 +275,7 @@ class PlaylistLoader extends EventHandler {
   }
 
   loadtimeout (stats, context, networkDetails = null) {
-    this._handleNetworkError(context, networkDetails, true);
+    this._handleNetworkError(context, networkDetails, true, null);
   }
 
   _handleMasterPlaylist (response, stats, context, networkDetails) {
@@ -299,6 +299,7 @@ class PlaylistLoader extends EventHandler {
 
     let audioTracks = M3U8Parser.parseMasterPlaylistMedia(string, url, 'AUDIO', audioGroups);
     let subtitles = M3U8Parser.parseMasterPlaylistMedia(string, url, 'SUBTITLES');
+    let captions = M3U8Parser.parseMasterPlaylistMedia(string, url, 'CLOSED-CAPTIONS');
 
     if (audioTracks.length) {
       // check if we have found an audio track embedded in main playlist (audio track without URI attribute)
@@ -326,6 +327,7 @@ class PlaylistLoader extends EventHandler {
       levels,
       audioTracks,
       subtitles,
+      captions,
       url,
       stats,
       networkDetails
@@ -344,9 +346,20 @@ class PlaylistLoader extends EventHandler {
     const levelType = PlaylistLoader.mapContextToLevelType(context);
 
     const levelDetails = M3U8Parser.parseLevelPlaylist(response.data, url, levelId, levelType, levelUrlId);
-
     // set stats on level structure
     levelDetails.tload = stats.tload;
+
+    if (!levelDetails.fragments.length) {
+      hls.trigger(Event.ERROR, {
+        type: ErrorTypes.NETWORK_ERROR,
+        details: ErrorDetails.LEVEL_EMPTY_ERROR,
+        fatal: false,
+        url: url,
+        reason: 'no fragments found in level',
+        level: context.level
+      });
+      return;
+    }
 
     // We have done our first request (Manifest-type) and receive
     // not a master playlist but a chunk-list (track/level)
@@ -417,16 +430,17 @@ class PlaylistLoader extends EventHandler {
     this.hls.trigger(Event.ERROR, {
       type: ErrorTypes.NETWORK_ERROR,
       details: ErrorDetails.MANIFEST_PARSING_ERROR,
-      fatal: true,
+      fatal: context.type === ContextType.MANIFEST,
       url: response.url,
       reason,
+      response,
+      context,
       networkDetails
     });
   }
 
   _handleNetworkError (context, networkDetails, timeout = false, response = null) {
     logger.info(`A network error occured while loading a ${context.type}-type playlist`);
-
     let details;
     let fatal;
 
@@ -459,8 +473,9 @@ class PlaylistLoader extends EventHandler {
       type: ErrorTypes.NETWORK_ERROR,
       details,
       fatal,
-      url: loader.url,
+      url: context.url,
       loader,
+      response,
       context,
       networkDetails
     };

@@ -13,6 +13,7 @@ export default class GapController {
     this.fragmentTracker = fragmentTracker;
     this.hls = hls;
     this.stallReported = false;
+    this.sourceBuffers = {};
   }
 
   /**
@@ -67,14 +68,16 @@ export default class GapController {
    * @private
    */
   _tryFixBufferStall (bufferInfo, stalledDuration) {
-    const { config, fragmentTracker, media } = this;
+    const { config, media, sourceBuffers } = this;
     const currentTime = media.currentTime;
 
-    const partial = fragmentTracker.getPartialFragment(currentTime);
-    if (partial) {
-      // Try to skip over the buffer hole caused by a partial fragment
-      // This method isn't limited by the size of the gap between buffered ranges
-      this._trySkipBufferHole(partial);
+    if (sourceBuffers.video && sourceBuffers.audio) {
+      // Since HTMLMediaElement buffered times are determined by the intersection of all sourceBuffers, gaps are caused
+      // by any ranges which exist in one buffer but not the other. The XOR ^  will return true if a buffer range exists
+      // in one sourceBuffer but not the other; and false if it exists in both or neither
+      if (BufferHelper.isBuffered(sourceBuffers.video, currentTime) ^ BufferHelper.isBuffered(sourceBuffers.audio, currentTime)) {
+        this._trySkipBufferHole();
+      }
     }
 
     if (bufferInfo.len > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
@@ -106,12 +109,7 @@ export default class GapController {
     }
   }
 
-  /**
-   * Attempts to fix buffer stalls by jumping over known gaps caused by partial fragments
-   * @param partial - The partial fragment found at the current time (where playback is stalling).
-   * @private
-   */
-  _trySkipBufferHole (partial) {
+  _trySkipBufferHole () {
     const { hls, media } = this;
     const currentTime = media.currentTime;
     let lastEndTime = 0;
@@ -126,8 +124,7 @@ export default class GapController {
           type: ErrorTypes.MEDIA_ERROR,
           details: ErrorDetails.BUFFER_SEEK_OVER_HOLE,
           fatal: false,
-          reason: `fragment loaded with buffer holes, seeking from ${currentTime} to ${media.currentTime}`,
-          frag: partial
+          reason: `fragment loaded with buffer holes, seeking from ${currentTime} to ${media.currentTime}`
         });
         return;
       }

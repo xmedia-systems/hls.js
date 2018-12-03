@@ -471,4 +471,21 @@ export default class LevelController extends EventHandler {
       this.hls.nextAutoLevel = nextLevel;
     }
   }
+
+  removeLevel (levelIndex, urlId) {
+    this._levels = this.levels.filter((level, index) => {
+      if (index !== levelIndex) {
+        return true;
+      }
+
+      if (level.url.length > 1 && urlId !== undefined) {
+        level.url = level.url.filter((url, id) => id !== urlId);
+        level.urlId = 0;
+        return true;
+      }
+      return false;
+    });
+
+    this.hls.trigger(Event.LEVELS_UPDATED, { levels: this._levels });
+  }
 }

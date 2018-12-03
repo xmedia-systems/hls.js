@@ -53,14 +53,17 @@ class StreamController extends TaskLoop {
       Event.AUDIO_TRACK_SWITCHED,
       Event.BUFFER_CREATED,
       Event.BUFFER_APPENDED,
-      Event.BUFFER_FLUSHED);
+      Event.BUFFER_FLUSHED,
+      Event.LEVELS_UPDATED
+    );
 
-    this.fragmentTracker = fragmentTracker;
-    this.config = hls.config;
     this.audioCodecSwap = false;
-    this._state = State.STOPPED;
-    this.stallReported = false;
+    this.bitrateTest = false;
+    this.config = hls.config;
+    this.fragmentTracker = fragmentTracker;
     this.gapController = null;
+    this.stallReported = false;
+    this._state = State.STOPPED;
   }
 
   onHandlerDestroying () {
@@ -76,7 +79,7 @@ class StreamController extends TaskLoop {
 
   startLoad (startPosition) {
     if (this.levels) {
-      let lastCurrentTime = this.lastCurrentTime, hls = this.hls;
+      const { lastCurrentTime, hls } = this;
       this.stopLoad();
       this.setInterval(TICK_INTERVAL);
       this.level = -1;
@@ -85,9 +88,13 @@ class StreamController extends TaskLoop {
         // determine load level
         let startLevel = hls.startLevel;
         if (startLevel === -1) {
-          // -1 : guess start Level by doing a bitrate test by loading first fragment of lowest quality level
-          startLevel = 0;
-          this.bitrateTest = true;
+          if (hls.config.testBandwidth) {
+            // -1 : guess start Level by doing a bitrate test by loading first fragment of lowest quality level
+            startLevel = 0;
+            this.bitrateTest = true;
+          } else {
+            startLevel = hls.nextAutoLevel;
+          }
         }
         // set new level to playlist loader : this will trigger start level load
         // hls.nextLoadLevel remains until it is set to a new value or until a new frag is successfully loaded
@@ -187,10 +194,10 @@ class StreamController extends TaskLoop {
     }
 
     // if we have not yet loaded any fragment, start loading from start position
-    let pos;
+    let pos = 0;
     if (this.loadedmetadata) {
       pos = media.currentTime;
-    } else {
+    } else if (this.nextLoadPosition) {
       pos = this.nextLoadPosition;
     }
 
@@ -429,7 +436,7 @@ class StreamController extends TaskLoop {
             // and if previous remuxed fragment did not start with a keyframe. (fragPrevious.dropped)
             // let's try to load previous fragment again to get last keyframe
             // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
-            if (deltaPTS && deltaPTS > config.maxBufferHole && fragPrevious.dropped && curSNIdx) {
+            if (deltaPTS && deltaPTS > config.maxBufferHole && fragPrevious.dropped && curSNIdx && !frag.backtracked) {
               frag = prevFrag;
               logger.warn('SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this');
             } else {
@@ -480,7 +487,7 @@ class StreamController extends TaskLoop {
     }
 
     // Allow backtracked fragments to load
-    if (frag.backtracked || fragState === FragmentState.NOT_LOADED || fragState === FragmentState.PARTIAL) {
+    if (frag.backtracked || fragState === FragmentState.NOT_LOADED) {
       frag.autoLevel = this.hls.autoLevelEnabled;
       frag.bitrateTest = this.bitrateTest;
 
@@ -570,7 +577,8 @@ class StreamController extends TaskLoop {
 
       if (BufferHelper.isBuffered(video, currentTime)) {
         fragPlayingCurrent = this.getBufferedFrag(currentTime);
-      } else if (BufferHelper.isBuffered(video, currentTime + 0.1)) {
+      }
+      if (!fragPlayingCurrent && BufferHelper.isBuffered(video, currentTime + 0.1)) {
         /* ensure that FRAG_CHANGED event is triggered at startup,
           when first video frame is displayed and playback is paused.
           add a tolerance of 100ms, in case current position is not buffered,
@@ -824,6 +832,7 @@ class StreamController extends TaskLoop {
     this.fragmentTracker.removeAllFragments();
     this.stalled = false;
     this.startPosition = this.lastCurrentTime = 0;
+    this.fragPlaying = null;
   }
 
   onManifestParsed (data) {
@@ -862,7 +871,7 @@ class StreamController extends TaskLoop {
     const duration = newDetails.totalduration;
     let sliding = 0;
 
-    logger.log(`level ${newLevelId} loaded [${newDetails.startSN},${newDetails.endSN}],duration:${duration}`);
+    logger.log(`level ${newLevelId} loaded [${newDetails.startSN},${newDetails.endSN}], cc [${newDetails.startCC}, ${newDetails.endCC}] duration:${duration}`);
 
     if (newDetails.live) {
       let curDetails = curLevel.details;
@@ -1126,7 +1135,7 @@ class StreamController extends TaskLoop {
         }
       }
 
-      let drift = LevelHelper.updateFragPTSDTS(level.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS),
+      let drift = LevelHelper.updateFragPTSDTS(level.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS, data.type),
         hls = this.hls;
       hls.trigger(Event.LEVEL_PTS_UPDATED, { details: level.details, level: this.level, drift: drift, type: data.type, start: data.startPTS, end: data.endPTS });
       // has remuxer dropped video frames located before first keyframe ?
@@ -1220,6 +1229,7 @@ class StreamController extends TaskLoop {
         if (type === 'video') {
           this.videoBuffer = tracks[type].buffer;
         }
+        this.gapController.sourceBuffers[type] = tracks[type].buffer;
       } else {
         alternate = true;
       }
@@ -1400,6 +1410,10 @@ class StreamController extends TaskLoop {
     this.state = State.IDLE;
     // reset reference to frag
     this.fragPrevious = null;
+  }
+
+  onLevelsUpdated (data) {
+    this.levels = data.levels;
   }
 
   swapAudioCodec () {

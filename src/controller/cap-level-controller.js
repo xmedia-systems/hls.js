@@ -11,6 +11,7 @@ class CapLevelController extends EventHandler {
       Event.FPS_DROP_LEVEL_CAPPING,
       Event.MEDIA_ATTACHING,
       Event.MANIFEST_PARSED,
+      Event.LEVELS_UPDATED,
       Event.BUFFER_CODECS,
       Event.MEDIA_DETACHING);
 
@@ -70,7 +71,7 @@ class CapLevelController extends EventHandler {
   }
 
   detectPlayerSize () {
-    if (this.media) {
+    if (this.media && this.mediaHeight > 0 && this.mediaWidth > 0) {
       let levelsLength = this.levels ? this.levels.length : 0;
       if (levelsLength) {
         const hls = this.hls;

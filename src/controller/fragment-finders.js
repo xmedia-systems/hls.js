@@ -2,7 +2,7 @@ import BinarySearch from '../utils/binary-search';
 
 /**
  * Returns first fragment whose endPdt value exceeds the given PDT.
- * @param {Array<Fragment>} fragments - The array of candidate fragments
+ * @param {Array} fragments - The array of candidate fragments
  * @param {number|null} [PDTValue = null] - The PDT value which must be exceeded
  * @param {number} [maxFragLookUpTolerance = 0] - The amount of time that a fragment's start/end can be within in order to be considered contiguous
  * @returns {*|null} fragment - The best matching fragment
@@ -37,7 +37,7 @@ export function findFragmentByPDT (fragments, PDTValue, maxFragLookUpTolerance) 
  * This method compensates for small buffer gaps by applying a tolerance to the start of any candidate fragment, thus
  * breaking any traps which would cause the same fragment to be continuously selected within a small range.
  * @param {*} fragPrevious - The last frag successfully appended
- * @param {Array<Fragment>} fragments - The array of candidate fragments
+ * @param {Array} fragments - The array of candidate fragments
  * @param {number} [bufferEnd = 0] - The end of the contiguous buffered range the playhead is currently within
  * @param {number} maxFragLookUpTolerance - The amount of time that a fragment's start/end can be within in order to be considered contiguous
  * @returns {*} foundFrag - The best matching fragment
