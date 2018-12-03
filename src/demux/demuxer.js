@@ -94,32 +94,35 @@ class Demuxer {
   }
 
   push (data, initSegment, audioCodec, videoCodec, frag, duration, accurateTimeOffset, defaultInitPTS) {
-    const w = this.w;
-    const videoStartDTS = frag.timing['video'] ? frag.timing['video'].startDTS : null;
-    const timeOffset = Number.isFinite(videoStartDTS) ? videoStartDTS : frag.start;
-    const decryptdata = frag.decryptdata;
-    const lastFrag = this.frag;
+    const { demuxer, frag: lastFrag, id, w: worker } = this;
+
+    let timeOffset;
+    if (lastFrag) {
+      timeOffset = lastFrag.timing.video.endDTS;
+    }
+    if (!Number.isFinite(timeOffset)) {
+      const videoStartDTS = frag.timing.video.startDTS;
+      timeOffset = Number.isFinite(videoStartDTS) ? videoStartDTS : frag.start;
+    }
     const discontinuity = !(lastFrag && (frag.cc === lastFrag.cc));
     const trackSwitch = !(lastFrag && (frag.level === lastFrag.level));
     const nextSN = lastFrag && (frag.sn === (lastFrag.sn + 1));
     const contiguous = !trackSwitch && nextSN;
-    if (discontinuity) {
-      logger.log(`${this.id}:discontinuity detected`);
-    }
 
+    if (discontinuity) {
+      logger.log(`${id}:discontinuity detected`);
+    }
     if (trackSwitch) {
-      logger.log(`${this.id}:switch detected`);
+      logger.log(`${id}:switch detected`);
     }
 
     this.frag = frag;
-    if (w) {
+    const decryptdata = frag.decryptdata;
+    if (worker) {
       // post fragment payload as transferable objects for ArrayBuffer (no copy)
-      w.postMessage({ cmd: 'demux', data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS }, data instanceof ArrayBuffer ? [data] : []);
-    } else {
-      let demuxer = this.demuxer;
-      if (demuxer) {
-        demuxer.push(data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS);
-      }
+      worker.postMessage({ cmd: 'demux', data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS }, data instanceof ArrayBuffer ? [data] : []);
+    } else if (demuxer) {
+      demuxer.push(data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS);
     }
   }
 

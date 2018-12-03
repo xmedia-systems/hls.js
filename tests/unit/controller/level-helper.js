@@ -1,4 +1,4 @@
-import * as LevelHelper from '../../../src/controller/level-helper';
+import { updateFragPTSDTS, updatePTS } from '../../../src/controller/level-helper';
 
 describe('level-helper', function () {
   describe('updateFragPTSDTS', function () {
@@ -31,7 +31,7 @@ describe('level-helper', function () {
         const startDTS = 1;
         const endDTS = 11;
 
-        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
+        updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 2, 12, 1, 11, 2);
       });
 
@@ -46,7 +46,7 @@ describe('level-helper', function () {
         frag.startDTS = 2;
         frag.endDTS = 12;
 
-        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
+        updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 3, 12, 2, 11, 3);
         expect(frag.deltaPTS).to.equal(1);
 
@@ -55,7 +55,7 @@ describe('level-helper', function () {
         frag.startDTS = 0;
         frag.endDTS = 10;
 
-        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
+        updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 2, 10, 1, 10, 2);
         expect(frag.deltaPTS).to.equal(2);
       });
@@ -71,7 +71,7 @@ describe('level-helper', function () {
         frag.startDTS = 2;
         frag.endDTS = 12;
 
-        LevelHelper.updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
+        updateFragPTSDTS(null, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 3, 24, 1, 12, 14);
         expect(frag.deltaPTS).to.equal(11);
       });
@@ -91,7 +91,7 @@ describe('level-helper', function () {
         details.live = false;
         frag.sn = 5;
 
-        LevelHelper.updateFragPTSDTS(details, frag, startPTS, endPTS, startDTS, endDTS, 'video');
+        updateFragPTSDTS(details, frag, startPTS, endPTS, startDTS, endDTS, 'video');
         checkFragProperties(frag, 3, 13, 2, 12, 3);
         expect(frag.deltaPTS).to.equal(1);
       });
@@ -113,14 +113,35 @@ describe('level-helper', function () {
 
       it('returns a drift of 0 if the fragment is out of the sequence range of its level', function () {
         frag.sn = 50;
-        expect(LevelHelper.updateFragPTSDTS(details, frag, startPTS, endPTS, startDTS, endDTS)).to.equal(0);
+        expect(updateFragPTSDTS(details, frag, startPTS, endPTS, startDTS, endDTS)).to.equal(0);
       });
 
       it('returns the drift between startPTS and fragStart if the fragment is within the sequence range', function () {
         frag.sn = 0;
         frag.start = 0;
-        expect(LevelHelper.updateFragPTSDTS(details, frag, startPTS, endPTS, startDTS, endDTS)).to.equal(2);
+        expect(updateFragPTSDTS(details, frag, startPTS, endPTS, startDTS, endDTS)).to.equal(2);
       });
+    });
+  });
+
+  describe('updatePTS', function () {
+    let fragments;
+    beforeEach(function () {
+      fragments = [
+        { start: 0.5,
+          duration: 4,
+          timing: {
+            audio: { startPTS: 0.5, endPTS: 4.5, startDTS: 0.5, endDTS: 4.5 },
+            video: { startPTS: 0.5, endPTS: 4.5, startDTS: 0.5, endDTS: 4.5 }
+          }
+        },
+        { start: 4, timing: {} },
+        { start: 8, timing: {} }
+      ];
+    });
+
+    describe('timing estimation', function () {
+
     });
   });
 });

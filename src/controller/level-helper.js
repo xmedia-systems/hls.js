@@ -27,7 +27,9 @@ export function addGroupId (level, type, id) {
 }
 
 export function updatePTS (fragments, fromIdx, toIdx, type) {
-  let fragFrom = fragments[fromIdx], fragTo = fragments[toIdx], fragToPTS = fragTo.startPTS;
+  const fragFrom = fragments[fromIdx];
+  const fragTo = fragments[toIdx];
+  const fragToPTS = fragTo.startPTS;
   // if we know startPTS[toIdx]
   if (Number.isFinite(fragToPTS)) {
     // update fragment duration.
@@ -45,21 +47,10 @@ export function updatePTS (fragments, fromIdx, toIdx, type) {
     }
   } else {
     // we dont know startPTS[toIdx]
-    const fromTiming = fragFrom.timing;
-    const toTiming = fragTo.timing;
-    const { startPTS, endPTS, startDTS, endDTS } = fromTiming[type];
     if (toIdx > fromIdx) {
       fragTo.start = fragFrom.start + fragFrom.duration;
-      toTiming[type].startPTS = endPTS;
-      toTiming[type].endPTS = endPTS + (endPTS - startPTS);
-      toTiming[type].startDTS = endDTS;
-      toTiming[type].endDTS = endDTS + (endDTS - startDTS);
     } else {
       fragTo.start = fragFrom.start - fragFrom.duration;
-      toTiming[type].startPTS = startPTS - (endPTS - startPTS);
-      toTiming[type].endPTS = startPTS;
-      toTiming[type].startDTS = startDTS - (endDTS - startDTS);
-      toTiming[type].endDTS = startDTS;
     }
   }
 }
