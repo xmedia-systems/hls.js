@@ -140,6 +140,7 @@ const WebVTTParser = {
           });
           try {
             // Calculate subtitle offset in milliseconds.
+            syncPTS += (vttCCs[cc].start * 90000) || 0;
             syncPTS = syncPTS < 0 ? syncPTS + 8589934592 : syncPTS;
             // Adjust MPEGTS by sync PTS.
             mpegTs -= syncPTS;
