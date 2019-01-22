@@ -123,7 +123,7 @@ export default class Hls extends Observer {
     const capLevelController = new config.capLevelController(this); // eslint-disable-line new-cap
     const fpsController = new config.fpsController(this); // eslint-disable-line new-cap
     const playListLoader = new PlaylistLoader(this);
-    const fragmentLoader = new FragmentLoader(this);
+    // const fragmentLoader = new FragmentLoader(this);
     const keyLoader = new KeyLoader(this);
 
     // network controllers
@@ -162,7 +162,7 @@ export default class Hls extends Observer {
      */
     const coreComponents = [
       playListLoader,
-      fragmentLoader,
+      // fragmentLoader,
       keyLoader,
       abrController,
       bufferController,

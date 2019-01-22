@@ -12,6 +12,7 @@ import BaseStreamController, { State } from './base-stream-controller';
 import { mergeSubtitlePlaylists } from './level-helper';
 
 const { performance } = window;
+
 const TICK_INTERVAL = 500; // how often to tick in ms
 
 export class SubtitleStreamController extends BaseStreamController {
@@ -21,21 +22,31 @@ export class SubtitleStreamController extends BaseStreamController {
       Event.MEDIA_DETACHING,
       Event.ERROR,
       Event.KEY_LOADED,
-      Event.FRAG_LOADED,
       Event.SUBTITLE_TRACKS_UPDATED,
       Event.SUBTITLE_TRACK_SWITCH,
       Event.SUBTITLE_TRACK_LOADED,
       Event.SUBTITLE_FRAG_PROCESSED,
       Event.LEVEL_UPDATED);
 
-    this.fragmentTracker = fragmentTracker;
     this.config = hls.config;
+    this.currentTrackId = -1;
+    this.decrypter = new Decrypter(hls, hls.config);
+    this.fragCurrent = null;
+    this.fragmentTracker = fragmentTracker;
+    this.fragPrevious = null;
+    this.media = null;
     this.state = State.STOPPED;
     this.tracks = [];
     this.tracksBuffered = [];
     this.currentTrackId = -1;
     this.decrypter = new Decrypter(hls, hls.config);
     this.lastAVStart = 0;
+  }
+
+  onHandlerDestroyed () {
+    this.fragmentTracker = null;
+    this.state = State.STOPPED;
+    super.onHandlerDestroyed();
   }
 
   onSubtitleFragProcessed (data) {
@@ -141,26 +152,28 @@ export class SubtitleStreamController extends BaseStreamController {
     }
   }
 
-  onFragLoaded (data) {
-    const fragCurrent = this.fragCurrent;
-    const decryptData = data.frag.decryptdata;
-    const fragLoaded = data.frag;
+  onFragLoaded (frag, payload, stats) {
+    const decryptData = frag.decryptdata;
     const hls = this.hls;
 
-    if (this.state === State.FRAG_LOADING &&
-        fragCurrent &&
-        data.frag.type === 'subtitle' &&
-        fragCurrent.sn === data.frag.sn) {
-      // check to see if the payload needs to be decrypted
-      if (data.payload.byteLength > 0 && (decryptData && decryptData.key && decryptData.method === 'AES-128')) {
-        let startTime = performance.now();
-
-        // decrypt the subtitles
-        this.decrypter.decrypt(data.payload, decryptData.key.buffer, decryptData.iv.buffer, function (decryptedData) {
-          let endTime = performance.now();
-          hls.trigger(Event.FRAG_DECRYPTED, { frag: fragLoaded, payload: decryptedData, stats: { tstart: startTime, tdecrypt: endTime } });
+    if (this._fragLoadAborted(frag)) {
+      return;
+    }
+    // check to see if the payload needs to be decrypted
+    if (payload.byteLength > 0 && (decryptData && decryptData.key && decryptData.method === 'AES-128')) {
+      let startTime = performance.now();
+      // decrypt the subtitles
+      this.decrypter.decrypt(payload, decryptData.key.buffer, decryptData.iv.buffer, function (decryptedData) {
+        const endTime = performance.now();
+        hls.trigger(Event.FRAG_DECRYPTED, {
+          frag,
+          payload: decryptedData,
+          stats: {
+            tstart: startTime,
+            tdecrypt: endTime
+          }
         });
-      }
+      });
     }
   }
 
@@ -216,8 +229,7 @@ export class SubtitleStreamController extends BaseStreamController {
       } else if (foundFrag && fragmentTracker.getState(foundFrag) === FragmentState.NOT_LOADED) {
         // only load if fragment is not loaded
         this.fragCurrent = foundFrag;
-        this.state = State.FRAG_LOADING;
-        this.hls.trigger(Event.FRAG_LOADING, { frag: foundFrag });
+        this._loadFragForPlayback(foundFrag);
       }
     }
     }
