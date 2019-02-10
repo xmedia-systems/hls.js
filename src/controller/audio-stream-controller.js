@@ -13,8 +13,9 @@ import { findFragWithCC } from '../utils/discontinuities';
 import { FragmentState } from './fragment-tracker';
 import Fragment, { ElementaryStreamTypes } from '../loader/fragment';
 import BaseStreamController, { State } from './base-stream-controller';
-const { performance } = window;
 import FragmentLoader from '../loader/fragment-loader';
+import { findFragmentByPTS } from './fragment-finders';
+const { performance } = window;
 
 const TICK_INTERVAL = 100; // how often to tick in ms
 
@@ -44,6 +45,7 @@ class AudioStreamController extends BaseStreamController {
     this.waitingFragment = null;
     this.videoTrackCC = null;
     this.fragmentLoader = new FragmentLoader(hls.config);
+    this.levels = [];
   }
 
   // Signal that video PTS was found
@@ -65,7 +67,7 @@ class AudioStreamController extends BaseStreamController {
   }
 
   startLoad (startPosition) {
-    if (this.tracks) {
+    if (this.levels) {
       let lastCurrentTime = this.lastCurrentTime;
       this.stopLoad();
       this.setInterval(TICK_INTERVAL);
@@ -112,9 +114,9 @@ class AudioStreamController extends BaseStreamController {
       this.loadedmetadata = false;
       break;
     case State.IDLE:
-      const tracks = this.tracks;
+      const levels = this.levels;
       // audio tracks not received => exit loop
-      if (!tracks) {
+      if (!levels) {
         break;
       }
 
@@ -154,8 +156,8 @@ class AudioStreamController extends BaseStreamController {
         trackId = this.trackId;
 
         // if buffer length is less than maxBufLen try to load a new fragment
-      if ((bufferLen < maxBufLen || audioSwitch) && trackId < tracks.length) {
-        trackDetails = tracks[trackId].details;
+      if ((bufferLen < maxBufLen || audioSwitch) && trackId < levels.length) {
+        trackDetails = levels[trackId].details;
         // if track info not retrieved yet, switch state and wait for track retrieval
         if (typeof trackDetails === 'undefined') {
           this.state = State.WAITING_TRACK;
@@ -266,7 +268,7 @@ class AudioStreamController extends BaseStreamController {
       }
       break;
     case State.WAITING_TRACK:
-      track = this.tracks[this.trackId];
+      track = this.levels[this.trackId];
       // check if playlist is already loaded
       if (track && track.details) {
         this.state = State.IDLE;
@@ -295,7 +297,7 @@ class AudioStreamController extends BaseStreamController {
       if (waitingFrag) {
         const waitingFragCC = waitingFrag.frag.cc;
         if (videoTrackCC !== waitingFragCC) {
-          track = this.tracks[this.trackId];
+          track = this.levels[this.trackId];
           if (track.details && track.details.live) {
             logger.warn(`Waiting fragment CC (${waitingFragCC}) does not match video track CC (${videoTrackCC})`);
             this.waitingFragment = null;
@@ -329,7 +331,7 @@ class AudioStreamController extends BaseStreamController {
     media.addEventListener('seeking', this.onvseeking);
     media.addEventListener('ended', this.onvended);
     let config = this.config;
-    if (this.tracks && config.autoStartLoad) {
+    if (this.levels && config.autoStartLoad) {
       this.startLoad(config.startPosition);
     }
   }
@@ -354,7 +356,7 @@ class AudioStreamController extends BaseStreamController {
 
   onAudioTracksUpdated (data) {
     logger.log('audio tracks updated');
-    this.tracks = data.audioTracks;
+    this.levels = data.audioTracks;
   }
 
   onAudioTrackSwitching (data) {
@@ -388,7 +390,7 @@ class AudioStreamController extends BaseStreamController {
   onAudioTrackLoaded (data) {
     let newDetails = data.details,
       trackId = data.id,
-      track = this.tracks[trackId],
+      track = this.levels[trackId],
       duration = newDetails.totalduration,
       sliding = 0;
 
@@ -448,9 +450,9 @@ class AudioStreamController extends BaseStreamController {
   }
 
   onFragLoaded (frag, payload, stats) {
-    const { config, trackId, tracks } = this;
+    const { config, trackId, levels } = this;
     const { cc, sn } = frag;
-    const track = tracks[trackId];
+    const track = levels[trackId];
     const details = track.details;
     const audioCodec = config.defaultAudioCodec || track.audioCodec || 'mp4a.40.2';
     this.stats = stats;
@@ -470,7 +472,7 @@ class AudioStreamController extends BaseStreamController {
       logger.log(`Demuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
       // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
       let accurateTimeOffset = false; // details.PTSKnown || !details.live;
-      this.demuxer.push(payload, initSegmentData, audioCodec, null, frag, details.duration, accurateTimeOffset, initPTS);
+      this.demuxer.push(payload, initSegmentData, audioCodec, null, frag, details.totalduration, accurateTimeOffset, initPTS);
     } else {
       logger.log(`unknown video PTS for continuity counter ${cc}, waiting for video PTS before demuxing audio frag ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
       this.waitingFragment = { frag, payload, stats };
