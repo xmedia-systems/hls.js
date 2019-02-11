@@ -3,12 +3,12 @@ const webdriver = require('selenium-webdriver');
 const chromedriver = require('chromedriver');
 const HttpServer = require('http-server');
 const streams = require('../../test-streams');
-
 const browserConfig = { version: 'latest' };
 const onTravis = !!process.env.TRAVIS;
+const chai = require('chai');
+const expect = chai.expect;
 
 let browserDescription;
-
 let stream;
 
 // Setup browser config data from env vars
