@@ -7,26 +7,10 @@ import MP4 from './mp4-generator';
 import Event from '../events';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { logger } from '../utils/logger';
+import { InitSegmentData, RemuxerResult, RemuxedMetadata, RemuxedTrack } from '../types/remuxer';
 
 // 10 seconds
 const MAX_SILENT_FRAME_DURATION = 10 * 1000;
-
-interface RemuxedTrack {
-    data1: Uint8Array
-    data2: Uint8Array
-    startPTS: number
-    endPTS: number
-    startDTS: number
-    endDTS: number
-    type: string
-    hasAudio: boolean
-    hasVideo: boolean
-    nb: number
-}
-
-interface RemuxedMetadata {
-  samples: Uint8Array
-}
 
 class MP4Remuxer {
   private observer: any;
@@ -59,10 +43,15 @@ class MP4Remuxer {
     this.ISGenerated = false;
   }
 
-  remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset) {
+  remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset) : RemuxerResult {
     // generate Init Segment if needed
+    let video;
+    let audio;
+    let initSegment;
+    let text;
+    let id3;
     if (!this.ISGenerated) {
-      this.generateIS(audioTrack, videoTrack, timeOffset);
+      initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
     }
 
     if (this.ISGenerated) {
@@ -86,57 +75,62 @@ class MP4Remuxer {
         // if initSegment was generated without video samples, regenerate it again
         if (!audioTrack.timescale) {
           logger.warn('regenerate InitSegment as audio detected');
-          this.generateIS(audioTrack, videoTrack, timeOffset);
+          initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
         }
-        let audioData = this.remuxAudio(audioTrack, audioTimeOffset, contiguous, accurateTimeOffset);
+        audio = this.remuxAudio(audioTrack, audioTimeOffset, contiguous, accurateTimeOffset);
         // logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (nbVideoSamples) {
           let audioTrackLength;
-          if (audioData) {
-            audioTrackLength = audioData.endPTS - audioData.startPTS;
+          if (audio) {
+            audioTrackLength = audio.endPTS - audio.startPTS;
           }
 
           // if initSegment was generated without video samples, regenerate it again
           if (!videoTrack.timescale) {
             logger.warn('regenerate InitSegment as video detected');
-            this.generateIS(audioTrack, videoTrack, timeOffset);
+            initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
           }
-          this.remuxVideo(videoTrack, videoTimeOffset, contiguous, audioTrackLength, accurateTimeOffset);
+          video = this.remuxVideo(videoTrack, videoTimeOffset, contiguous, audioTrackLength, accurateTimeOffset);
         }
       } else {
         // logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (nbVideoSamples) {
-          let videoData = this.remuxVideo(videoTrack, videoTimeOffset, contiguous, 0, accurateTimeOffset);
-          if (videoData && audioTrack.codec) {
-            this.remuxEmptyAudio(audioTrack, audioTimeOffset, contiguous, videoData);
+          let video = this.remuxVideo(videoTrack, videoTimeOffset, contiguous, 0, accurateTimeOffset);
+          if (video && audioTrack.codec) {
+            audio = this.remuxEmptyAudio(audioTrack, audioTimeOffset, contiguous, video);
           }
         }
       }
     }
     // logger.log('nb ID3 samples:' + audioTrack.samples.length);
     if (id3Track.samples.length) {
-      this.remuxID3(id3Track);
+      id3 = this.remuxID3(id3Track);
     }
 
     // logger.log('nb ID3 samples:' + audioTrack.samples.length);
     if (textTrack.samples.length) {
-      this.remuxText(textTrack);
+      text = this.remuxText(textTrack);
     }
 
-    // notify end of parsing
-    this.observer.trigger(Event.FRAG_PARSED);
+    return {
+      audio,
+      video,
+      initSegment,
+      text,
+      id3
+    };
   }
 
-  generateIS (audioTrack, videoTrack, timeOffset) {
-    let observer = this.observer,
-      audioSamples = audioTrack.samples,
-      videoSamples = videoTrack.samples,
-      typeSupported = this.typeSupported,
-      container = 'audio/mp4',
-      tracks = {} as any,
-      data = { tracks: tracks },
-      computePTSDTS = (this._initPTS === undefined),
-      initPTS, initDTS;
+  generateIS (audioTrack, videoTrack, timeOffset) : InitSegmentData | undefined {
+    const observer = this.observer;
+    const audioSamples = audioTrack.samples;
+    const videoSamples = videoTrack.samples;
+    const typeSupported = this.typeSupported;
+    const tracks = {} as any;
+    const computePTSDTS = (this._initPTS === undefined);
+    let container = 'audio/mp4';
+    let initPTS;
+    let initDTS;
 
     if (computePTSDTS) {
       initPTS = initDTS = Infinity;
@@ -188,23 +182,25 @@ class MP4Remuxer {
       if (computePTSDTS) {
         initPTS = Math.min(initPTS, videoSamples[0].pts - inputTimeScale * timeOffset);
         initDTS = Math.min(initDTS, videoSamples[0].dts - inputTimeScale * timeOffset);
-        this.observer.trigger(Event.INIT_PTS_FOUND, { initPTS: initPTS });
       }
     }
 
     if (Object.keys(tracks).length) {
-      observer.trigger(Event.FRAG_PARSING_INIT_SEGMENT, data);
       this.ISGenerated = true;
       if (computePTSDTS) {
         this._initPTS = initPTS;
         this._initDTS = initDTS;
       }
-    } else {
-      observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'no audio/video samples found' });
+
+      return {
+        tracks,
+        initPTS
+      };
     }
+    observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'no audio/video samples found' });
   }
 
-  remuxVideo (track, timeOffset, contiguous, audioTrackLength, accurateTimeOffset) : RemuxedTrack | null {
+  remuxVideo (track, timeOffset, contiguous, audioTrackLength, accurateTimeOffset) : RemuxedTrack | undefined {
     let offset = 8;
     let mp4SampleDuration;
     let mdat;
@@ -226,7 +222,7 @@ class MP4Remuxer {
     const isSafari = this.isSafari;
 
     if (nbSamples === 0) {
-      return null;
+      return;
     }
 
     // Safari does not like overlapping DTS on consecutive fragments. let's use nextAvcDts to overcome this if fragments are consecutive
@@ -339,7 +335,7 @@ class MP4Remuxer {
       mdat = new Uint8Array(mdatSize);
     } catch (err) {
       this.observer.trigger(Event.ERROR, { type: ErrorTypes.MUX_ERROR, details: ErrorDetails.REMUX_ALLOC_ERROR, fatal: false, bytes: mdatSize, reason: `fail allocating video mdat ${mdatSize}` });
-      return null;
+      return;
     }
     let view = new DataView(mdat.buffer);
     view.setUint32(0, mdatSize);
@@ -445,11 +441,10 @@ class MP4Remuxer {
       nb: outputSamples.length,
       dropped: dropped
     };
-    this.observer.trigger(Event.FRAG_PARSING_DATA, data);
     return data;
   }
 
-  remuxAudio (track, timeOffset, contiguous, accurateTimeOffset): RemuxedTrack | null {
+  remuxAudio (track, timeOffset, contiguous, accurateTimeOffset): RemuxedTrack | undefined {
     const inputTimeScale = track.inputTimeScale;
     const mp4timeScale = track.timescale;
     const scaleFactor = inputTimeScale / mp4timeScale;
@@ -495,7 +490,7 @@ class MP4Remuxer {
 
     // in case all samples have negative PTS, and have been filtered out, return now
     if (inputSamples.length === 0) {
-      return null;
+      return;
     }
 
     if (!contiguous) {
@@ -617,7 +612,7 @@ class MP4Remuxer {
             mdat = new Uint8Array(mdatSize);
           } catch (err) {
             this.observer.trigger(Event.ERROR, { type: ErrorTypes.MUX_ERROR, details: ErrorDetails.REMUX_ALLOC_ERROR, fatal: false, bytes: mdatSize, reason: `fail allocating audio mdat ${mdatSize}` });
-            return null;
+            return;
           }
           if (!rawMPEG) {
             const view = new DataView(mdat.buffer);
@@ -626,7 +621,7 @@ class MP4Remuxer {
           }
         } else {
           // no audio samples
-          return null;
+          return;
         }
         for (let i = 0; i < numMissingFrames; i++) {
           fillFrame = AAC.getSilentFrame(track.manifestCodec || track.codec, track.channelCount);
@@ -704,13 +699,11 @@ class MP4Remuxer {
         hasVideo: false,
         nb: nbSamples
       };
-      this.observer.trigger(Event.FRAG_PARSING_DATA, audioData);
       return audioData;
     }
-    return null;
   }
 
-  remuxEmptyAudio (track, timeOffset, contiguous, videoData) : RemuxedTrack | null {
+  remuxEmptyAudio (track, timeOffset, contiguous, videoData) : RemuxedTrack | undefined {
     let inputTimeScale = track.inputTimeScale,
       mp4timeScale = track.samplerate ? track.samplerate : inputTimeScale,
       scaleFactor = inputTimeScale / mp4timeScale,
@@ -733,7 +726,7 @@ class MP4Remuxer {
     // Can't remux if we can't generate a silent frame...
     if (!silentFrame) {
       logger.trace('Unable to remuxEmptyAudio since we were unable to get a silent frame for given audio codec!');
-      return null;
+      return;
     }
 
     let samples = [] as Array<any>;
@@ -747,52 +740,44 @@ class MP4Remuxer {
     return this.remuxAudio(track, timeOffset, contiguous, false);
   }
 
-  remuxID3 (track) : RemuxedMetadata | null {
-    let length = track.samples.length, sample;
+  remuxID3 (track) : RemuxedMetadata | undefined {
+    const length = track.samples.length;
+    if (!length) {
+      return;
+    }
     const inputTimeScale = track.inputTimeScale;
     const initPTS = this._initPTS;
     const initDTS = this._initDTS;
-    // consume samples
-    if (!length) {
-      return null;
-    }
     for (let index = 0; index < length; index++) {
-      sample = track.samples[index];
+      let sample = track.samples[index];
       // setting id3 pts, dts to relative time
       // using this._initPTS and this._initDTS to calculate relative time
       sample.pts = ((sample.pts - initPTS) / inputTimeScale);
       sample.dts = ((sample.dts - initDTS) / inputTimeScale);
     }
-    const data = {
+    return {
       samples: track.samples
     };
-    this.observer.trigger(Event.FRAG_PARSING_METADATA, data);
-    return data;
   }
 
-  remuxText (track) : RemuxedMetadata | null {
-    track.samples.sort(function (a, b) {
-      return (a.pts - b.pts);
-    });
+  remuxText (track) : RemuxedMetadata | undefined {
+    const length = track.samples.length;
+    if (!length) {
+      return;
+    }
+    track.samples.sort((a, b) => a.pts - b.pts);
 
-    let length = track.samples.length, sample;
     const inputTimeScale = track.inputTimeScale;
     const initPTS = this._initPTS;
-    // consume samples
-    if (!length) {
-      return null;
-    }
     for (let index = 0; index < length; index++) {
-      sample = track.samples[index];
+      let sample = track.samples[index];
       // setting text pts, dts to relative time
       // using this._initPTS and this._initDTS to calculate relative time
       sample.pts = ((sample.pts - initPTS) / inputTimeScale);
     }
-    const data = {
+    return {
       samples: track.samples
     };
-    this.observer.trigger(Event.FRAG_PARSING_USERDATA, data);
-    return data;
   }
 
   _PTSNormalize (value, reference) {
