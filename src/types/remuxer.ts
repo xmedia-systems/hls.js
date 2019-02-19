@@ -1,5 +1,18 @@
 import { TrackSet } from './track';
 
+export interface Remuxer {
+  remux(audioTrack: any,
+        videoTrack: any,
+        id3Track:any,
+        textTrack: any,
+        timeOffset: number,
+        contiguous: boolean,
+        accurateTimeOffset: boolean
+  ): RemuxerResult
+  resetInitSegment(): void
+  resetTimeStamp(defaultInitPTS): void
+}
+
 export interface RemuxedTrack {
     data1: Uint8Array
     data2: Uint8Array
@@ -28,15 +41,4 @@ export interface RemuxerResult {
 export interface InitSegmentData {
     tracks?: TrackSet
     initPTS?: number
-}
-
-export interface Remuxer {
-    remux(audioTrack: any,
-          videoTrack: any,
-          id3Track:any,
-          textTrack: any,
-          timeOffset: number,
-          contiguous: boolean,
-          accurateTimeOffset: boolean
-    ): RemuxerResult
 }

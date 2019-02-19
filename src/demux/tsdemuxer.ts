@@ -17,7 +17,7 @@ import SampleAesDecrypter from './sample-aes';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { Remuxer, RemuxerResult } from '../types/remuxer';
-import { DemuxerResult } from '../types/demuxer';
+import { Demuxer, DemuxerResult } from '../types/demuxer';
 
 // We are using fixed track IDs for driving the MP4 remuxer
 // instead of following the TS PIDs.
@@ -34,7 +34,7 @@ const RemuxerTrackIdConfig = {
   text: 4
 };
 
-class TSDemuxer {
+class TSDemuxer implements Demuxer{
   private observer: any;
   private config: any;
   private typeSupported: any;

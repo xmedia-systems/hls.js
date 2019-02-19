@@ -14,6 +14,8 @@ import TSDemuxer from '../demux/tsdemuxer';
 import MP3Demuxer from '../demux/mp3demuxer';
 import MP4Remuxer from '../remux/mp4-remuxer';
 import PassThroughRemuxer from '../remux/passthrough-remuxer';
+import { Demuxer } from '../types/demuxer';
+import { Remuxer, RemuxerResult } from '../types/remuxer';
 
 import { getSelfScope } from '../utils/get-self-scope';
 import { logger } from '../utils/logger';
@@ -31,6 +33,15 @@ try {
 }
 
 class DemuxerInline {
+  private observer: any;
+  private typeSupported: any;
+  private config: any;
+  private vendor: any;
+  private demuxer!: Demuxer;
+  private remuxer!: Remuxer;
+  private decrypter: any;
+  private probe!: Function;
+
   constructor (observer, typeSupported, config, vendor) {
     this.observer = observer;
     this.typeSupported = typeSupported;
@@ -45,25 +56,39 @@ class DemuxerInline {
     }
   }
 
-  push (data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS) {
-    if ((data.byteLength > 0) && (decryptdata != null) && (decryptdata.key != null) && (decryptdata.method === 'AES-128')) {
-      let decrypter = this.decrypter;
-      if (decrypter == null) {
-        decrypter = this.decrypter = new Decrypter(this.observer, this.config);
-      }
+  push (data: ArrayBuffer,
+    decryptdata: any | null,
+    initSegment: any,
+    audioCodec: string,
+    videoCodec: string,
+    timeOffset: number,
+    discontinuity: boolean,
+    trackSwitch: boolean,
+    contiguous: boolean,
+    duration: number,
+    accurateTimeOffset: boolean,
+    defaultInitPTS: number
+  ): Promise<RemuxerResult> {
+    return new Promise((resolve) => {
+      if ((data.byteLength > 0) && (decryptdata != null) && (decryptdata.key != null) && (decryptdata.method === 'AES-128')) {
+        let decrypter = this.decrypter;
+        if (decrypter === null) {
+          decrypter = this.decrypter = new Decrypter(this.observer, this.config);
+        }
 
-      const startTime = now();
-      decrypter.decrypt(data, decryptdata.key.buffer, decryptdata.iv.buffer, (decryptedData) => {
-        const endTime = now();
-        this.observer.trigger(Event.FRAG_DECRYPTED, { stats: { tstart: startTime, tdecrypt: endTime } });
-        this.pushDecrypted(new Uint8Array(decryptedData), decryptdata, new Uint8Array(initSegment), audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS);
-      });
-    } else {
-      this.pushDecrypted(new Uint8Array(data), decryptdata, new Uint8Array(initSegment), audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS);
-    }
+        const startTime = now();
+        decrypter.decrypt(data, decryptdata.key.buffer, decryptdata.iv.buffer, (decryptedData) => {
+          const endTime = now();
+          this.observer.trigger(Event.FRAG_DECRYPTED, { stats: { tstart: startTime, tdecrypt: endTime } });
+          resolve(this.pushDecrypted(new Uint8Array(decryptedData), decryptdata, new Uint8Array(initSegment), audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS));
+        });
+      } else {
+        resolve(this.pushDecrypted(new Uint8Array(data), decryptdata, new Uint8Array(initSegment), audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS));
+      }
+    });
   }
 
-  pushDecrypted (data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS) {
+  pushDecrypted (data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS): Promise<RemuxerResult> {
     let demuxer = this.demuxer;
     if (!demuxer ||
       // in case of continuity change, or track switch
@@ -94,7 +119,7 @@ class DemuxerInline {
       }
       if (!demuxer) {
         observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: true, reason: 'no demux matching with content found' });
-        return;
+        return Promise.reject();
       }
       this.demuxer = demuxer;
     }
@@ -112,7 +137,7 @@ class DemuxerInline {
       demuxer.setDecryptData(decryptdata);
     }
 
-    demuxer.append(data, timeOffset, contiguous, accurateTimeOffset);
+    return demuxer.append(data, timeOffset, contiguous, accurateTimeOffset);
   }
 }
 
