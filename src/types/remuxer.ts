@@ -29,3 +29,14 @@ export interface InitSegmentData {
     tracks?: TrackSet
     initPTS?: number
 }
+
+export interface Remuxer {
+    remux(audioTrack: any,
+          videoTrack: any,
+          id3Track:any,
+          textTrack: any,
+          timeOffset: number,
+          contiguous: boolean,
+          accurateTimeOffset: boolean
+    ): RemuxerResult
+}

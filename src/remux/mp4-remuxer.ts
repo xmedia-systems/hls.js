@@ -7,12 +7,12 @@ import MP4 from './mp4-generator';
 import Event from '../events';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { logger } from '../utils/logger';
-import { InitSegmentData, RemuxerResult, RemuxedMetadata, RemuxedTrack } from '../types/remuxer';
+import { InitSegmentData, Remuxer, RemuxerResult, RemuxedMetadata, RemuxedTrack } from '../types/remuxer';
 
 // 10 seconds
 const MAX_SILENT_FRAME_DURATION = 10 * 1000;
 
-class MP4Remuxer {
+class MP4Remuxer implements Remuxer {
   private observer: any;
   private config: any;
   private typeSupported: any;

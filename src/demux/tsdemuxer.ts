@@ -17,6 +17,7 @@ import SampleAesDecrypter from './sample-aes';
 // import Hex from '../utils/hex';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
+import { Remuxer, RemuxerResult } from '../types/remuxer';
 
 // We are using fixed track IDs for driving the MP4 remuxer
 // instead of following the TS PIDs.
@@ -34,12 +35,34 @@ const RemuxerTrackIdConfig = {
 };
 
 class TSDemuxer {
+  private observer: any;
+  private config: any;
+  private typeSupported: any;
+  private remuxer: Remuxer;
+
+  private sampleAes: any = null;
+  private pmtParsed: boolean = false;
+  private contiguous: boolean = false;
+  private audioCodec!: string;
+  private videoCodec!: string;
+  private _duration: number = 0;
+  private aacLastPTS: number | null = null;
+  private _initPTS: number | null = null;
+  private _initDTS?: number | null = null;
+  private _pmtId: number = -1;
+
+  private _avcTrack: any;
+  private _audioTrack: any;
+  private _id3Track: any;
+  private _txtTrack: any;
+  private aacOverFlow: any;
+  private avcSample: any;
+
   constructor (observer, remuxer, config, typeSupported) {
     this.observer = observer;
     this.config = config;
     this.typeSupported = typeSupported;
     this.remuxer = remuxer;
-    this.sampleAes = null;
   }
 
   setDecryptData (decryptdata) {
@@ -136,7 +159,7 @@ class TSDemuxer {
   resetTimeStamp () {}
 
   // feed incoming data to the front of the parsing pipeline
-  append (data, timeOffset, contiguous, accurateTimeOffset) {
+  append (data, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
     let start, len = data.length, stt, pid, atf, offset, pes,
       unknownPIDs = false;
     this.contiguous = contiguous;
@@ -313,36 +336,34 @@ class TSDemuxer {
     }
 
     if (this.sampleAes == null) {
-      this.remuxer.remux(audioTrack, avcTrack, id3Track, this._txtTrack, timeOffset, contiguous, accurateTimeOffset);
+      return this.remuxer.remux(audioTrack, avcTrack, id3Track, this._txtTrack, timeOffset, contiguous, accurateTimeOffset);
     } else {
-      this.decryptAndRemux(audioTrack, avcTrack, id3Track, this._txtTrack, timeOffset, contiguous, accurateTimeOffset);
+      return this.decryptAndRemux(audioTrack, avcTrack, id3Track, this._txtTrack, timeOffset, contiguous, accurateTimeOffset);
     }
   }
 
-  decryptAndRemux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset) {
+  decryptAndRemux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
     if (audioTrack.samples && audioTrack.isAAC) {
-      let localthis = this;
-      this.sampleAes.decryptAacSamples(audioTrack.samples, 0, function () {
-        localthis.decryptAndRemuxAvc(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
+      this.sampleAes.decryptAacSamples(audioTrack.samples, 0, () => {
+        this.decryptAndRemuxAvc(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
       });
     } else {
-      this.decryptAndRemuxAvc(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
+      return this.decryptAndRemuxAvc(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
     }
   }
 
-  decryptAndRemuxAvc (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset) {
+  decryptAndRemuxAvc (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
     if (videoTrack.samples) {
-      let localthis = this;
-      this.sampleAes.decryptAvcSamples(videoTrack.samples, 0, 0, function () {
-        localthis.remuxer.remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
+      this.sampleAes.decryptAvcSamples(videoTrack.samples, 0, 0, () => {
+        this.remuxer.remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
       });
     } else {
-      this.remuxer.remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
+      return this.remuxer.remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
     }
   }
 
   destroy () {
-    this._initPTS = this._initDTS = undefined;
+    this._initPTS = this._initDTS = null;
     this._duration = 0;
   }
 
@@ -556,7 +577,7 @@ class TSDemuxer {
   _parseAVCPES (pes, last) {
     // logger.log('parse new PES');
     let track = this._avcTrack,
-      units = this._parseAVCNALu(pes.data),
+      units = this._parseAVCNALu(pes.data) as Array<any>,
       debug = false,
       expGolombDecoder,
       avcSample = this.avcSample,
@@ -804,7 +825,7 @@ class TSDemuxer {
 
   _parseAVCNALu (array) {
     let i = 0, len = array.byteLength, value, overflow, track = this._avcTrack, state = track.naluState || 0, lastState = state;
-    let units = [], unit, unitType, lastUnitStart = -1, lastUnitType;
+    let units = [] as Array<any>, unit, unitType, lastUnitStart = -1, lastUnitType;
     // logger.log('PES:' + Hex.hexDump(array));
 
     if (state === -1) {
@@ -902,7 +923,7 @@ class TSDemuxer {
    */
   discardEPB (data) {
     let length = data.byteLength,
-      EPBPositions = [],
+      EPBPositions = [] as Array<number>,
       i = 1,
       newLength, newData;
 
