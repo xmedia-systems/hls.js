@@ -14,10 +14,10 @@ import MpegAudio from './mpegaudio';
 import Event from '../events';
 import ExpGolomb from './exp-golomb';
 import SampleAesDecrypter from './sample-aes';
-// import Hex from '../utils/hex';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { Remuxer, RemuxerResult } from '../types/remuxer';
+import { DemuxerResult } from '../types/demuxer';
 
 // We are using fixed track IDs for driving the MP4 remuxer
 // instead of following the TS PIDs.
@@ -158,31 +158,52 @@ class TSDemuxer {
    */
   resetTimeStamp () {}
 
-  // feed incoming data to the front of the parsing pipeline
-  append (data, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
-    let start, len = data.length, stt, pid, atf, offset, pes,
-      unknownPIDs = false;
+  append (data, timeOffset, contiguous, accurateTimeOffset) : Promise<RemuxerResult> {
     this.contiguous = contiguous;
-    let pmtParsed = this.pmtParsed,
-      avcTrack = this._avcTrack,
-      audioTrack = this._audioTrack,
-      id3Track = this._id3Track,
-      avcId = avcTrack.pid,
-      audioId = audioTrack.pid,
-      id3Id = id3Track.pid,
-      pmtId = this._pmtId,
-      avcData = avcTrack.pesData,
-      audioData = audioTrack.pesData,
-      id3Data = id3Track.pesData,
-      parsePAT = this._parsePAT,
-      parsePMT = this._parsePMT,
-      parsePES = this._parsePES,
-      parseAVCPES = this._parseAVCPES.bind(this),
-      parseAACPES = this._parseAACPES.bind(this),
-      parseMPEGPES = this._parseMPEGPES.bind(this),
-      parseID3PES = this._parseID3PES.bind(this);
+    const { audioTrack, avcTrack, id3Track, textTrack } = this.demux(data);
+    return new Promise(resolve => {
+      if (this.sampleAes) {
+        this.decrypt(audioTrack, avcTrack, this.sampleAes)
+          .then(() => {
+            resolve(this.remuxer.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset));
+          });
+      } else {
+        resolve(this.remuxer.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset));
+      }
+    });
+  }
 
+  // feed incoming data to the front of the parsing pipeline
+  demux (data): DemuxerResult {
+    let start;
+    let stt;
+    let pid;
+    let atf;
+    let offset;
+    let pes;
+
+    const avcTrack = this._avcTrack;
+    const audioTrack = this._audioTrack;
+    const id3Track = this._id3Track;
+    const parsePAT = this._parsePAT;
+    const parsePMT = this._parsePMT;
+    const parsePES = this._parsePES;
+    const parseAVCPES = this._parseAVCPES.bind(this);
+    const parseAACPES = this._parseAACPES.bind(this);
+    const parseMPEGPES = this._parseMPEGPES.bind(this);
+    const parseID3PES = this._parseID3PES.bind(this);
     const syncOffset = TSDemuxer._syncOffset(data);
+
+    let avcId = avcTrack.pid;
+    let avcData = avcTrack.pesData;
+    let audioId = audioTrack.pid;
+    let id3Id = id3Track.pid;
+    let audioData = audioTrack.pesData;
+    let id3Data = id3Track.pesData;
+    let len = data.length;
+    let unknownPIDs = false;
+    let pmtParsed = this.pmtParsed;
+    let pmtId = this._pmtId;
 
     // don't parse last TS packet if incomplete
     len -= (len + syncOffset) % 188;
@@ -335,31 +356,32 @@ class TSDemuxer {
       id3Track.pesData = id3Data;
     }
 
-    if (this.sampleAes == null) {
-      return this.remuxer.remux(audioTrack, avcTrack, id3Track, this._txtTrack, timeOffset, contiguous, accurateTimeOffset);
-    } else {
-      return this.decryptAndRemux(audioTrack, avcTrack, id3Track, this._txtTrack, timeOffset, contiguous, accurateTimeOffset);
-    }
+    return {
+      audioTrack,
+      avcTrack,
+      id3Track,
+      textTrack: this._txtTrack
+    };
   }
 
-  decryptAndRemux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
-    if (audioTrack.samples && audioTrack.isAAC) {
-      this.sampleAes.decryptAacSamples(audioTrack.samples, 0, () => {
-        this.decryptAndRemuxAvc(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
-      });
-    } else {
-      return this.decryptAndRemuxAvc(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
-    }
-  }
-
-  decryptAndRemuxAvc (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
-    if (videoTrack.samples) {
-      this.sampleAes.decryptAvcSamples(videoTrack.samples, 0, 0, () => {
-        this.remuxer.remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
-      });
-    } else {
-      return this.remuxer.remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
-    }
+  decrypt (audioTrack, videoTrack, sampleAes): Promise<void> {
+    return new Promise((resolve) => {
+      if (audioTrack.samples && audioTrack.isAAC) {
+        sampleAes.decryptAacSamples(audioTrack.samples, 0, () => {
+          if (videoTrack.samples) {
+            sampleAes.decryptAvcSamples(videoTrack.samples, 0, 0, () => {
+              resolve();
+            });
+          } else {
+            resolve();
+          }
+        });
+      } else if (videoTrack.samples) {
+        sampleAes.decryptAvcSamples(videoTrack.samples, 0, 0, () => {
+          resolve();
+        });
+      }
+    });
   }
 
   destroy () {
@@ -387,7 +409,7 @@ class TSDemuxer {
       switch (data[offset]) {
       case 0xcf: // SAMPLE-AES AAC
         if (!isSampleAes) {
-          logger.log('unkown stream type:' + data[offset]);
+          logger.log('unknown stream type:' + data[offset]);
           break;
         }
         /* falls through */
