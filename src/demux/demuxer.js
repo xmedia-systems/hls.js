@@ -2,7 +2,7 @@ import { EventEmitter } from 'eventemitter3';
 import * as work from 'webworkify-webpack';
 
 import Event from '../events';
-import DemuxerInline from '../demux/demuxer-inline';
+import Transmuxer from '../demux/transmuxer';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { getMediaSource } from '../utils/mediasource-helper';
@@ -51,7 +51,7 @@ class Demuxer {
       logger.log('demuxing in webworker');
       let w;
       try {
-        w = this.w = work(require.resolve('../demux/demuxer-worker.ts'));
+        w = this.w = work(require.resolve('../demux/transmuxer-worker.ts'));
         this.onwmsg = this.onWorkerMessage.bind(this);
         w.addEventListener('message', this.onwmsg);
         w.onerror = function (event) {
@@ -60,16 +60,16 @@ class Demuxer {
         w.postMessage({ cmd: 'init', typeSupported: typeSupported, vendor: vendor, id: id, config: JSON.stringify(config) });
       } catch (err) {
         logger.warn('Error in worker:', err);
-        logger.error('Error while initializing DemuxerWorker, fallback on DemuxerInline');
+        logger.error('Error while initializing DemuxerWorker, fallback to inline');
         if (w) {
           // revoke the Object URL that was used to create demuxer worker, so as not to leak it
           global.URL.revokeObjectURL(w.objectURL);
         }
-        this.demuxer = new DemuxerInline(observer, typeSupported, config, vendor);
+        this.demuxer = new Transmuxer(observer, typeSupported, config, vendor);
         this.w = undefined;
       }
     } else {
-      this.demuxer = new DemuxerInline(observer, typeSupported, config, vendor);
+      this.demuxer = new Transmuxer(observer, typeSupported, config, vendor);
     }
   }
 

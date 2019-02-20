@@ -1,15 +1,15 @@
-/* demuxer web worker.
+/* transmuxer web worker.
  *  - listen to worker message, and trigger DemuxerInline upon reception of Fragments.
  *  - provides MP4 Boxes back to main thread using [transferable objects](https://developers.google.com/web/updates/2011/12/Transferable-Objects-Lightning-Fast) in order to minimize message passing overhead.
  */
 
-import DemuxerInline from '../demux/demuxer-inline';
+import Transmuxer from '../demux/transmuxer';
 import Event from '../events';
 import { enableLogs } from '../utils/logger';
 import { EventEmitter } from 'eventemitter3';
 import { RemuxerResult, RemuxedTrack } from '../types/remuxer';
 
-let DemuxerWorker = function (self) {
+let TransmuxerWorker = function (self) {
   // observer setup
   let observer = new EventEmitter() as any;
   observer.trigger = function trigger (event, ...data) {
@@ -26,11 +26,11 @@ let DemuxerWorker = function (self) {
 
   self.addEventListener('message', function (ev) {
     let data = ev.data;
-    // console.log('demuxer cmd:' + data.cmd);
+    // console.log('transmuxer cmd:' + data.cmd);
     switch (data.cmd) {
     case 'init': {
       const config = JSON.parse(data.config);
-      self.demuxer = new DemuxerInline(observer, data.typeSupported, config, data.vendor);
+      self.transmuxer = new Transmuxer(observer, data.typeSupported, config, data.vendor);
 
       enableLogs(config.debug);
 
@@ -40,7 +40,7 @@ let DemuxerWorker = function (self) {
     }
     case 'demux': {
       const start = performance.now();
-      const remuxResult = self.demuxer.push(data.data,
+      const remuxResult = self.transmuxer.push(data.data,
         data.decryptdata,
         data.initSegment,
         data.audioCodec,
@@ -101,4 +101,4 @@ function convertToTransferable (track: RemuxedTrack): Array<ArrayBuffer> {
   return transferable;
 }
 
-export default DemuxerWorker;
+export default TransmuxerWorker;

@@ -32,7 +32,7 @@ try {
   now = global.Date.now;
 }
 
-class DemuxerInline {
+class Transmuxer {
   private observer: any;
   private typeSupported: any;
   private config: any;
@@ -171,4 +171,4 @@ function getEncryptionType (data: Uint8Array, decryptData): string | null {
   return encryptionType;
 }
 
-export default DemuxerInline;
+export default Transmuxer;
