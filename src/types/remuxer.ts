@@ -11,6 +11,7 @@ export interface Remuxer {
   ): RemuxerResult
   resetInitSegment(): void
   resetTimeStamp(defaultInitPTS): void
+  destroy() : void
 }
 
 export interface RemuxedTrack {

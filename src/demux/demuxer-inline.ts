@@ -37,8 +37,8 @@ class DemuxerInline {
   private typeSupported: any;
   private config: any;
   private vendor: any;
-  private demuxer!: Demuxer;
-  private remuxer!: Remuxer;
+  private demuxer?: Demuxer;
+  private remuxer?: Remuxer;
   private decrypter: any;
   private probe!: Function;
 
@@ -47,13 +47,6 @@ class DemuxerInline {
     this.typeSupported = typeSupported;
     this.config = config;
     this.vendor = vendor;
-  }
-
-  destroy () {
-    let demuxer = this.demuxer;
-    if (demuxer) {
-      demuxer.destroy();
-    }
   }
 
   push (data: ArrayBuffer,
@@ -68,77 +61,114 @@ class DemuxerInline {
     duration: number,
     accurateTimeOffset: boolean,
     defaultInitPTS: number
-  ): Promise<RemuxerResult> {
-    return new Promise((resolve) => {
-      if ((data.byteLength > 0) && (decryptdata != null) && (decryptdata.key != null) && (decryptdata.method === 'AES-128')) {
-        let decrypter = this.decrypter;
-        if (decrypter === null) {
-          decrypter = this.decrypter = new Decrypter(this.observer, this.config);
-        }
-
-        const startTime = now();
-        decrypter.decrypt(data, decryptdata.key.buffer, decryptdata.iv.buffer, (decryptedData) => {
-          const endTime = now();
-          this.observer.trigger(Event.FRAG_DECRYPTED, { stats: { tstart: startTime, tdecrypt: endTime } });
-          resolve(this.pushDecrypted(new Uint8Array(decryptedData), decryptdata, new Uint8Array(initSegment), audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS));
-        });
-      } else {
-        resolve(this.pushDecrypted(new Uint8Array(data), decryptdata, new Uint8Array(initSegment), audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS));
-      }
-    });
-  }
-
-  pushDecrypted (data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS): Promise<RemuxerResult> {
-    let demuxer = this.demuxer;
+  ): RemuxerResult | Promise<RemuxerResult> | null {
+    const uintData = new Uint8Array(data);
+    const uintInitSegment = new Uint8Array(initSegment);
+    let { demuxer, remuxer } = this;
     if (!demuxer ||
       // in case of continuity change, or track switch
       // we might switch from content type (AAC container to TS container, or TS to fmp4 for example)
       // so let's check that current demuxer is still valid
       ((discontinuity || trackSwitch) && !this.probe(data))) {
-      const observer = this.observer;
-      const typeSupported = this.typeSupported;
-      const config = this.config;
-      // probing order is TS/MP4/AAC/MP3
-      const muxConfig = [
-        { demux: TSDemuxer, remux: MP4Remuxer },
-        { demux: MP4Demuxer, remux: PassThroughRemuxer },
-        { demux: AACDemuxer, remux: MP4Remuxer },
-        { demux: MP3Demuxer, remux: MP4Remuxer }
-      ];
-
-      // probe for content type
-      for (let i = 0, len = muxConfig.length; i < len; i++) {
-        const mux = muxConfig[i];
-        const probe = mux.demux.probe;
-        if (probe(data)) {
-          const remuxer = this.remuxer = new mux.remux(observer, config, typeSupported, this.vendor);
-          demuxer = new mux.demux(observer, remuxer, config, typeSupported);
-          this.probe = probe;
-          break;
-        }
-      }
-      if (!demuxer) {
-        observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: true, reason: 'no demux matching with content found' });
-        return Promise.reject();
-      }
-      this.demuxer = demuxer;
+      ({ demuxer, remuxer } = this.configureTransmuxer(uintData));
     }
-    const remuxer = this.remuxer;
+    if (!demuxer || !remuxer) {
+      this.observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: true, reason: 'no demux matching with content found' });
+      return null;
+    }
 
     if (discontinuity || trackSwitch) {
-      demuxer.resetInitSegment(initSegment, audioCodec, videoCodec, duration);
+      demuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec, duration);
       remuxer.resetInitSegment();
     }
     if (discontinuity) {
       demuxer.resetTimeStamp(defaultInitPTS);
       remuxer.resetTimeStamp(defaultInitPTS);
     }
-    if (typeof demuxer.setDecryptData === 'function') {
-      demuxer.setDecryptData(decryptdata);
+
+    let result;
+    const encryptionType = getEncryptionType(uintData, decryptdata);
+    if (encryptionType === 'AES-128') {
+      result = this.transmuxAes128(uintData, decryptdata, timeOffset, contiguous, accurateTimeOffset);
+    } else if (encryptionType === 'SAMPLE-AES') {
+      result = this.transmuxSampleAes(uintData, decryptdata, timeOffset, contiguous, accurateTimeOffset);
+    } else {
+      result = this.transmux(uintData, timeOffset, contiguous, accurateTimeOffset);
+    }
+    return result;
+  }
+
+  destroy () {
+    if (this.demuxer) {
+      this.demuxer.destroy();
+      this.demuxer = undefined;
+    }
+    if (this.remuxer) {
+      this.remuxer.destroy();
+      this.remuxer = undefined;
+    }
+  }
+
+  private transmux (data: Uint8Array, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
+    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.demux(data, contiguous, false);
+    return this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
+  }
+
+  private transmuxAes128 (data: Uint8Array, decryptData, timeOffset, contiguous, accurateTimeOffset): Promise<RemuxerResult> {
+    let decrypter = this.decrypter;
+    if (!decrypter) {
+      decrypter = this.decrypter = new Decrypter(this.observer, this.config);
+    }
+    return new Promise(resolve => {
+      const startTime = now();
+      decrypter.decrypt(data, decryptData.key.buffer, decryptData.iv.buffer, (decryptedData) => {
+        const endTime = now();
+        this.observer.trigger(Event.FRAG_DECRYPTED, { stats: { tstart: startTime, tdecrypt: endTime } });
+        resolve(this.transmux(new Uint8Array(decryptedData), timeOffset, contiguous, accurateTimeOffset));
+      });
+    });
+  }
+
+  private transmuxSampleAes (data: Uint8Array, decryptData, contiguous, timeOffset, accurateTimeOffset) : Promise<RemuxerResult> {
+    return this.demuxer!.demuxSampleAes(data, decryptData, contiguous)
+      .then(demuxResult =>
+        this.remuxer!.remux(demuxResult.audioTrack, demuxResult.avcTrack, demuxResult.id3Track, demuxResult.textTrack, timeOffset, contiguous, accurateTimeOffset)
+      );
+  }
+
+  private configureTransmuxer (data: Uint8Array) {
+    const { config, observer, typeSupported, vendor } = this;
+    let demuxer, remuxer;
+    // probing order is TS/MP4/AAC/MP3
+    const muxConfig = [
+      { demux: TSDemuxer, remux: MP4Remuxer },
+      { demux: MP4Demuxer, remux: PassThroughRemuxer },
+      { demux: AACDemuxer, remux: MP4Remuxer },
+      { demux: MP3Demuxer, remux: MP4Remuxer }
+    ];
+
+    // probe for content type
+    for (let i = 0, len = muxConfig.length; i < len; i++) {
+      const mux = muxConfig[i];
+      const probe = mux.demux.probe;
+      if (probe(data)) {
+        remuxer = this.remuxer = new mux.remux(observer, config, typeSupported, vendor);
+        demuxer = this.demuxer = new mux.demux(observer, config, typeSupported);
+        this.probe = probe;
+        break;
+      }
     }
 
-    return demuxer.append(data, timeOffset, contiguous, accurateTimeOffset);
+    return { demuxer, remuxer };
   }
+}
+
+function getEncryptionType (data: Uint8Array, decryptData): string | null {
+  let encryptionType = null;
+  if ((data.byteLength > 0) && (decryptData != null) && (decryptData.key != null)) {
+    encryptionType = decryptData.method;
+  }
+  return encryptionType;
 }
 
 export default DemuxerInline;

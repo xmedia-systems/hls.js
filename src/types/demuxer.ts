@@ -1,11 +1,11 @@
 import { RemuxerResult } from './remuxer';
 
 export interface Demuxer {
-  append (data: Uint8Array, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean) : Promise<RemuxerResult>
+  demux (data: Uint8Array, contiguous: boolean, isSampleAes: boolean) : DemuxerResult
+  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, contiguous) : Promise<DemuxerResult>
   destroy() : void
   resetInitSegment(initSegment: any, audioCodec: string, videoCodec: string, duration: number);
   resetTimeStamp(defaultInitPTS): void
-  setDecryptData(decryptData: any): void
 }
 
 export interface DemuxerResult {

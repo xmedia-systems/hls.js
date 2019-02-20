@@ -40,7 +40,7 @@ let DemuxerWorker = function (self) {
     }
     case 'demux': {
       const start = performance.now();
-      const demuxerPromise = self.demuxer.push(data.data,
+      const remuxResult = self.demuxer.push(data.data,
         data.decryptdata,
         data.initSegment,
         data.audioCodec,
@@ -54,25 +54,16 @@ let DemuxerWorker = function (self) {
         data.defaultInitPTS
       ) as Promise<RemuxerResult>;
 
-      demuxerPromise.then(remuxerResult => {
-        let transferable = [] as Array<ArrayBuffer>;
-        console.log('>>>', performance.now() - start);
-        const { audio, video, text, id3, initSegment } = remuxerResult;
-        if (initSegment) {
-          observer.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { tracks: initSegment.tracks });
-          if (initSegment.initPTS) {
-            observer.trigger(Event.INIT_PTS_FOUND, { initPTS: initSegment.initPTS });
-          }
-        }
-        if (audio) {
-          transferable = transferable.concat(convertToTransferable(audio));
-        }
-        if (video) {
-          transferable = transferable.concat(convertToTransferable(video));
-        }
-        observer.trigger(Event.FRAG_PARSED);
-        self.postMessage({ event: 'remuxPromiseResolved', data: remuxerResult }, transferable);
-      });
+      if (!remuxResult) {
+        return;
+      }
+      if (remuxResult.then) {
+        remuxResult.then(data => {
+          emitTransmuxComplete(data, start, observer);
+        });
+      } else {
+        emitTransmuxComplete(remuxResult as RemuxerResult, start, observer);
+      }
       break;
     }
     default:
@@ -80,42 +71,34 @@ let DemuxerWorker = function (self) {
     }
   });
 
-  function convertToTransferable (track: RemuxedTrack): Array<ArrayBuffer> {
-    const transferable = [] as Array<ArrayBuffer>;
-    if (track.data1) {
-      transferable.push(track.data1.buffer);
+  function emitTransmuxComplete (remuxerResult : RemuxerResult, start, observer) {
+    let transferable = [] as Array<ArrayBuffer>;
+    console.log('>>>', performance.now() - start);
+    const { audio, video } = remuxerResult;
+    if (audio) {
+      transferable = transferable.concat(convertToTransferable(audio));
     }
-    if (track.data2) {
-      transferable.push(track.data2.buffer);
+    if (video) {
+      transferable = transferable.concat(convertToTransferable(video));
     }
-    return transferable;
+    observer.trigger(Event.FRAG_PARSED);
+    self.postMessage({ event: 'transmuxComplete', data: remuxerResult }, transferable);
   }
 
   // forward events to main thread
   observer.on(Event.FRAG_DECRYPTED, forwardMessage);
-  observer.on(Event.FRAG_PARSING_INIT_SEGMENT, forwardMessage);
-  observer.on(Event.FRAG_PARSED, forwardMessage);
   observer.on(Event.ERROR, forwardMessage);
-  observer.on(Event.FRAG_PARSING_METADATA, forwardMessage);
-  observer.on(Event.FRAG_PARSING_USERDATA, forwardMessage);
-  observer.on(Event.INIT_PTS_FOUND, forwardMessage);
-
-  // special case for FRAG_PARSING_DATA: pass data1/data2 as transferable object (no copy)
-  observer.on(Event.FRAG_PARSING_DATA, function (ev, data) {
-    let transferable = [];
-    let message = { event: ev, data: data };
-    if (data.data1) {
-      message.data1 = data.data1.buffer;
-      transferable.push(data.data1.buffer);
-      delete data.data1;
-    }
-    if (data.data2) {
-      message.data2 = data.data2.buffer;
-      transferable.push(data.data2.buffer);
-      delete data.data2;
-    }
-    self.postMessage(message, transferable);
-  });
 };
+
+function convertToTransferable (track: RemuxedTrack): Array<ArrayBuffer> {
+  const transferable = [] as Array<ArrayBuffer>;
+  if (track.data1) {
+    transferable.push(track.data1.buffer);
+  }
+  if (track.data2) {
+    transferable.push(track.data2.buffer);
+  }
+  return transferable;
+}
 
 export default DemuxerWorker;

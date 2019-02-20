@@ -16,7 +16,6 @@ import ExpGolomb from './exp-golomb';
 import SampleAesDecrypter from './sample-aes';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
-import { Remuxer, RemuxerResult } from '../types/remuxer';
 import { Demuxer, DemuxerResult } from '../types/demuxer';
 
 // We are using fixed track IDs for driving the MP4 remuxer
@@ -34,11 +33,10 @@ const RemuxerTrackIdConfig = {
   text: 4
 };
 
-class TSDemuxer implements Demuxer{
+class TSDemuxer implements Demuxer {
   private observer: any;
   private config: any;
   private typeSupported: any;
-  private remuxer: Remuxer;
 
   private sampleAes: any = null;
   private pmtParsed: boolean = false;
@@ -58,19 +56,10 @@ class TSDemuxer implements Demuxer{
   private aacOverFlow: any;
   private avcSample: any;
 
-  constructor (observer, remuxer, config, typeSupported) {
+  constructor (observer, config, typeSupported) {
     this.observer = observer;
     this.config = config;
     this.typeSupported = typeSupported;
-    this.remuxer = remuxer;
-  }
-
-  setDecryptData (decryptdata) {
-    if ((decryptdata != null) && (decryptdata.key != null) && (decryptdata.method === 'SAMPLE-AES')) {
-      this.sampleAes = new SampleAesDecrypter(this.observer, this.config, decryptdata, this.discardEPB);
-    } else {
-      this.sampleAes = null;
-    }
   }
 
   static probe (data) {
@@ -158,23 +147,12 @@ class TSDemuxer implements Demuxer{
    */
   resetTimeStamp () {}
 
-  append (data, timeOffset, contiguous, accurateTimeOffset) : Promise<RemuxerResult> {
-    this.contiguous = contiguous;
-    const { audioTrack, avcTrack, id3Track, textTrack } = this.demux(data);
-    return new Promise(resolve => {
-      if (this.sampleAes) {
-        this.decrypt(audioTrack, avcTrack, this.sampleAes)
-          .then(() => {
-            resolve(this.remuxer.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset));
-          });
-      } else {
-        resolve(this.remuxer.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset));
-      }
-    });
-  }
-
   // feed incoming data to the front of the parsing pipeline
-  demux (data): DemuxerResult {
+  demux (data, contiguous, isSampleAes = false): DemuxerResult {
+    if (!isSampleAes) {
+      this.sampleAes = null;
+    }
+    this.contiguous = contiguous;
     let start;
     let stt;
     let pid;
@@ -280,7 +258,7 @@ class TSDemuxer implements Demuxer{
             offset += data[offset] + 1;
           }
 
-          let parsedPIDs = parsePMT(data, offset, this.typeSupported.mpeg === true || this.typeSupported.mp3 === true, this.sampleAes != null);
+          let parsedPIDs = parsePMT(data, offset, this.typeSupported.mpeg === true || this.typeSupported.mp3 === true, isSampleAes);
 
           // only update track id if track PID found while parsing PMT
           // this is to avoid resetting the PID to -1 in case
@@ -364,6 +342,17 @@ class TSDemuxer implements Demuxer{
     };
   }
 
+  demuxSampleAes (data, decryptData, contiguous): Promise <DemuxerResult> {
+    const demuxResult = this.demux(data, contiguous, true);
+    const sampleAes = this.sampleAes = new SampleAesDecrypter(this.observer, this.config, decryptData, this.discardEPB);
+    return new Promise((resolve, reject) => {
+      this.decrypt(demuxResult.audioTrack, demuxResult.avcTrack, sampleAes)
+        .then(() => {
+          resolve(demuxResult);
+        });
+    });
+  }
+
   decrypt (audioTrack, videoTrack, sampleAes): Promise<void> {
     return new Promise((resolve) => {
       if (audioTrack.samples && audioTrack.isAAC) {
@@ -434,7 +423,7 @@ class TSDemuxer implements Demuxer{
 
       case 0xdb: // SAMPLE-AES AVC
         if (!isSampleAes) {
-          logger.log('unkown stream type:' + data[offset]);
+          logger.log('unknown stream type:' + data[offset]);
           break;
         }
         /* falls through */
@@ -466,7 +455,7 @@ class TSDemuxer implements Demuxer{
         break;
 
       default:
-        logger.log('unkown stream type:' + data[offset]);
+        logger.log('unknown stream type:' + data[offset]);
         break;
       }
       // move to the next table entry

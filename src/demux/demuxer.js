@@ -137,7 +137,12 @@ class Demuxer {
         data.data.data2 = new Uint8Array(data.data2);
       }
 
-      /* falls through */
+    case 'transmuxComplete': {
+      this.handleTransmuxComplete(data.data, this.observer);
+      break;
+    }
+
+    /* falls through */
     default:
       data.data = data.data || {};
       data.data.frag = this.frag;
@@ -145,6 +150,24 @@ class Demuxer {
       hls.trigger(data.event, data.data);
       break;
     }
+  }
+
+  handleTransmuxComplete (remuxResult, observer) {
+    let data = { frag: this.frag, id: this.id };
+    const { audio, video, text, id3, initSegment } = remuxResult;
+    if (initSegment) {
+      observer.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { ...data, tracks: initSegment.tracks });
+      if (initSegment.initPTS) {
+        observer.trigger(Event.INIT_PTS_FOUND, { ...data, initPTS: initSegment.initPTS });
+      }
+    }
+    if (audio) {
+      observer.trigger(Event.FRAG_PARSING_DATA, { ...data, ...audio });
+    }
+    if (video) {
+      observer.trigger(Event.FRAG_PARSING_DATA, { ...data, ...video });
+    }
+    observer.trigger(Event.FRAG_PARSED, data);
   }
 }
 
