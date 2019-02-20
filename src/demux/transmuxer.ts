@@ -98,7 +98,7 @@ class Transmuxer {
     return result;
   }
 
-  destroy () {
+  destroy (): void {
     if (this.demuxer) {
       this.demuxer.destroy();
       this.demuxer = undefined;
@@ -109,12 +109,12 @@ class Transmuxer {
     }
   }
 
-  private transmux (data: Uint8Array, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
+  private transmux (data: Uint8Array, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean): RemuxerResult {
     const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.demux(data, contiguous, false);
     return this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
   }
 
-  private transmuxAes128 (data: Uint8Array, decryptData, timeOffset, contiguous, accurateTimeOffset): Promise<RemuxerResult> {
+  private transmuxAes128 (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean): Promise<RemuxerResult> {
     let decrypter = this.decrypter;
     if (!decrypter) {
       decrypter = this.decrypter = new Decrypter(this.observer, this.config);
@@ -129,7 +129,7 @@ class Transmuxer {
     });
   }
 
-  private transmuxSampleAes (data: Uint8Array, decryptData, contiguous, timeOffset, accurateTimeOffset) : Promise<RemuxerResult> {
+  private transmuxSampleAes (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean) : Promise<RemuxerResult> {
     return this.demuxer!.demuxSampleAes(data, decryptData, contiguous)
       .then(demuxResult =>
         this.remuxer!.remux(demuxResult.audioTrack, demuxResult.avcTrack, demuxResult.id3Track, demuxResult.textTrack, timeOffset, contiguous, accurateTimeOffset)
@@ -163,7 +163,7 @@ class Transmuxer {
   }
 }
 
-function getEncryptionType (data: Uint8Array, decryptData): string | null {
+function getEncryptionType (data: Uint8Array, decryptData: any): string | null {
   let encryptionType = null;
   if ((data.byteLength > 0) && (decryptData != null) && (decryptData.key != null)) {
     encryptionType = decryptData.method;
