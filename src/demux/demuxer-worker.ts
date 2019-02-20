@@ -71,7 +71,7 @@ let DemuxerWorker = function (self) {
           transferable = transferable.concat(convertToTransferable(video));
         }
         observer.trigger(Event.FRAG_PARSED);
-        self.postMessage({ event: 'remuxPromiseResolved', ...remuxerResult }, transferable);
+        self.postMessage({ event: 'remuxPromiseResolved', data: remuxerResult }, transferable);
       });
       break;
     }

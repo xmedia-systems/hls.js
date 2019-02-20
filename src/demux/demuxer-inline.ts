@@ -4,7 +4,7 @@
  * appropriate demuxer depending on content type (TSDemuxer, AACDemuxer, ...)
  *
  */
-
+// TODO: Rename to transmuxer
 import Event from '../events';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import Decrypter from '../crypt/decrypter';
