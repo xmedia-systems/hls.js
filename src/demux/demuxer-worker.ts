@@ -6,12 +6,12 @@
 import DemuxerInline from '../demux/demuxer-inline';
 import Event from '../events';
 import { enableLogs } from '../utils/logger';
-
 import { EventEmitter } from 'eventemitter3';
+import { RemuxerResult, RemuxedTrack } from '../types/remuxer';
 
 let DemuxerWorker = function (self) {
   // observer setup
-  let observer = new EventEmitter();
+  let observer = new EventEmitter() as any;
   observer.trigger = function trigger (event, ...data) {
     observer.emit(event, event, ...data);
   };
@@ -28,7 +28,7 @@ let DemuxerWorker = function (self) {
     let data = ev.data;
     // console.log('demuxer cmd:' + data.cmd);
     switch (data.cmd) {
-    case 'init':
+    case 'init': {
       const config = JSON.parse(data.config);
       self.demuxer = new DemuxerInline(observer, data.typeSupported, config, data.vendor);
 
@@ -37,13 +37,59 @@ let DemuxerWorker = function (self) {
       // signal end of worker init
       forwardMessage('init', null);
       break;
-    case 'demux':
-      self.demuxer.push(data.data, data.decryptdata, data.initSegment, data.audioCodec, data.videoCodec, data.timeOffset, data.discontinuity, data.trackSwitch, data.contiguous, data.duration, data.accurateTimeOffset, data.defaultInitPTS);
+    }
+    case 'demux': {
+      const start = performance.now();
+      const demuxerPromise = self.demuxer.push(data.data,
+        data.decryptdata,
+        data.initSegment,
+        data.audioCodec,
+        data.videoCodec,
+        data.timeOffset,
+        data.discontinuity,
+        data.trackSwitch,
+        data.contiguous,
+        data.duration,
+        data.accurateTimeOffset,
+        data.defaultInitPTS
+      ) as Promise<RemuxerResult>;
+
+      demuxerPromise.then(remuxerResult => {
+        let transferable = [] as Array<ArrayBuffer>;
+        console.log('>>>', performance.now() - start);
+        const { audio, video, text, id3, initSegment } = remuxerResult;
+        if (initSegment) {
+          observer.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { tracks: initSegment.tracks });
+          if (initSegment.initPTS) {
+            observer.trigger(Event.INIT_PTS_FOUND, { initPTS: initSegment.initPTS });
+          }
+        }
+        if (audio) {
+          transferable = transferable.concat(convertToTransferable(audio));
+        }
+        if (video) {
+          transferable = transferable.concat(convertToTransferable(video));
+        }
+        observer.trigger(Event.FRAG_PARSED);
+        self.postMessage({ event: 'remuxPromiseResolved', ...remuxerResult }, transferable);
+      });
       break;
+    }
     default:
       break;
     }
   });
+
+  function convertToTransferable (track: RemuxedTrack): Array<ArrayBuffer> {
+    const transferable = [] as Array<ArrayBuffer>;
+    if (track.data1) {
+      transferable.push(track.data1.buffer);
+    }
+    if (track.data2) {
+      transferable.push(track.data2.buffer);
+    }
+    return transferable;
+  }
 
   // forward events to main thread
   observer.on(Event.FRAG_DECRYPTED, forwardMessage);

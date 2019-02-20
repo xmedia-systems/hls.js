@@ -24,6 +24,8 @@ export interface RemuxedTrack {
     hasAudio: boolean
     hasVideo: boolean
     nb: number
+    transferredData1?: ArrayBuffer
+    transferredData2?: ArrayBuffer
 }
 
 export interface RemuxedMetadata {

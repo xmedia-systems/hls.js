@@ -51,7 +51,7 @@ class Demuxer {
       logger.log('demuxing in webworker');
       let w;
       try {
-        w = this.w = work(require.resolve('../demux/demuxer-worker.js'));
+        w = this.w = work(require.resolve('../demux/demuxer-worker.ts'));
         this.onwmsg = this.onWorkerMessage.bind(this);
         w.addEventListener('message', this.onwmsg);
         w.onerror = function (event) {
