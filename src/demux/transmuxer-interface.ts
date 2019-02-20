@@ -1,20 +1,26 @@
-import { EventEmitter } from 'eventemitter3';
 import * as work from 'webworkify-webpack';
-
 import Event from '../events';
 import Transmuxer from '../demux/transmuxer';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { getMediaSource } from '../utils/mediasource-helper';
 import { getSelfScope } from '../utils/get-self-scope';
-
 import { Observer } from '../observer';
+import Fragment from '../loader/fragment';
 
 // see https://stackoverflow.com/a/11237259/589493
 const global = getSelfScope(); // safeguard for code that might run both on worker and main thread
 const MediaSource = getMediaSource();
 
-class Demuxer {
+export default class TransmuxerInterface {
+  private hls: any;
+  private id: any;
+  private observer: any;
+  private frag?: Fragment;
+  private worker: any;
+  private onwmsg?: Function;
+  private transmuxer?: Transmuxer | null;
+
   constructor (hls, id) {
     this.hls = hls;
     this.id = id;
@@ -49,41 +55,41 @@ class Demuxer {
     const vendor = navigator.vendor;
     if (config.enableWorker && (typeof (Worker) !== 'undefined')) {
       logger.log('demuxing in webworker');
-      let w;
+      let worker;
       try {
-        w = this.w = work(require.resolve('../demux/transmuxer-worker.ts'));
+        worker = this.worker = work(require.resolve('../demux/transmuxer-worker.ts'));
         this.onwmsg = this.onWorkerMessage.bind(this);
-        w.addEventListener('message', this.onwmsg);
-        w.onerror = function (event) {
+        worker.addEventListener('message', this.onwmsg);
+        worker.onerror = (event) => {
           hls.trigger(Event.ERROR, { type: ErrorTypes.OTHER_ERROR, details: ErrorDetails.INTERNAL_EXCEPTION, fatal: true, event: 'demuxerWorker', err: { message: event.message + ' (' + event.filename + ':' + event.lineno + ')' } });
         };
-        w.postMessage({ cmd: 'init', typeSupported: typeSupported, vendor: vendor, id: id, config: JSON.stringify(config) });
+        worker.postMessage({ cmd: 'init', typeSupported: typeSupported, vendor: vendor, id: id, config: JSON.stringify(config) });
       } catch (err) {
         logger.warn('Error in worker:', err);
         logger.error('Error while initializing DemuxerWorker, fallback to inline');
-        if (w) {
-          // revoke the Object URL that was used to create demuxer worker, so as not to leak it
-          global.URL.revokeObjectURL(w.objectURL);
+        if (worker) {
+          // revoke the Object URL that was used to create transmuxer worker, so as not to leak it
+          global.URL.revokeObjectURL(worker.objectURL);
         }
-        this.demuxer = new Transmuxer(observer, typeSupported, config, vendor);
-        this.w = undefined;
+        this.transmuxer = new Transmuxer(observer, typeSupported, config, vendor);
+        this.worker = null;
       }
     } else {
-      this.demuxer = new Transmuxer(observer, typeSupported, config, vendor);
+      this.transmuxer = new Transmuxer(observer, typeSupported, config, vendor);
     }
   }
 
-  destroy () {
-    let w = this.w;
+  destroy (): void {
+    let w = this.worker;
     if (w) {
       w.removeEventListener('message', this.onwmsg);
       w.terminate();
-      this.w = null;
+      this.worker = null;
     } else {
-      let demuxer = this.demuxer;
-      if (demuxer) {
-        demuxer.destroy();
-        this.demuxer = null;
+      let transmuxer = this.transmuxer;
+      if (transmuxer) {
+        transmuxer.destroy();
+        this.transmuxer = null;
       }
     }
     const observer = this.observer;
@@ -93,14 +99,14 @@ class Demuxer {
     }
   }
 
-  push (data, initSegment, audioCodec, videoCodec, frag, duration, accurateTimeOffset, defaultInitPTS) {
-    const w = this.w;
+  push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, defaultInitPTS: number): void {
+    const w = this.worker;
     const timeOffset = Number.isFinite(frag.startPTS) ? frag.startPTS : frag.start;
     const decryptdata = frag.decryptdata;
     const lastFrag = this.frag;
     const discontinuity = !(lastFrag && (frag.cc === lastFrag.cc));
     const trackSwitch = !(lastFrag && (frag.level === lastFrag.level));
-    const nextSN = lastFrag && (frag.sn === (lastFrag.sn + 1));
+    const nextSN = lastFrag && (frag.sn === (lastFrag.sn as number + 1));
     const contiguous = !trackSwitch && nextSN;
     if (discontinuity) {
       logger.log(`${this.id}:discontinuity detected`);
@@ -111,48 +117,78 @@ class Demuxer {
     }
 
     this.frag = frag;
+    const { observer, transmuxer } = this;
     if (w) {
       // post fragment payload as transferable objects for ArrayBuffer (no copy)
-      w.postMessage({ cmd: 'demux', data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS }, data instanceof ArrayBuffer ? [data] : []);
-    } else {
-      let demuxer = this.demuxer;
-      if (demuxer) {
-        demuxer.push(data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS);
+      w.postMessage({
+        cmd: 'demux',
+        data,
+        decryptdata,
+        initSegment,
+        audioCodec,
+        videoCodec,
+        timeOffset,
+        discontinuity,
+        trackSwitch,
+        contiguous,
+        duration,
+        accurateTimeOffset,
+        defaultInitPTS
+      }, data instanceof ArrayBuffer ? [data] : []);
+    } else if (transmuxer) {
+      const remuxResult =
+        transmuxer.push(data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS);
+      if (!remuxResult) {
+        return;
+      }
+      // Checking for existence of .then is the safest promise check, since it detects polyfills which aren't instanceof Promise
+      // @ts-ignore
+      if (remuxResult.then) {
+        // @ts-ignore
+        remuxResult.then(data => {
+          this.handleTransmuxComplete(data, observer);
+        });
+      } else {
+        this.handleTransmuxComplete(remuxResult, observer);
       }
     }
   }
 
-  onWorkerMessage (ev) {
-    let data = ev.data,
-      hls = this.hls;
+  private onWorkerMessage (ev: any): void {
+    const data = ev.data;
+    const hls = this.hls;
     switch (data.event) {
-    case 'init':
-      // revoke the Object URL that was used to create demuxer worker, so as not to leak it
-      global.URL.revokeObjectURL(this.w.objectURL);
+    case 'init': {
+      // revoke the Object URL that was used to create transmuxer worker, so as not to leak it
+      global.URL.revokeObjectURL(this.worker.objectURL);
       break;
-      // special case for FRAG_PARSING_DATA: data1 and data2 are transferable objects
-    case Event.FRAG_PARSING_DATA:
+    }
+    // special case for FRAG_PARSING_DATA: data1 and data2 are transferable objects
+    case Event.FRAG_PARSING_DATA: {
       data.data.data1 = new Uint8Array(data.data1);
       if (data.data2) {
         data.data.data2 = new Uint8Array(data.data2);
       }
-
+      break;
+    }
     case 'transmuxComplete': {
       this.handleTransmuxComplete(data.data, this.observer);
       break;
     }
 
     /* falls through */
-    default:
+    default: {
       data.data = data.data || {};
       data.data.frag = this.frag;
       data.data.id = this.id;
       hls.trigger(data.event, data.data);
       break;
     }
+    }
   }
 
-  handleTransmuxComplete (remuxResult, observer) {
+  // TODO: Does the transfered data need to be converted to uint8?
+  private handleTransmuxComplete (remuxResult, observer): void {
     let data = { frag: this.frag, id: this.id };
     const { audio, video, text, id3, initSegment } = remuxResult;
     if (initSegment) {
@@ -170,5 +206,3 @@ class Demuxer {
     observer.trigger(Event.FRAG_PARSED, data);
   }
 }
-
-export default Demuxer;

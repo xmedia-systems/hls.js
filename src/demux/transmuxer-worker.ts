@@ -52,7 +52,7 @@ export default function TransmuxerWorker (self) {
         data.duration,
         data.accurateTimeOffset,
         data.defaultInitPTS
-      ) as Promise<RemuxerResult>;
+      );
 
       if (!remuxResult) {
         return;
