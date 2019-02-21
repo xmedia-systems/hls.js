@@ -1,10 +1,8 @@
-import { InitSegmentData, RemuxerResult } from './remuxer';
-
 export interface Demuxer {
   demux (data: Uint8Array, timeOffset: number, contiguous: boolean, isSampleAes?: boolean) : DemuxerResult
   demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number, contiguous: boolean) : Promise<DemuxerResult>
   destroy() : void
-  resetInitSegment(audioCodec: string, videoCodec: string, duration: number, initSegment?: any);
+  resetInitSegment(initSegment: Uint8Array, audioCodec: string, videoCodec: string, duration: number);
   resetTimeStamp(defaultInitPTS): void
 }
 
@@ -23,6 +21,7 @@ export interface DemuxedTrack {
   sequenceNumber: number
   samples: any
   len: number,
+  timescale?: number
   container?: string
   dropped?: number
   duration?: number

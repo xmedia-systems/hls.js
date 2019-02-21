@@ -17,7 +17,9 @@ class PassThroughRemuxer implements Remuxer {
     this.initPTS = defaultInitPTS;
   }
 
-  resetInitSegment (initSegment) {
+  resetInitSegment (initSegment, audioCodec, videoCodec) {
+    this.audioCodec = audioCodec;
+    this.videoCodec = videoCodec;
     this.generateInitSegment(initSegment);
     this.emitInitSegment = true;
   }
@@ -33,11 +35,11 @@ class PassThroughRemuxer implements Remuxer {
 
     // default audio codec if nothing specified
     // TODO : extract that from initsegment
-    if (audioCodec == null) {
+    if (!audioCodec) {
       audioCodec = 'mp4a.40.5';
     }
 
-    if (videoCodec == null) {
+    if (!videoCodec) {
       videoCodec = 'avc1.42e01e';
     }
 

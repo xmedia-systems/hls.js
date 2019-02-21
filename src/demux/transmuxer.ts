@@ -4,7 +4,6 @@
  * appropriate demuxer depending on content type (TSDemuxer, AACDemuxer, ...)
  *
  */
-// TODO: Rename to transmuxer
 import Event from '../events';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import Decrypter from '../crypt/decrypter';
@@ -78,8 +77,8 @@ class Transmuxer {
     }
 
     if (discontinuity || trackSwitch) {
-      demuxer.resetInitSegment(audioCodec, videoCodec, duration, uintInitSegment);
-      remuxer.resetInitSegment(uintInitSegment);
+      demuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec, duration);
+      remuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec);
     }
     if (discontinuity) {
       demuxer.resetTimeStamp(defaultInitPTS);
@@ -110,13 +109,8 @@ class Transmuxer {
   }
 
   private transmux (data: Uint8Array, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean): RemuxerResult {
-    const { audioTrack, avcTrack, id3Track, textTrack, startDTS, initSegment } = this.demuxer!.demux(data, timeOffset, contiguous, false);
-    const offset = Number.isFinite(startDTS!) ? startDTS : timeOffset;
-    const remuxResult = this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, offset as number, contiguous, accurateTimeOffset);
-    if (initSegment) {
-      remuxResult.initSegment = initSegment;
-    }
-    return remuxResult;
+    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.demux(data, timeOffset, contiguous, false);
+    return this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
   }
 
   private transmuxAes128 (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean): Promise<RemuxerResult> {

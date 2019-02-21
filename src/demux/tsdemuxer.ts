@@ -117,11 +117,12 @@ class TSDemuxer implements Demuxer {
    * Resets all internal track instances of the demuxer.
    *
    * @override Implements generic demuxing/remuxing interface (see DemuxerInline)
+   * @param {Uint8Array} initSegment
    * @param {string} audioCodec
    * @param {string} videoCodec
    * @param {number} duration (in TS timescale = 90kHz)
    */
-  resetInitSegment (audioCodec, videoCodec, duration) {
+  resetInitSegment (initSegment, audioCodec, videoCodec, duration) {
     this.pmtParsed = false;
     this._pmtId = -1;
 

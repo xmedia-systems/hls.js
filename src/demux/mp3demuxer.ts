@@ -15,7 +15,7 @@ class MP3Demuxer implements Demuxer {
     this.config = config;
   }
 
-  resetInitSegment (audioCodec, videoCodec, duration) {
+  resetInitSegment (initSegment, audioCodec, videoCodec, duration) {
     this._audioTrack = { container: 'audio/mpeg', type: 'audio', id: -1, sequenceNumber: 0, isAAC: false, samples: [], len: 0, manifestCodec: audioCodec, duration: duration, inputTimeScale: 90000 };
   }
 

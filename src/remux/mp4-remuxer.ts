@@ -143,6 +143,7 @@ class MP4Remuxer implements Remuxer {
       // rationale is that there is a integer nb of audio frames per audio sample (1024 for AAC)
       // using audio sampling rate here helps having an integer MP4 frame duration
       // this avoids potential rounding issue and AV sync issue
+      audioTrack.timescale = audioTrack.samplerate;
       logger.log(`audio sampling rate : ${audioTrack.samplerate}`);
       if (!audioTrack.isAAC) {
         if (typeSupported.mpeg) { // Chrome and Safari
@@ -169,7 +170,7 @@ class MP4Remuxer implements Remuxer {
     if (videoTrack.sps && videoTrack.pps && videoSamples.length) {
       // let's use input time scale as MP4 video timescale
       // we use input time scale straight away to avoid rounding issues on frame duration / cts computation
-      const inputTimeScale = videoTrack.inputTimeScale;
+      const inputTimeScale = videoTrack.timescale = videoTrack.inputTimeScale;
       tracks.video = {
         container: 'video/mp4',
         codec: videoTrack.codec,
@@ -445,7 +446,7 @@ class MP4Remuxer implements Remuxer {
 
   remuxAudio (track, timeOffset, contiguous, accurateTimeOffset): RemuxedTrack | undefined {
     const inputTimeScale = track.inputTimeScale;
-    const mp4timeScale = track.timescale;
+    const mp4timeScale = track.samplerate;
     const scaleFactor = inputTimeScale / mp4timeScale;
     const mp4SampleDuration = track.isAAC ? 1024 : 1152;
     const inputSampleDuration = mp4SampleDuration * scaleFactor;

@@ -10,7 +10,7 @@ export interface Remuxer {
         contiguous: boolean,
         accurateTimeOffset: boolean
   ): RemuxerResult
-  resetInitSegment(initSegment?: any): void
+  resetInitSegment(initSegment: Uint8Array, audioCodec: string, videoCodec: string): void
   resetTimeStamp(defaultInitPTS): void
   destroy() : void
 }
