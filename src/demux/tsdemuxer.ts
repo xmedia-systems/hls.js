@@ -148,7 +148,7 @@ class TSDemuxer implements Demuxer {
   resetTimeStamp () {}
 
   // feed incoming data to the front of the parsing pipeline
-  demux (data, contiguous, isSampleAes = false): DemuxerResult {
+  demux (data, contiguous, timeOffset, isSampleAes = false): DemuxerResult {
     if (!isSampleAes) {
       this.sampleAes = null;
     }
@@ -342,8 +342,8 @@ class TSDemuxer implements Demuxer {
     };
   }
 
-  demuxSampleAes (data, decryptData, contiguous): Promise <DemuxerResult> {
-    const demuxResult = this.demux(data, contiguous, true);
+  demuxSampleAes (data, decryptData, timeOffset, contiguous): Promise <DemuxerResult> {
+    const demuxResult = this.demux(data, contiguous, timeOffset, true);
     const sampleAes = this.sampleAes = new SampleAesDecrypter(this.observer, this.config, decryptData, this.discardEPB);
     return new Promise((resolve, reject) => {
       this.decrypt(demuxResult.audioTrack, demuxResult.avcTrack, sampleAes)

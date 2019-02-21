@@ -3,23 +3,31 @@
  */
 import { logger } from '../utils/logger';
 import Event from '../events';
+import { Demuxer, DemuxerResult } from '../types/demuxer';
+import { TrackSet } from '../types/track';
+import { InitSegmentData } from '../types/remuxer';
 
 const UINT32_MAX = Math.pow(2, 32) - 1;
 
-class MP4Demuxer {
-  constructor (observer, remuxer) {
+class MP4Demuxer implements Demuxer {
+  private observer: any;
+  private initPTS!: number;
+  private initData!: any;
+  private audioCodec!: string;
+  private videoCodec!: string;
+
+  constructor (observer) {
     this.observer = observer;
-    this.remuxer = remuxer;
   }
 
   resetTimeStamp (initPTS) {
     this.initPTS = initPTS;
   }
 
-  resetInitSegment (initSegment, audioCodec, videoCodec, duration) {
+  resetInitSegment (initSegment, audioCodec, videoCodec, duration): TrackSet | undefined {
     // jshint unused:false
     if (initSegment && initSegment.byteLength) {
-      const initData = this.initData = MP4Demuxer.parseInitSegment(initSegment);
+      const initData = this.initData = MP4Demuxer.parseInitSegment(initSegment) as any;
 
       // default audio codec if nothing specified
       // TODO : extract that from initsegment
@@ -31,7 +39,7 @@ class MP4Demuxer {
         videoCodec = 'avc1.42e01e';
       }
 
-      const tracks = {};
+      const tracks = {} as any;
       if (initData.audio && initData.video) {
         tracks.audiovideo = { container: 'video/mp4', codec: audioCodec + ',' + videoCodec, initSegment: duration ? initSegment : null };
       } else {
@@ -43,7 +51,7 @@ class MP4Demuxer {
           tracks.video = { container: 'video/mp4', codec: videoCodec, initSegment: duration ? initSegment : null };
         }
       }
-      this.observer.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { tracks });
+      return tracks;
     } else {
       if (audioCodec) {
         this.audioCodec = audioCodec;
@@ -101,8 +109,8 @@ class MP4Demuxer {
   }
 
   // Find the data for a box specified by its path
-  static findBox (data, path) {
-    let results = [],
+  static findBox (data, path): any {
+    let results = [] as Array<any>,
       i, size, type, end, subresults, start, endbox;
 
     if (data.data) {
@@ -253,7 +261,7 @@ class MP4Demuxer {
    * the init segment is malformed.
    */
   static parseInitSegment (initSegment) {
-    let result = [];
+    let result = [] as Array<any>;
     let traks = MP4Demuxer.findBox(initSegment, ['moov', 'trak']);
 
     traks.forEach(trak => {
@@ -375,22 +383,35 @@ class MP4Demuxer {
     });
   }
 
-  // feed incoming data to the front of the parsing pipeline
-  append (data, timeOffset, contiguous, accurateTimeOffset) {
+  // TODO: Move initSegment logic into passthrough-remuxer
+  demux (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
     let initData = this.initData;
+    debugger;
+    const initSegment = {} as InitSegmentData;
     if (!initData) {
-      this.resetInitSegment(data, this.audioCodec, this.videoCodec, false);
+      initSegment.tracks = this.resetInitSegment(data, this.audioCodec, this.videoCodec, false);
       initData = this.initData;
     }
     let startDTS, initPTS = this.initPTS;
     if (initPTS === undefined) {
       let startDTS = MP4Demuxer.getStartDTS(initData, data);
       this.initPTS = initPTS = startDTS - timeOffset;
-      this.observer.trigger(Event.INIT_PTS_FOUND, { initPTS: initPTS });
+      initSegment.initPTS = initPTS;
     }
     MP4Demuxer.offsetStartDTS(initData, data, initPTS);
     startDTS = MP4Demuxer.getStartDTS(initData, data);
-    this.remuxer.remux(initData.audio, initData.video, null, null, startDTS, contiguous, accurateTimeOffset, data);
+    return {
+      audioTrack: initData.audio,
+      avcTrack: initData.video,
+      id3Track: null,
+      textTrack: null,
+      startDTS,
+      initSegment
+    };
+  }
+
+  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number, contiguous: boolean): Promise<DemuxerResult> {
+    return Promise.reject(new Error('The MP4 demuxer does not support SAMPLE-AES decryption'));
   }
 
   destroy () {}

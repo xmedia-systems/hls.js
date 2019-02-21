@@ -1,8 +1,8 @@
-import { RemuxerResult } from './remuxer';
+import { InitSegmentData, RemuxerResult } from './remuxer';
 
 export interface Demuxer {
-  demux (data: Uint8Array, contiguous: boolean, isSampleAes: boolean) : DemuxerResult
-  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, contiguous) : Promise<DemuxerResult>
+  demux (data: Uint8Array, timeOffset: number, contiguous: boolean, isSampleAes?: boolean) : DemuxerResult
+  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number, contiguous: boolean) : Promise<DemuxerResult>
   destroy() : void
   resetInitSegment(initSegment: any, audioCodec: string, videoCodec: string, duration: number);
   resetTimeStamp(defaultInitPTS): void
@@ -13,20 +13,6 @@ export interface DemuxerResult {
   avcTrack: any
   id3Track: any
   textTrack: any
-}
-
-export interface IDemuxerInline {
-  push (data: ArrayBuffer,
-        decryptdata: ArrayBuffer | null,
-        initSegment: any,
-        audioCodec: string,
-        videoCodec: string,
-        timeOffset: number,
-        discontinuity: boolean,
-        trackSwitch: boolean,
-        contiguous: boolean,
-        duration: number,
-        accurateTimeOffset: boolean,
-        defaultInitPTS: number
-  ): Promise<RemuxerResult>
+  startDTS?: number
+  initSegment?: InitSegmentData
 }

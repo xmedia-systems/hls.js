@@ -110,8 +110,13 @@ class Transmuxer {
   }
 
   private transmux (data: Uint8Array, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean): RemuxerResult {
-    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.demux(data, contiguous, false);
-    return this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset);
+    const { audioTrack, avcTrack, id3Track, textTrack, startDTS, initSegment } = this.demuxer!.demux(data, timeOffset, contiguous, false);
+    const offset = Number.isFinite(startDTS!) ? startDTS : timeOffset;
+    const remuxResult = this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, offset as number, contiguous, accurateTimeOffset);
+    if (initSegment) {
+      remuxResult.initSegment = initSegment;
+    }
+    return remuxResult;
   }
 
   private transmuxAes128 (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean): Promise<RemuxerResult> {
@@ -130,7 +135,7 @@ class Transmuxer {
   }
 
   private transmuxSampleAes (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean) : Promise<RemuxerResult> {
-    return this.demuxer!.demuxSampleAes(data, decryptData, contiguous)
+    return this.demuxer!.demuxSampleAes(data, decryptData, timeOffset, contiguous)
       .then(demuxResult =>
         this.remuxer!.remux(demuxResult.audioTrack, demuxResult.avcTrack, demuxResult.id3Track, demuxResult.textTrack, timeOffset, contiguous, accurateTimeOffset)
       );
