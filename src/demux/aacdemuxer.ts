@@ -15,7 +15,7 @@ class AACDemuxer implements Demuxer {
     this.config = config;
   }
 
-  resetInitSegment (initSegment, audioCodec, videoCodec, duration) {
+  resetInitSegment (audioCodec, videoCodec, duration) {
     this._audioTrack = { container: 'audio/adts', type: 'audio', id: 0, sequenceNumber: 0, isAAC: true, samples: [], len: 0, manifestCodec: audioCodec, duration: duration, inputTimeScale: 90000 };
   }
 
@@ -81,9 +81,9 @@ class AACDemuxer implements Demuxer {
 
     return {
       audioTrack: track,
-      avcTrack: { samples: [] },
-      id3Track: { samples: id3Samples, inputTimeScale: 90000 },
-      textTrack: { samples: [] }
+      avcTrack: { type: 'avc', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] },
+      id3Track: { type: 'id3', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] },
+      textTrack: { type: 'text', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] }
     };
   }
 

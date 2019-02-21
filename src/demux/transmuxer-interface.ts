@@ -137,7 +137,7 @@ export default class TransmuxerInterface {
       }, data instanceof ArrayBuffer ? [data] : []);
     } else if (transmuxer) {
       const remuxResult =
-        transmuxer.push(data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, contiguous, duration, accurateTimeOffset, defaultInitPTS);
+        transmuxer.push(data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, !!contiguous, duration, accurateTimeOffset, defaultInitPTS);
       if (!remuxResult) {
         return;
       }
@@ -193,7 +193,7 @@ export default class TransmuxerInterface {
     const { audio, video, text, id3, initSegment } = remuxResult;
     if (initSegment) {
       if (initSegment.tracks) {
-        observer.trigger(Event.FRAG_PARSING_INIT_SEGMENT, {...data, tracks: initSegment.tracks});
+        observer.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { ...data, tracks: initSegment.tracks });
       }
       if (Number.isFinite(initSegment.initPTS)) {
         observer.trigger(Event.INIT_PTS_FOUND, { ...data, initPTS: initSegment.initPTS });

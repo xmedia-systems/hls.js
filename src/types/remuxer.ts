@@ -1,16 +1,16 @@
 import { TrackSet } from './track';
+import { DemuxedAudioTrack, DemuxedAvcTrack, DemuxedTrack } from './demuxer';
 
 export interface Remuxer {
-  remux(audioTrack: any,
-        videoTrack: any,
-        id3Track:any,
-        textTrack: any,
+  remux(audioTrack: DemuxedAudioTrack,
+        videoTrack: DemuxedAvcTrack,
+        id3Track: DemuxedTrack,
+        textTrack: DemuxedTrack,
         timeOffset: number,
         contiguous: boolean,
-        accurateTimeOffset: boolean,
-        rawData?: Uint8Array
+        accurateTimeOffset: boolean
   ): RemuxerResult
-  resetInitSegment(): void
+  resetInitSegment(initSegment?: any): void
   resetTimeStamp(defaultInitPTS): void
   destroy() : void
 }

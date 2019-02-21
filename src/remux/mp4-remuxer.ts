@@ -8,6 +8,8 @@ import Event from '../events';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { logger } from '../utils/logger';
 import { InitSegmentData, Remuxer, RemuxerResult, RemuxedMetadata, RemuxedTrack } from '../types/remuxer';
+import { DemuxedAudioTrack, DemuxedAvcTrack, DemuxedTrack } from '../types/demuxer';
+import { TrackSet } from '../types/track';
 
 // 10 seconds
 const MAX_SILENT_FRAME_DURATION = 10 * 1000;
@@ -43,7 +45,7 @@ class MP4Remuxer implements Remuxer {
     this.ISGenerated = false;
   }
 
-  remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset) : RemuxerResult {
+  remux (audioTrack: DemuxedAudioTrack, videoTrack: DemuxedAvcTrack, id3Track: DemuxedTrack, textTrack: DemuxedTrack, timeOffset, contiguous, accurateTimeOffset) : RemuxerResult {
     // generate Init Segment if needed
     let video;
     let audio;
@@ -73,7 +75,7 @@ class MP4Remuxer implements Remuxer {
       // logger.log('nb AAC samples:' + audioTrack.samples.length);
       if (nbAudioSamples) {
         // if initSegment was generated without video samples, regenerate it again
-        if (!audioTrack.timescale) {
+        if (!audioTrack.samplerate) {
           logger.warn('regenerate InitSegment as audio detected');
           initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
         }
@@ -86,7 +88,7 @@ class MP4Remuxer implements Remuxer {
           }
 
           // if initSegment was generated without video samples, regenerate it again
-          if (!videoTrack.timescale) {
+          if (!videoTrack.inputTimeScale) {
             logger.warn('regenerate InitSegment as video detected');
             initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
           }
@@ -121,12 +123,12 @@ class MP4Remuxer implements Remuxer {
     };
   }
 
-  generateIS (audioTrack, videoTrack, timeOffset) : InitSegmentData | undefined {
+  generateIS (audioTrack: DemuxedAudioTrack, videoTrack: DemuxedAvcTrack, timeOffset) : InitSegmentData | undefined {
     const observer = this.observer;
     const audioSamples = audioTrack.samples;
     const videoSamples = videoTrack.samples;
     const typeSupported = this.typeSupported;
-    const tracks = {} as any;
+    const tracks = {} as TrackSet;
     const computePTSDTS = (this._initPTS === undefined);
     let container = 'audio/mp4';
     let initPTS;
@@ -141,7 +143,6 @@ class MP4Remuxer implements Remuxer {
       // rationale is that there is a integer nb of audio frames per audio sample (1024 for AAC)
       // using audio sampling rate here helps having an integer MP4 frame duration
       // this avoids potential rounding issue and AV sync issue
-      audioTrack.timescale = audioTrack.samplerate;
       logger.log(`audio sampling rate : ${audioTrack.samplerate}`);
       if (!audioTrack.isAAC) {
         if (typeSupported.mpeg) { // Chrome and Safari
@@ -169,7 +170,6 @@ class MP4Remuxer implements Remuxer {
       // let's use input time scale as MP4 video timescale
       // we use input time scale straight away to avoid rounding issues on frame duration / cts computation
       const inputTimeScale = videoTrack.inputTimeScale;
-      videoTrack.timescale = inputTimeScale;
       tracks.video = {
         container: 'video/mp4',
         codec: videoTrack.codec,
@@ -200,7 +200,7 @@ class MP4Remuxer implements Remuxer {
     observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'no audio/video samples found' });
   }
 
-  remuxVideo (track, timeOffset, contiguous, audioTrackLength, accurateTimeOffset) : RemuxedTrack | undefined {
+  remuxVideo (track: DemuxedTrack, timeOffset, contiguous, audioTrackLength, accurateTimeOffset) : RemuxedTrack | undefined {
     let offset = 8;
     let mp4SampleDuration;
     let mdat;
@@ -209,7 +209,7 @@ class MP4Remuxer implements Remuxer {
     let firstDTS;
     let lastPTS;
     let lastDTS;
-    const timeScale = track.timescale;
+    const timeScale = track.inputTimeScale;
     const inputSamples = track.samples;
     const outputSamples = [] as Array<any>;
     const nbSamples = inputSamples.length;
@@ -415,7 +415,6 @@ class MP4Remuxer implements Remuxer {
     this.nextAvcDts = lastDTS + mp4SampleDuration;
     let dropped = track.dropped;
     track.len = 0;
-    track.nbNalu = 0;
     track.dropped = 0;
     if (outputSamples.length && navigator.userAgent.toLowerCase().indexOf('chrome') > -1) {
       let flags = outputSamples[0].flags;

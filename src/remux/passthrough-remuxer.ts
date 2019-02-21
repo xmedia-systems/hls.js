@@ -1,49 +1,113 @@
-import { RemuxedTrack, Remuxer, RemuxerResult } from '../types/remuxer';
+import { InitSegmentData, RemuxedTrack, Remuxer, RemuxerResult } from '../types/remuxer';
+import { getStartDTS, offsetStartDTS, parseInitSegment } from '../utils/mp4-tools';
+import { TrackSet } from '../types/track';
 
 class PassThroughRemuxer implements Remuxer {
+  private emitInitSegment: boolean = false;
+  private audioCodec?: string;
+  private videoCodec?: string;
+  private initData?: any;
+  private initPTS?: number;
+  private initTracks?: TrackSet;
+
   destroy () {
   }
 
-  resetTimeStamp () {
+  resetTimeStamp (defaultInitPTS) {
+    this.initPTS = defaultInitPTS;
   }
 
-  resetInitSegment () {
+  resetInitSegment (initSegment) {
+    this.generateInitSegment(initSegment);
+    this.emitInitSegment = true;
   }
 
-  remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset, rawData): RemuxerResult {
-    let audio;
-    let video;
-    if (audioTrack) {
-      audio = {
-        data1: rawData,
-        startPTS: timeOffset,
-        startDTS: timeOffset,
-        type: 'audio',
-        hasAudio: !!audioTrack,
-        hasVideo: !!videoTrack,
-        nb: 1,
-        dropped: 0
-      } as RemuxedTrack;
+  generateInitSegment (initSegment): void {
+    let { audioCodec, videoCodec } = this;
+    if (!initSegment || !initSegment.byteLength) {
+      this.initTracks = undefined;
+      this.initData = undefined;
+      return;
+    }
+    const initData = this.initData = parseInitSegment(initSegment) as any;
+
+    // default audio codec if nothing specified
+    // TODO : extract that from initsegment
+    if (audioCodec == null) {
+      audioCodec = 'mp4a.40.5';
     }
 
-    if (videoTrack) {
-      video = {
-        data1: rawData,
-        startPTS: timeOffset,
-        startDTS: timeOffset,
-        type: 'video',
-        hasAudio: !!audioTrack,
-        hasVideo: !!videoTrack,
-        nb: 1,
-        dropped: 0
-      } as RemuxedTrack;
+    if (videoCodec == null) {
+      videoCodec = 'avc1.42e01e';
+    }
+
+    const tracks = {} as TrackSet;
+    if (initData.audio && initData.video) {
+      tracks.audiovideo = {
+        container: 'video/mp4',
+        codec: audioCodec + ',' + videoCodec,
+        initSegment
+      };
+    } else {
+      if (initData.audio) {
+        tracks.audio = { container: 'audio/mp4', codec: audioCodec, initSegment };
+      }
+
+      if (initData.video) {
+        tracks.video = { container: 'video/mp4', codec: videoCodec, initSegment };
+      }
+    }
+    this.initTracks = tracks;
+  }
+
+  remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
+    const data = videoTrack.samples;
+    let initData = this.initData;
+    const initSegment = {} as InitSegmentData;
+    if (!initData) {
+      this.generateInitSegment(data);
+      initData = this.initData;
+    }
+
+    let startDTS = timeOffset;
+    let initPTS = this.initPTS;
+    if (!Number.isFinite(initPTS as number)) {
+      let startDTS = getStartDTS(initData, data);
+      this.initPTS = initPTS = startDTS - timeOffset;
+      initSegment.initPTS = initPTS;
+    }
+    offsetStartDTS(initData, data, initPTS);
+
+    if (this.emitInitSegment) {
+      initSegment.tracks = this.initTracks;
+      this.emitInitSegment = false;
+    }
+
+    let track = {
+      data1: data,
+      startPTS: startDTS,
+      startDTS,
+      type: '',
+      hasAudio: !!audioTrack,
+      hasVideo: !!videoTrack,
+      nb: 1,
+      dropped: 0
+    } as RemuxedTrack;
+
+    if (initData.audio) {
+      track.type += 'audio';
+    }
+
+    if (initData.video) {
+      track.type += 'video';
     }
 
     return {
-      audio,
-      video,
+      audio: track.type === 'audio' ? track : undefined,
+      video: track.type !== 'audio' ? track : undefined,
       text: textTrack,
-      id3: id3Track
+      id3: id3Track,
+      initSegment
     };
   }
 }

@@ -16,7 +16,7 @@ import ExpGolomb from './exp-golomb';
 import SampleAesDecrypter from './sample-aes';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
-import { Demuxer, DemuxerResult } from '../types/demuxer';
+import { DemuxedAvcTrack, DemuxedAudioTrack, DemuxedTrack, Demuxer, DemuxerResult } from '../types/demuxer';
 
 // We are using fixed track IDs for driving the MP4 remuxer
 // instead of following the TS PIDs.
@@ -49,10 +49,10 @@ class TSDemuxer implements Demuxer {
   private _initDTS?: number | null = null;
   private _pmtId: number = -1;
 
-  private _avcTrack: any;
-  private _audioTrack: any;
-  private _id3Track: any;
-  private _txtTrack: any;
+  private _avcTrack!: DemuxedAvcTrack;
+  private _audioTrack!: DemuxedAudioTrack;
+  private _id3Track!: DemuxedTrack;
+  private _txtTrack!: DemuxedTrack;
   private aacOverFlow: any;
   private avcSample: any;
 
@@ -97,7 +97,7 @@ class TSDemuxer implements Demuxer {
    * @param {number} duration
    * @return {object} TSDemuxer's internal track model
    */
-  static createTrack (type, duration) {
+  static createTrack (type, duration) : DemuxedTrack {
     return {
       container: type === 'video' || type === 'audio' ? 'video/mp2t' : undefined,
       type,
@@ -108,7 +108,6 @@ class TSDemuxer implements Demuxer {
       samples: [],
       len: 0,
       dropped: type === 'video' ? 0 : undefined,
-      isAAC: type === 'audio' ? true : undefined,
       duration: type === 'audio' ? duration : undefined
     };
   }
@@ -118,12 +117,11 @@ class TSDemuxer implements Demuxer {
    * Resets all internal track instances of the demuxer.
    *
    * @override Implements generic demuxing/remuxing interface (see DemuxerInline)
-   * @param {object} initSegment
    * @param {string} audioCodec
    * @param {string} videoCodec
    * @param {number} duration (in TS timescale = 90kHz)
    */
-  resetInitSegment (initSegment, audioCodec, videoCodec, duration) {
+  resetInitSegment (audioCodec, videoCodec, duration) {
     this.pmtParsed = false;
     this._pmtId = -1;
 
@@ -131,6 +129,7 @@ class TSDemuxer implements Demuxer {
     this._audioTrack = TSDemuxer.createTrack('audio', duration);
     this._id3Track = TSDemuxer.createTrack('id3', duration);
     this._txtTrack = TSDemuxer.createTrack('text', duration);
+    this._audioTrack.isAAC = true;
 
     // flush any partial content
     this.aacOverFlow = null;

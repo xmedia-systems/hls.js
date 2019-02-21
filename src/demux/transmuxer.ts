@@ -78,8 +78,8 @@ class Transmuxer {
     }
 
     if (discontinuity || trackSwitch) {
-      demuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec, duration);
-      remuxer.resetInitSegment();
+      demuxer.resetInitSegment(audioCodec, videoCodec, duration, uintInitSegment);
+      remuxer.resetInitSegment(uintInitSegment);
     }
     if (discontinuity) {
       demuxer.resetTimeStamp(defaultInitPTS);
