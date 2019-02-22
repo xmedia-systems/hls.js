@@ -50,8 +50,8 @@ class AudioStreamController extends BaseStreamController {
 
   // Signal that video PTS was found
   onInitPtsFound (data) {
-    let demuxerId = data.id, cc = data.frag.cc, initPTS = data.initPTS;
-    if (demuxerId === 'main') {
+    let transmuxerId = data.id, cc = data.frag.cc, initPTS = data.initPTS;
+    if (transmuxerId === 'main') {
       // Always update the new INIT PTS
       // Can change due level switch
       this.initPTS[cc] = initPTS;
@@ -367,11 +367,11 @@ class AudioStreamController extends BaseStreamController {
     this.fragCurrent = null;
     this.state = State.PAUSED;
     this.waitingFragment = null;
-    // destroy useless demuxer when switching audio to main
+    // destroy useless transmuxer when switching audio to main
     if (!altAudio) {
-      if (this.demuxer) {
-        this.demuxer.destroy();
-        this.demuxer = null;
+      if (this.transmuxer) {
+        this.transmuxer.destroy();
+        this.transmuxer = null;
       }
     } else {
       // switching to audio track, start timer if not already started
@@ -459,8 +459,8 @@ class AudioStreamController extends BaseStreamController {
     this.state = State.PARSING;
     // transmux the MPEG-TS data to ISO-BMFF segments
     this.appended = false;
-    if (!this.demuxer) {
-      this.demuxer = new TransmuxerInterface(this.hls, 'audio');
+    if (!this.transmuxer) {
+      this.transmuxer = new TransmuxerInterface(this.hls, 'audio');
     }
 
     // Check if we have video initPTS
@@ -469,12 +469,12 @@ class AudioStreamController extends BaseStreamController {
     const initSegmentData = details.initSegment ? details.initSegment.data : [];
     if (details.initSegment || Number.isFinite(initPTS)) {
       this.pendingBuffering = true;
-      logger.log(`Demuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
+      logger.log(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
       // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
       let accurateTimeOffset = false; // details.PTSKnown || !details.live;
-      this.demuxer.push(payload, initSegmentData, audioCodec, null, frag, details.totalduration, accurateTimeOffset, initPTS);
+      this.transmuxer.push(payload, initSegmentData, audioCodec, null, frag, details.totalduration, accurateTimeOffset, initPTS);
     } else {
-      logger.log(`unknown video PTS for continuity counter ${cc}, waiting for video PTS before demuxing audio frag ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
+      logger.log(`unknown video PTS for continuity counter ${cc}, waiting for video PTS before transmuxing audio frag ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
       this.waitingFragment = { frag, payload, stats };
       this.state = State.WAITING_INIT_PTS;
     }
@@ -490,7 +490,7 @@ class AudioStreamController extends BaseStreamController {
         this.state === State.PARSING) {
       let tracks = data.tracks, track;
 
-      // delete any video track found on audio demuxer
+      // delete any video track found on audio transmuxer
       if (tracks.video) {
         delete tracks.video;
       }

@@ -845,8 +845,8 @@ class StreamController extends BaseStreamController {
 
     // transmux the MPEG-TS data to ISO-BMFF segments
     logger.log(`Parsing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
-    const demuxer = this.demuxer = this.demuxer || new TransmuxerInterface(this.hls, 'main');
-    demuxer.push(
+    const transmuxer = this.transmuxer = this.transmuxer || new TransmuxerInterface(this.hls, 'main');
+    transmuxer.push(
       payload,
       initSegmentData,
       audioCodec,
@@ -1037,10 +1037,10 @@ class StreamController extends BaseStreamController {
         }
         this.fragCurrent = null;
         this.fragPrevious = null;
-        // destroy demuxer to force init segment generation (following audio switch)
-        if (this.demuxer) {
-          this.demuxer.destroy();
-          this.demuxer = null;
+        // destroy transmuxer to force init segment generation (following audio switch)
+        if (this.transmuxer) {
+          this.transmuxer.destroy();
+          this.transmuxer = null;
         }
         // switch to IDLE state to load new fragment
         this.state = State.IDLE;
