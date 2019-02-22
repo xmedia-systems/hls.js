@@ -4,7 +4,7 @@
 
 import BinarySearch from '../utils/binary-search';
 import { BufferHelper } from '../utils/buffer-helper';
-import Demuxer from '../demux/demuxer';
+import TransmuxerInterface from '../demux/transmuxer-interface';
 import Event from '../events';
 import { FragmentState } from './fragment-tracker';
 import { ElementaryStreamTypes } from '../loader/fragment';
@@ -845,7 +845,7 @@ class StreamController extends BaseStreamController {
 
     // transmux the MPEG-TS data to ISO-BMFF segments
     logger.log(`Parsing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
-    const demuxer = this.demuxer = this.demuxer || new Demuxer(this.hls, 'main');
+    const demuxer = this.demuxer = this.demuxer || new TransmuxerInterface(this.hls, 'main');
     demuxer.push(
       payload,
       initSegmentData,

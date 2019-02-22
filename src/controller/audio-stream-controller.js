@@ -3,7 +3,7 @@
 */
 
 import { BufferHelper } from '../utils/buffer-helper';
-import Demuxer from '../demux/demuxer';
+import TransmuxerInterface from '../demux/transmuxer-interface';
 import Event from '../events';
 import * as LevelHelper from './level-helper';
 import TimeRanges from '../utils/time-ranges';
@@ -460,7 +460,7 @@ class AudioStreamController extends BaseStreamController {
     // transmux the MPEG-TS data to ISO-BMFF segments
     this.appended = false;
     if (!this.demuxer) {
-      this.demuxer = new Demuxer(this.hls, 'audio');
+      this.demuxer = new TransmuxerInterface(this.hls, 'audio');
     }
 
     // Check if we have video initPTS
