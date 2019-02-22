@@ -37,13 +37,8 @@ export default class TransmuxerInterface {
 
     // forward events to main thread
     observer.on(Event.FRAG_DECRYPTED, forwardMessage);
-    observer.on(Event.FRAG_PARSING_INIT_SEGMENT, forwardMessage);
-    observer.on(Event.FRAG_PARSING_DATA, forwardMessage);
-    observer.on(Event.FRAG_PARSED, forwardMessage);
     observer.on(Event.ERROR, forwardMessage);
-    observer.on(Event.FRAG_PARSING_METADATA, forwardMessage);
-    observer.on(Event.FRAG_PARSING_USERDATA, forwardMessage);
-    observer.on(Event.INIT_PTS_FOUND, forwardMessage);
+    observer.on('transmuxComplete', forwardMessage);
 
     const typeSupported = {
       mp4: MediaSource.isTypeSupported('video/mp4'),
@@ -117,7 +112,7 @@ export default class TransmuxerInterface {
     }
 
     this.frag = frag;
-    const { observer, transmuxer } = this;
+    const { transmuxer } = this;
     if (w) {
       // post fragment payload as transferable objects for ArrayBuffer (no copy)
       w.postMessage({
@@ -146,10 +141,10 @@ export default class TransmuxerInterface {
       if (remuxResult.then) {
         // @ts-ignore
         remuxResult.then(data => {
-          this.handleTransmuxComplete(data, observer);
+          this.handleTransmuxComplete(data);
         });
       } else {
-        this.handleTransmuxComplete(remuxResult, observer);
+        this.handleTransmuxComplete(remuxResult);
       }
     }
   }
@@ -163,16 +158,8 @@ export default class TransmuxerInterface {
       global.URL.revokeObjectURL(this.worker.objectURL);
       break;
     }
-    // special case for FRAG_PARSING_DATA: data1 and data2 are transferable objects
-    case Event.FRAG_PARSING_DATA: {
-      data.data.data1 = new Uint8Array(data.data1);
-      if (data.data2) {
-        data.data.data2 = new Uint8Array(data.data2);
-      }
-      break;
-    }
     case 'transmuxComplete': {
-      this.handleTransmuxComplete(data.data, this.observer);
+      this.handleTransmuxComplete(data.data);
       break;
     }
 
@@ -188,23 +175,37 @@ export default class TransmuxerInterface {
   }
 
   // TODO: Does the transfered data need to be converted to uint8?
-  private handleTransmuxComplete (remuxResult, observer): void {
-    let data = { frag: this.frag, id: this.id };
+  private handleTransmuxComplete (remuxResult): void {
+    const { frag, hls, id } = this;
+    Object.keys(remuxResult).forEach(key => {
+      const data = remuxResult[key];
+      if (!data) {
+        return;
+      }
+      data.frag = frag;
+      data.id = id;
+    });
     const { audio, video, text, id3, initSegment } = remuxResult;
     if (initSegment) {
       if (initSegment.tracks) {
-        observer.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { ...data, tracks: initSegment.tracks });
+        hls.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { frag, id, tracks: initSegment.tracks });
       }
       if (Number.isFinite(initSegment.initPTS)) {
-        observer.trigger(Event.INIT_PTS_FOUND, { ...data, initPTS: initSegment.initPTS });
+        hls.trigger(Event.INIT_PTS_FOUND, { frag, id, initPTS: initSegment.initPTS });
       }
     }
     if (audio) {
-      observer.trigger(Event.FRAG_PARSING_DATA, { ...data, ...audio });
+      hls.trigger(Event.FRAG_PARSING_DATA, audio);
     }
     if (video) {
-      observer.trigger(Event.FRAG_PARSING_DATA, { ...data, ...video });
+      hls.trigger(Event.FRAG_PARSING_DATA, video);
     }
-    observer.trigger(Event.FRAG_PARSED, data);
+    if (id3) {
+      hls.trigger(Event.FRAG_PARSING_METADATA, id3);
+    }
+    if (text) {
+      hls.trigger(Event.FRAG_PARSING_USERDATA, text);
+    }
+    hls.trigger(Event.FRAG_PARSED, { frag, id });
   }
 }
