@@ -1,29 +1,36 @@
-import { LoaderCallbacks, LoaderContext, LoaderStats } from '../types/loader';
+import { LoaderCallbacks, LoaderContext, Loader, LoaderStats, LoaderConfiguration } from '../types/loader';
 
-/**
- * Fetch based loader
- * timeout / abort / onprogress not supported for now
- * timeout / abort : some ideas here : https://github.com/whatwg/fetch/issues/20#issuecomment-196113354
- * but still it is not bullet proof as it fails to avoid data waste....
-*/
+const { fetch, AbortController, ReadableStream, Request, Headers, performance } = window as any;
 
-const { Request, Headers, fetch, performance } = window as any;
+export function fetchSupported () {
+    if (fetch && AbortController && ReadableStream && Request) {
+        try {
+            new ReadableStream({}); // eslint-disable-line no-new
+            return true;
+        } catch (e) { /* noop */ }
+    }
+    return false;
+}
 
-class FetchLoader {
-  private config: any;
+class FetchLoader implements Loader<LoaderContext> {
+  private config!: LoaderConfiguration;
   private fetchSetup: Function;
+  private requestTimeout?: number;
   private request!: Request;
   private response!: Response;
+  private controller: AbortController;
+  public context!: LoaderContext;
   public stats: LoaderStats;
 
-  constructor (config) {
-    this.config = config;
+  constructor (config /* HlsConfig */) {
     this.fetchSetup = config.fetchSetup || getRequest;
+    this.controller = new AbortController();
     this.stats = {
       tfirst: 0,
       trequest: 0,
       tload: 0,
       loaded: 0,
+      tparsed: 0,
       total: 0,
       retry: 0,
       aborted: false
@@ -36,24 +43,28 @@ class FetchLoader {
 
   abort (): void {
     this.stats.aborted = true;
+    this.controller.abort();
   }
 
-  load (context: LoaderContext, config: any, callbacks: LoaderCallbacks): void {
+  load (context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>): void {
+    this.context = context;
+    this.config = config;
+
     const stats = this.stats;
     stats.trequest = window.performance.now();
-    stats.retry = 0;
-    stats.tfirst = 0;
-    stats.loaded = 0;
 
-    const initParams = getRequestParameters(context);
+    const initParams = getRequestParameters(context, this.controller.signal);
 
     this.request = this.fetchSetup(context, initParams);
 
+    this.requestTimeout = window.setTimeout(() => {
+      this.abort();
+      callbacks.onTimeout(stats, context);
+    }, config.timeout);
+
     fetch(this.request, initParams).then((response: Response): Promise<string | ArrayBuffer> => {
       this.response = response;
-      if (stats.aborted) {
-        return Promise.resolve('');
-      }
+
       if (!response.ok) {
         const { status, statusText } = response;
         throw new FetchError(statusText || 'fetch, bad network response', status, response);
@@ -65,9 +76,7 @@ class FetchLoader {
       }
       return response.text();
     }).then((responseData: string | ArrayBuffer) => {
-      if (stats.aborted || !responseData) {
-        return;
-      }
+      clearTimeout(this.requestTimeout);
       stats.tload = Math.max(stats.tfirst, performance.now());
       stats.loaded = stats.total = (typeof responseData === 'string') ? responseData.length : responseData.byteLength;
 
@@ -79,6 +88,7 @@ class FetchLoader {
       const response = { url: this.response.url, data: responseData };
       callbacks.onSuccess(response, stats, context, this.response);
     }).catch((error) => {
+      clearTimeout(this.requestTimeout);
       if (stats.aborted) {
         return;
       }
@@ -87,11 +97,12 @@ class FetchLoader {
   }
 }
 
-function getRequestParameters (context: LoaderContext): any {
+function getRequestParameters (context: LoaderContext, signal): any {
   const initParams: any = {
     method: 'GET',
     mode: 'cors',
-    credentials: 'same-origin'
+    credentials: 'same-origin',
+    signal,
   };
 
   if (context.rangeEnd) {

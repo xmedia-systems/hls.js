@@ -7,7 +7,7 @@ import BufferController from './controller/buffer-controller';
 import CapLevelController from './controller/cap-level-controller';
 import FPSController from './controller/fps-controller';
 import XhrLoader from './utils/xhr-loader';
-import FetchLoader from './utils/fetch-loader';
+import FetchLoader, { fetchSupported } from './utils/fetch-loader';
 
 import AudioTrackController from './controller/audio-track-controller';
 import AudioStreamController from './controller/audio-stream-controller';
@@ -115,14 +115,4 @@ if (__USE_ALT_AUDIO__) {
 
 if (__USE_EME_DRM__) {
   hlsDefaultConfig.emeController = EMEController;
-}
-
-function fetchSupported () {
-  if (window.fetch && window.AbortController && window.ReadableStream) {
-    try {
-      new ReadableStream({}); // eslint-disable-line no-new
-      return true;
-    } catch (e) { /* noop */ }
-  }
-  return false;
 }

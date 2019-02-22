@@ -80,11 +80,7 @@ class KeyLoader extends EventHandler {
   }
 
   loadtimeout (stats, context) {
-    let frag = context.frag,
-      loader = frag.loader;
-    if (loader) {
-      loader.abort();
-    }
+    const frag = context.frag;
 
     this.loaders[context.type] = undefined;
     this.hls.trigger(Event.ERROR, { type: ErrorTypes.NETWORK_ERROR, details: ErrorDetails.KEY_LOAD_TIMEOUT, fatal: false, frag: frag });
