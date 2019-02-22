@@ -7,6 +7,7 @@ import { getMediaSource } from '../utils/mediasource-helper';
 import { getSelfScope } from '../utils/get-self-scope';
 import { Observer } from '../observer';
 import Fragment from '../loader/fragment';
+import { TransmuxIdentifier } from '../types/transmuxer';
 
 // see https://stackoverflow.com/a/11237259/589493
 const global = getSelfScope(); // safeguard for code that might run both on worker and main thread
@@ -20,10 +21,12 @@ export default class TransmuxerInterface {
   private worker: any;
   private onwmsg?: Function;
   private transmuxer?: Transmuxer | null;
+  private onTransmuxComplete: Function;
 
-  constructor (hls, id) {
+  constructor (hls, id, onTransmuxComplete) {
     this.hls = hls;
     this.id = id;
+    this.onTransmuxComplete = onTransmuxComplete;
 
     const observer = this.observer = new Observer();
     const config = hls.config;
@@ -38,7 +41,6 @@ export default class TransmuxerInterface {
     // forward events to main thread
     observer.on(Event.FRAG_DECRYPTED, forwardMessage);
     observer.on(Event.ERROR, forwardMessage);
-    observer.on('transmuxComplete', forwardMessage);
 
     const typeSupported = {
       mp4: MediaSource.isTypeSupported('video/mp4'),
@@ -95,7 +97,6 @@ export default class TransmuxerInterface {
   }
 
   push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, defaultInitPTS: number): void {
-    const w = this.worker;
     const timeOffset = Number.isFinite(frag.startPTS) ? frag.startPTS : frag.start;
     const decryptdata = frag.decryptdata;
     const lastFrag = this.frag;
@@ -111,11 +112,12 @@ export default class TransmuxerInterface {
       logger.log(`${this.id}:switch detected`);
     }
 
-    this.frag = frag;
-    const { transmuxer } = this;
-    if (w) {
+    // Frags with sn of 'initSegment' are not transmuxed
+    const transmuxIdentifier: TransmuxIdentifier = { level: frag.level, sn: frag.sn as number };
+    const { transmuxer, worker } = this;
+    if (worker) {
       // post fragment payload as transferable objects for ArrayBuffer (no copy)
-      w.postMessage({
+      worker.postMessage({
         cmd: 'demux',
         data,
         decryptdata,
@@ -128,23 +130,37 @@ export default class TransmuxerInterface {
         contiguous,
         duration,
         accurateTimeOffset,
-        defaultInitPTS
+        defaultInitPTS,
+        transmuxIdentifier
       }, data instanceof ArrayBuffer ? [data] : []);
     } else if (transmuxer) {
-      const remuxResult =
-        transmuxer.push(data, decryptdata, initSegment, audioCodec, videoCodec, timeOffset, discontinuity, trackSwitch, !!contiguous, duration, accurateTimeOffset, defaultInitPTS);
-      if (!remuxResult) {
+      const transmuxResult =
+        transmuxer.push(data,
+            decryptdata,
+            initSegment,
+            audioCodec,
+            videoCodec,
+            timeOffset,
+            discontinuity,
+            trackSwitch,
+            !!contiguous,
+            duration,
+            accurateTimeOffset,
+            defaultInitPTS,
+            transmuxIdentifier
+        );
+      if (!transmuxResult) {
         return;
       }
       // Checking for existence of .then is the safest promise check, since it detects polyfills which aren't instanceof Promise
       // @ts-ignore
-      if (remuxResult.then) {
+      if (transmuxResult.then) {
         // @ts-ignore
-        remuxResult.then(data => {
-          this.handleTransmuxComplete(data);
+        transmuxResult.then(data => {
+          this.onTransmuxComplete(data);
         });
       } else {
-        this.handleTransmuxComplete(remuxResult);
+        this.onTransmuxComplete(transmuxResult);
       }
     }
   }
@@ -159,7 +175,7 @@ export default class TransmuxerInterface {
       break;
     }
     case 'transmuxComplete': {
-      this.handleTransmuxComplete(data.data);
+      this.onTransmuxComplete(data.data);
       break;
     }
 
@@ -172,40 +188,5 @@ export default class TransmuxerInterface {
       break;
     }
     }
-  }
-
-  // TODO: Does the transfered data need to be converted to uint8?
-  private handleTransmuxComplete (remuxResult): void {
-    const { frag, hls, id } = this;
-    Object.keys(remuxResult).forEach(key => {
-      const data = remuxResult[key];
-      if (!data) {
-        return;
-      }
-      data.frag = frag;
-      data.id = id;
-    });
-    const { audio, video, text, id3, initSegment } = remuxResult;
-    if (initSegment) {
-      if (initSegment.tracks) {
-        hls.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { frag, id, tracks: initSegment.tracks });
-      }
-      if (Number.isFinite(initSegment.initPTS)) {
-        hls.trigger(Event.INIT_PTS_FOUND, { frag, id, initPTS: initSegment.initPTS });
-      }
-    }
-    if (audio) {
-      hls.trigger(Event.FRAG_PARSING_DATA, audio);
-    }
-    if (video) {
-      hls.trigger(Event.FRAG_PARSING_DATA, video);
-    }
-    if (id3) {
-      hls.trigger(Event.FRAG_PARSING_METADATA, id3);
-    }
-    if (text) {
-      hls.trigger(Event.FRAG_PARSING_USERDATA, text);
-    }
-    hls.trigger(Event.FRAG_PARSED, { frag, id });
   }
 }

@@ -7,10 +7,10 @@ import Transmuxer from '../demux/transmuxer';
 import Event from '../events';
 import { enableLogs } from '../utils/logger';
 import { EventEmitter } from 'eventemitter3';
-import { RemuxerResult, RemuxedTrack } from '../types/remuxer';
+import { RemuxedTrack } from '../types/remuxer';
+import { TransmuxerResult } from '../types/transmuxer';
 
 export default function TransmuxerWorker (self) {
-  // observer setup
   const observer = new EventEmitter() as any;
   observer.trigger = (event, data) => {
     observer.emit(event, event, ...data);
@@ -40,7 +40,7 @@ export default function TransmuxerWorker (self) {
       break;
     }
     case 'demux': {
-      const remuxResult = self.transmuxer.push(data.data,
+      const transmuxResult = self.transmuxer.push(data.data,
         data.decryptdata,
         data.initSegment,
         data.audioCodec,
@@ -51,18 +51,19 @@ export default function TransmuxerWorker (self) {
         data.contiguous,
         data.duration,
         data.accurateTimeOffset,
-        data.defaultInitPTS
+        data.defaultInitPTS,
+        data.transmuxIdentifier
       );
 
-      if (!remuxResult) {
+      if (!transmuxResult) {
         return;
       }
-      if (remuxResult.then) {
-        remuxResult.then(data => {
+      if (transmuxResult.then) {
+        transmuxResult.then(data => {
           emitTransmuxComplete(self, data);
         });
       } else {
-        emitTransmuxComplete(self, remuxResult as RemuxerResult);
+        emitTransmuxComplete(self, transmuxResult as TransmuxerResult);
       }
       break;
     }
@@ -72,16 +73,16 @@ export default function TransmuxerWorker (self) {
   });
 }
 
-function emitTransmuxComplete (self: any, remuxerResult : RemuxerResult): void {
+function emitTransmuxComplete (self: any, transmuxResult : TransmuxerResult): void {
   let transferable = [] as Array<ArrayBuffer>;
-  const { audio, video } = remuxerResult;
+  const { audio, video } = transmuxResult.remuxResult;
   if (audio) {
     transferable = transferable.concat(convertToTransferable(audio));
   }
   if (video) {
     transferable = transferable.concat(convertToTransferable(video));
   }
-  self.postMessage({ event: 'transmuxComplete', data: remuxerResult }, transferable);
+  self.postMessage({ event: 'transmuxComplete', data: transmuxResult }, transferable);
 }
 
 function convertToTransferable (track: RemuxedTrack): Array<ArrayBuffer> {

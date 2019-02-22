@@ -32,8 +32,6 @@ class StreamController extends BaseStreamController {
       Event.KEY_LOADED,
       Event.FRAG_LOAD_EMERGENCY_ABORTED,
       Event.FRAG_PARSING_INIT_SEGMENT,
-      Event.FRAG_PARSING_DATA,
-      Event.FRAG_PARSED,
       Event.ERROR,
       Event.AUDIO_TRACK_SWITCHING,
       Event.AUDIO_TRACK_SWITCHED,
@@ -845,7 +843,7 @@ class StreamController extends BaseStreamController {
 
     // transmux the MPEG-TS data to ISO-BMFF segments
     logger.log(`Parsing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
-    const transmuxer = this.transmuxer = this.transmuxer || new TransmuxerInterface(this.hls, 'main');
+    const transmuxer = this.transmuxer = this.transmuxer || new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this));
     transmuxer.push(
       payload,
       initSegmentData,
@@ -930,19 +928,13 @@ class StreamController extends BaseStreamController {
   }
 
   onFragParsingData (data) {
-    const fragCurrent = this.fragCurrent;
-    const fragNew = data.frag;
-    if (fragCurrent &&
-        data.id === 'main' &&
-        fragNew.sn === fragCurrent.sn &&
-        fragNew.level === fragCurrent.level &&
-        !(data.type === 'audio' && this.altAudio) && // filter out main audio if audio track is loaded through audio stream controller
-        this.state === State.PARSING) {
-      let level = this.levels[this.level],
-        frag = fragCurrent;
+    const frag = data.frag;
+    // filter out main audio if audio track is loaded through audio stream controller
+    if (!(data.type === 'audio' && this.altAudio) && this.state === State.PARSING) {
+      const level = this.levels[this.level];
       if (!Number.isFinite(data.endPTS)) {
-        data.endPTS = data.startPTS + fragCurrent.duration;
-        data.endDTS = data.startDTS + fragCurrent.duration;
+        data.endPTS = data.startPTS + frag.duration;
+        data.endDTS = data.startDTS + frag.duration;
       }
 
       if (data.hasAudio === true) {
@@ -1008,7 +1000,6 @@ class StreamController extends BaseStreamController {
     const fragCurrent = this.fragCurrent;
     const fragNew = data.frag;
     if (fragCurrent &&
-        data.id === 'main' &&
         fragNew.sn === fragCurrent.sn &&
         fragNew.level === fragCurrent.level &&
         this.state === State.PARSING) {
@@ -1328,6 +1319,52 @@ class StreamController extends BaseStreamController {
       });
   }
 
+  _handleTransmuxComplete (transmuxResult) {
+    const id = 'main';
+    const { hls, levels } = this;
+    const { remuxResult, transmuxIdentifier: { level, sn } } = transmuxResult;
+
+    if (!levels) {
+      return;
+    }
+    const levelDetails = levels[level];
+    if (!levelDetails) {
+      return;
+    }
+
+    const frag = levelDetails.fragments[sn - levelDetails.startSN];
+    if (!frag || frag !== this.fragCurrent) {
+      return;
+    }
+
+    const { audio, video, text, id3, initSegment } = remuxResult;
+    if (initSegment) {
+      if (initSegment.tracks) {
+        hls.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { frag, id, tracks: initSegment.tracks });
+      }
+      if (Number.isFinite(initSegment.initPTS)) {
+        hls.trigger(Event.INIT_PTS_FOUND, { frag, id, initPTS: initSegment.initPTS });
+      }
+    }
+    if (audio) {
+      audio.frag = frag;
+      this.onFragParsingData(audio);
+    }
+    if (video) {
+      video.frag = frag;
+      this.onFragParsingData(video);
+    }
+    if (id3) {
+      id3.frag = frag;
+      hls.trigger(Event.FRAG_PARSING_METADATA, id3);
+    }
+    if (text) {
+      text.frag = frag;
+      hls.trigger(Event.FRAG_PARSING_USERDATA, text);
+    }
+    this.onFragParsed({ frag, id });
+  }
+
   get liveSyncPosition () {
     return this._liveSyncPosition;
   }
@@ -1336,4 +1373,5 @@ class StreamController extends BaseStreamController {
     this._liveSyncPosition = value;
   }
 }
+
 export default StreamController;
