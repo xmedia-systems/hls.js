@@ -47,19 +47,20 @@ class FetchLoader implements Loader<LoaderContext> {
   }
 
   load (context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>): void {
-    this.context = context;
-    this.config = config;
-
     const stats = this.stats;
     stats.trequest = window.performance.now();
 
     const initParams = getRequestParameters(context, this.controller.signal);
+    const onProgress = callbacks.onProgress;
+    const isArrayBuffer = context.responseType === 'arraybuffer';
+    const LENGTH = isArrayBuffer ? 'byteLength' : 'length';
 
+    this.context = context;
+    this.config = config;
     this.request = this.fetchSetup(context, initParams);
-
     this.requestTimeout = window.setTimeout(() => {
       this.abort();
-      callbacks.onTimeout(stats, context);
+      callbacks.onTimeout(stats, context, this.response);
     }, config.timeout);
 
     fetch(this.request, initParams).then((response: Response): Promise<string | ArrayBuffer> => {
@@ -70,20 +71,35 @@ class FetchLoader implements Loader<LoaderContext> {
         throw new FetchError(statusText || 'fetch, bad network response', status, response);
       }
       stats.tfirst = Math.max(window.performance.now(), stats.trequest);
+      stats.total = parseInt(response.headers.get('Content-Length') || '0');
 
-      if (context.responseType === 'arraybuffer') {
+      if (onProgress) {
+        const reader = (response.clone().body as ReadableStream).getReader();
+        new ReadableStream({
+          start() {
+            const pump = () => {
+              reader.read().then(({ done, value }) => {
+                if (done) {
+                  return;
+                }
+                stats.loaded += value[LENGTH];
+                onProgress(stats, context, value, response);
+                pump();
+              }).catch(() => {/* aborted */});
+            };
+            pump();
+          }
+        });
+      }
+
+      if (isArrayBuffer) {
         return response.arrayBuffer();
       }
       return response.text();
     }).then((responseData: string | ArrayBuffer) => {
       clearTimeout(this.requestTimeout);
       stats.tload = Math.max(stats.tfirst, performance.now());
-      stats.loaded = stats.total = (typeof responseData === 'string') ? responseData.length : responseData.byteLength;
-
-      const onProgress = callbacks.onProgress;
-      if (onProgress) {
-        onProgress(stats, context, responseData, this.response);
-      }
+      stats.loaded = stats.total = responseData[LENGTH];
 
       const response = { url: this.response.url, data: responseData };
       callbacks.onSuccess(response, stats, context, this.response);

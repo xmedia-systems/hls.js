@@ -63,7 +63,7 @@ export default class FragmentLoader {
         return;
       }
       const callbacks: LoaderCallbacks<FragmentLoaderContext> = {
-          onSuccess: (response, stats, context, networkDetails = null) => {
+          onSuccess: (response, stats, context, networkDetails) => {
               this._resetLoader(frag);
               resolve({
                   payload: response.data as ArrayBuffer,
@@ -71,17 +71,18 @@ export default class FragmentLoader {
                   networkDetails
               });
           },
-          onError: (response, context, networkDetails = null) => {
+          onError: (response, context, networkDetails) => {
               this._abortLoader(frag);
               reject(new LoadError({
                   type: ErrorTypes.NETWORK_ERROR,
+                  details: ErrorDetails.FRAG_LOAD_ERROR,
                   fatal: false,
                   frag,
                   response,
                   networkDetails
               }));
           },
-          onTimeout: (response, context, networkDetails = null) => {
+          onTimeout: (response, context, networkDetails) => {
               this._abortLoader(frag);
               reject(new LoadError({
                   type: ErrorTypes.NETWORK_ERROR,
@@ -90,7 +91,8 @@ export default class FragmentLoader {
                   frag,
                   networkDetails
               }));
-          }
+          },
+          onProgress: (stats, context, data, networkDetails) => {}
       };
       loader.load(loaderContext, loaderConfig, callbacks);
     });
