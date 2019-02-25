@@ -154,7 +154,7 @@ export class SubtitleStreamController extends BaseStreamController {
     }
   }
 
-  onFragLoaded (frag, payload, stats) {
+  _handleFragmentLoad (frag, payload, stats) {
     const decryptData = frag.decryptdata;
     const hls = this.hls;
 

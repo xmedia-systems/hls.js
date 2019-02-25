@@ -24,7 +24,6 @@ export const State = {
 
 export default class BaseStreamController extends TaskLoop {
   doTick () {}
-  onFragLoaded (frag, payload, stats) {}
 
   startLoad () {}
 
@@ -140,7 +139,7 @@ export default class BaseStreamController extends TaskLoop {
         // For compatibility, emit the FRAG_LOADED with the same signature
         data.frag = frag;
         this.hls.trigger(Event.FRAG_LOADED, data);
-        this.onFragLoaded(frag, payload, stats);
+        this._handleFragmentLoad(frag, payload, stats);
       })
       .catch((e) => {
         this.hls.trigger(Event.ERROR, e.data);
@@ -176,4 +175,6 @@ export default class BaseStreamController extends TaskLoop {
     this.hls.trigger(Event.FRAG_LOADING, { frag });
     return this.fragmentLoader.load(frag);
   }
+
+  _handleFragmentLoad (frag, payload, stats) {}
 }

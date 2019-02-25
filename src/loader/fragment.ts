@@ -47,9 +47,9 @@ export default class Fragment {
   // core difference from the private field _decryptdata is the lack of the initialized IV
   // _decryptdata will set the IV for this segment based on the segment number in the fragment
   public levelkey?: LevelKey;
-  //
+  // A string representing the fragment type
   public type!: FragmentTypes;
-  //
+  // A reference to the loader. Set while the fragment is loading, and removed afterwards. Used to abort fragment loading
   public loader!: any;
 
   // setByteRange converts a EXT-X-BYTERANGE attribute into a two element array

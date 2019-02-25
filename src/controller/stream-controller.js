@@ -829,7 +829,7 @@ class StreamController extends BaseStreamController {
     }
   }
 
-  onFragLoaded (frag, payload, stats) {
+  _handleFragmentLoad (frag, payload, stats) {
     const { fragCurrent, levels, media } = this;
     const currentLevel = levels[fragCurrent.level];
     const details = currentLevel.details;

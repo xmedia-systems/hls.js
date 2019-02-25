@@ -305,7 +305,7 @@ class AudioStreamController extends BaseStreamController {
           }
         } else {
           this.state = State.FRAG_LOADING;
-          this.onFragLoaded(waitingFrag.frag, waitingFrag.payload, waitingFrag.stats);
+          this._handleFragmentLoad(waitingFrag.frag, waitingFrag.payload, waitingFrag.stats);
           this.waitingFragment = null;
         }
       } else {
@@ -449,7 +449,7 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  onFragLoaded (frag, payload, stats) {
+  _handleFragmentLoad (frag, payload, stats) {
     const { config, trackId, levels } = this;
     const { cc, sn } = frag;
     const track = levels[trackId];
