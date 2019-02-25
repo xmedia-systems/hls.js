@@ -174,10 +174,6 @@ export default class TransmuxerInterface {
       global.URL.revokeObjectURL(this.worker.objectURL);
       break;
     }
-    case 'transmuxComplete': {
-      this.onTransmuxComplete(data.data);
-      break;
-    }
 
     /* falls through */
     default: {
