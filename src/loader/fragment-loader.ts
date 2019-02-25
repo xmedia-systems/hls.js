@@ -75,6 +75,7 @@ export default class FragmentLoader {
               this._abortLoader(frag);
               reject(new LoadError({
                   type: ErrorTypes.NETWORK_ERROR,
+                  details: ErrorDetails.FRAG_LOAD_ERROR,
                   fatal: false,
                   frag,
                   response,
