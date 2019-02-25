@@ -536,9 +536,6 @@ class AudioStreamController extends BaseStreamController {
         data.endPTS = data.startPTS + fragCurrent.duration;
         data.endDTS = data.startDTS + fragCurrent.duration;
       }
-
-      fragCurrent.addElementaryStream(ElementaryStreamTypes.AUDIO);
-
       logger.log(`parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb}`);
 
       const track = this.levels[trackId];
