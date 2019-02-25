@@ -1279,17 +1279,16 @@ class StreamController extends BaseStreamController {
     // Check if the current fragment has been aborted. We check this by first seeing if we're still playing the current level.
     // If we are, subsequently check if the currently loading fragment (fragCurrent) has changed.
     // If nothing has changed by this point, allow the segment to be buffered.
-    if (!levels || !levels[level] || !levels[level].details) {
+    if (!levels) {
       return;
     }
-    const levelDetails = levels[level].details;
-    const frag = levelDetails.fragments[sn - levelDetails.startSN];
+    const frag = LevelHelper.getFragmentWithSN(levels[level], sn);
     if (!frag || frag !== this.fragCurrent) {
       return;
     }
 
     const { audio, video, text, id3, initSegment } = remuxResult;
-    if (_hasDroppedFrames(frag, video ? video.dropped : 0, levelDetails.startSN)) {
+    if (_hasDroppedFrames(frag, video ? video.dropped : 0, levels[level].details.startSN)) {
       this._backtrack(frag, video.startPTS);
       return;
     }
@@ -1311,10 +1310,12 @@ class StreamController extends BaseStreamController {
     }
     if (id3) {
       id3.frag = frag;
+      id3.id = id;
       hls.trigger(Event.FRAG_PARSING_METADATA, id3);
     }
     if (text) {
       text.frag = frag;
+      text.id = id;
       hls.trigger(Event.FRAG_PARSING_USERDATA, text);
     }
     this._endParsing();
