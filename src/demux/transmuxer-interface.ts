@@ -77,13 +77,13 @@ export default class TransmuxerInterface {
   }
 
   destroy (): void {
-    let w = this.worker;
+    const w = this.worker;
     if (w) {
       w.removeEventListener('message', this.onwmsg);
       w.terminate();
       this.worker = null;
     } else {
-      let transmuxer = this.transmuxer;
+      const transmuxer = this.transmuxer;
       if (transmuxer) {
         transmuxer.destroy();
         this.transmuxer = null;
