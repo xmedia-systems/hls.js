@@ -30,21 +30,27 @@ class XhrLoader implements Loader<LoaderContext> {
   }
 
   destroy (): void {
-    this.abort();
+    this.abortInternal();
     this.loader = null;
   }
 
-  abort (): void {
+  abortInternal (): void {
+    this.stats.aborted = true;
     let loader = this.loader;
     if (loader && loader.readyState !== 4) {
-      this.stats.aborted = true;
-      loader.abort();
+        loader.abort();
     }
-
     window.clearTimeout(this.requestTimeout);
     this.requestTimeout = -1;
     window.clearTimeout(this.retryTimeout);
     this.retryTimeout = -1;
+  }
+
+  abort (): void {
+    this.abortInternal();
+    if (this.callbacks.onAbort) {
+      this.callbacks.onAbort(this.stats, this.context, this.loader);
+    }
   }
 
   load (context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>): void {
@@ -166,7 +172,7 @@ class XhrLoader implements Loader<LoaderContext> {
 
   loadtimeout (): void {
     logger.warn(`timeout while loading ${this.context.url}`);
-    this.abort();
+    this.abortInternal();
     this.callbacks.onTimeout(this.stats, this.context, this.loader);
   }
 

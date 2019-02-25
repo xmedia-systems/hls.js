@@ -13,13 +13,14 @@ export function fetchSupported () {
 }
 
 class FetchLoader implements Loader<LoaderContext> {
-  private config!: LoaderConfiguration;
   private fetchSetup: Function;
   private requestTimeout?: number;
   private request!: Request;
   private response!: Response;
   private controller: AbortController;
   public context!: LoaderContext;
+  private config!: LoaderConfiguration;
+  private callbacks!: LoaderCallbacks<LoaderContext>;
   public stats: LoaderStats;
 
   constructor (config /* HlsConfig */) {
@@ -38,12 +39,19 @@ class FetchLoader implements Loader<LoaderContext> {
   }
 
   destroy (): void {
-    this.abort();
+    this.abortInternal();
+  }
+
+  abortInternal (): void {
+      this.stats.aborted = true;
+      this.controller.abort();
   }
 
   abort (): void {
-    this.stats.aborted = true;
-    this.controller.abort();
+    this.abortInternal();
+    if (this.callbacks.onAbort) {
+      this.callbacks.onAbort(this.stats, this.context, this.response);
+    }
   }
 
   load (context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>): void {
@@ -57,13 +65,14 @@ class FetchLoader implements Loader<LoaderContext> {
 
     this.context = context;
     this.config = config;
+    this.callbacks = callbacks;
     this.request = this.fetchSetup(context, initParams);
     this.requestTimeout = window.setTimeout(() => {
-      this.abort();
+      this.abortInternal();
       callbacks.onTimeout(stats, context, this.response);
     }, config.timeout);
 
-    fetch(this.request, initParams).then((response: Response): Promise<string | ArrayBuffer> => {
+    fetch(this.request).then((response: Response): Promise<string | ArrayBuffer> => {
       this.response = response;
 
       if (!response.ok) {

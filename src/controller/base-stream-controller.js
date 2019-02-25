@@ -3,6 +3,7 @@ import { FragmentState } from './fragment-tracker';
 import { BufferHelper } from '../utils/buffer-helper';
 import { logger } from '../utils/logger';
 import Event from '../events';
+import { ErrorDetails } from '../errors';
 
 export const State = {
   STOPPED: 'STOPPED',
@@ -142,6 +143,9 @@ export default class BaseStreamController extends TaskLoop {
         this._handleFragmentLoad(frag, payload, stats);
       })
       .catch((e) => {
+        if (e.data.details === ErrorDetails.INTERNAL_ABORTED) {
+          return;
+        }
         this.hls.trigger(Event.ERROR, e.data);
       });
   }
@@ -162,6 +166,9 @@ export default class BaseStreamController extends TaskLoop {
         this.tick();
       })
       .catch((e) => {
+        if (e.data.details === ErrorDetails.INTERNAL_ABORTED) {
+          return;
+        }
         this.hls.trigger(Event.ERROR, e.data);
       });
   }

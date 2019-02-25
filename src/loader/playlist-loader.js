@@ -465,7 +465,6 @@ class PlaylistLoader extends EventHandler {
     }
 
     if (loader) {
-      loader.abort();
       this.resetInternalLoader(context.type);
     }
 

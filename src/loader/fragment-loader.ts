@@ -72,7 +72,7 @@ export default class FragmentLoader {
               });
           },
           onError: (response, context, networkDetails) => {
-              this._abortLoader(frag);
+              this._resetLoader(frag);
               reject(new LoadError({
                   type: ErrorTypes.NETWORK_ERROR,
                   details: ErrorDetails.FRAG_LOAD_ERROR,
@@ -82,8 +82,18 @@ export default class FragmentLoader {
                   networkDetails
               }));
           },
+          onAbort: (stats, context, networkDetails) => {
+              this._resetLoader(frag);
+              reject(new LoadError({
+                  type: ErrorTypes.NETWORK_ERROR,
+                  details: ErrorDetails.INTERNAL_ABORTED,
+                  fatal: false,
+                  frag,
+                  networkDetails
+              }));
+          },
           onTimeout: (response, context, networkDetails) => {
-              this._abortLoader(frag);
+              this._resetLoader(frag);
               reject(new LoadError({
                   type: ErrorTypes.NETWORK_ERROR,
                   details: ErrorDetails.FRAG_LOAD_TIMEOUT,
@@ -98,15 +108,7 @@ export default class FragmentLoader {
     });
   }
 
-  _abortLoader (frag) {
-    if (!frag || !frag.loader) {
-      return;
-    }
-    frag.loader.abort();
-    this._resetLoader(frag);
-  }
-
-  _resetLoader (frag) {
+  _resetLoader (frag: Fragment) {
     frag.loader = null;
     this.loader = null;
   }

@@ -86,10 +86,17 @@ type LoaderOnTimeout < T extends LoaderContext > = (
   networkDetails: any,
 ) => void;
 
+type LoaderOnAbort < T extends LoaderContext > = (
+    stats: LoaderStats,
+    context: T,
+    networkDetails: any,
+) => void;
+
 export interface LoaderCallbacks<T extends LoaderContext>{
   onSuccess: LoaderOnSuccess<T>,
   onError: LoaderOnError<T>,
   onTimeout: LoaderOnTimeout<T>,
+  onAbort?: LoaderOnAbort<T>,
   onProgress?: LoaderOnProgress<T>,
 }
 
