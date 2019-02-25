@@ -63,7 +63,7 @@ export default class FragmentLoader {
         return;
       }
       const callbacks: LoaderCallbacks<FragmentLoaderContext> = {
-          onSuccess: (response, stats, context, networkDetails = null) => {
+          onSuccess: (response, stats, context, networkDetails) => {
               this._resetLoader(frag);
               resolve({
                   payload: response.data as ArrayBuffer,
@@ -71,8 +71,8 @@ export default class FragmentLoader {
                   networkDetails
               });
           },
-          onError: (response, context, networkDetails = null) => {
-              this._abortLoader(frag);
+          onError: (response, context, networkDetails) => {
+              this._resetLoader(frag);
               reject(new LoadError({
                   type: ErrorTypes.NETWORK_ERROR,
                   details: ErrorDetails.FRAG_LOAD_ERROR,
@@ -82,8 +82,18 @@ export default class FragmentLoader {
                   networkDetails
               }));
           },
-          onTimeout: (response, context, networkDetails = null) => {
-              this._abortLoader(frag);
+          onAbort: (stats, context, networkDetails) => {
+              this._resetLoader(frag);
+              reject(new LoadError({
+                  type: ErrorTypes.NETWORK_ERROR,
+                  details: ErrorDetails.INTERNAL_ABORTED,
+                  fatal: false,
+                  frag,
+                  networkDetails
+              }));
+          },
+          onTimeout: (response, context, networkDetails) => {
+              this._resetLoader(frag);
               reject(new LoadError({
                   type: ErrorTypes.NETWORK_ERROR,
                   details: ErrorDetails.FRAG_LOAD_TIMEOUT,
@@ -91,21 +101,14 @@ export default class FragmentLoader {
                   frag,
                   networkDetails
               }));
-          }
+          },
+          onProgress: (stats, context, data, networkDetails) => {}
       };
       loader.load(loaderContext, loaderConfig, callbacks);
     });
   }
 
-  _abortLoader (frag) {
-    if (!frag || !frag.loader) {
-      return;
-    }
-    frag.loader.abort();
-    this._resetLoader(frag);
-  }
-
-  _resetLoader (frag) {
+  _resetLoader (frag: Fragment) {
     frag.loader = null;
     this.loader = null;
   }

@@ -48,7 +48,11 @@ export interface LoaderStats {
   // number of loaded bytes
   loaded: number
   // total number of bytes
-  total: number
+  total: number,
+  // number of retries attempted
+  retry: number,
+  // the request was cancelled or timedzout
+  aborted: boolean
 }
 
 type LoaderOnSuccess < T extends LoaderContext > = (
@@ -79,12 +83,20 @@ type LoaderOnError < T extends LoaderContext > = (
 type LoaderOnTimeout < T extends LoaderContext > = (
   stats: LoaderStats,
   context: T,
+  networkDetails: any,
+) => void;
+
+type LoaderOnAbort < T extends LoaderContext > = (
+    stats: LoaderStats,
+    context: T,
+    networkDetails: any,
 ) => void;
 
 export interface LoaderCallbacks<T extends LoaderContext>{
   onSuccess: LoaderOnSuccess<T>,
   onError: LoaderOnError<T>,
   onTimeout: LoaderOnTimeout<T>,
+  onAbort?: LoaderOnAbort<T>,
   onProgress?: LoaderOnProgress<T>,
 }
 
