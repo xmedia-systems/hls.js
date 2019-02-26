@@ -99,7 +99,7 @@ class Transmuxer {
     return result;
   }
 
-  flush (timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier) {
+  flush (timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier) {
       const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush();
       return {
           remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset),

@@ -18,6 +18,7 @@ import { findFragmentByPDT, findFragmentByPTS } from './fragment-finders';
 import GapController from './gap-controller';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
+import { TransmuxIdentifier } from '../types/transmuxer';
 
 const TICK_INTERVAL = 100; // how often to tick in ms
 
@@ -842,7 +843,9 @@ class StreamController extends BaseStreamController {
 
     // transmux the MPEG-TS data to ISO-BMFF segments
     logger.log(`Parsing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
-    const transmuxer = this.transmuxer = this.transmuxer || new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this));
+    const transmuxer = this.transmuxer = this.transmuxer ||
+        new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
+    const transmuxIdentifier = { level: frag.level, sn: frag.sn };
     transmuxer.push(
       payload,
       initSegmentData,
@@ -850,8 +853,11 @@ class StreamController extends BaseStreamController {
       currentLevel.videoCodec,
       frag,
       details.totalduration,
-      accurateTimeOffset
+      accurateTimeOffset,
+      null,
+      transmuxIdentifier
     );
+    transmuxer.flush(details.totalduration, transmuxIdentifier);
   }
 
   _bufferInitSegment (frag, tracks) {
@@ -1319,6 +1325,9 @@ class StreamController extends BaseStreamController {
       text.id = id;
       hls.trigger(Event.FRAG_PARSING_USERDATA, text);
     }
+  }
+
+  _handleTransmuxerFlush () {
     this._endParsing();
   }
 

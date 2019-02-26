@@ -28,6 +28,7 @@ export interface RemuxedTrack {
     nb: number
     transferredData1?: ArrayBuffer
     transferredData2?: ArrayBuffer
+    dropped?: number
 }
 
 export interface RemuxedMetadata {

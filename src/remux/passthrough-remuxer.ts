@@ -63,50 +63,61 @@ class PassThroughRemuxer implements Remuxer {
   }
 
   remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
+    // The binary segment data is added to the videoTrack in the mp4demuxer. We don't check to see if the data is only
+    // audio or video (or both); adding it to video was an arbitrary choice.
     const data = videoTrack.samples;
+    if (!data || !data.length) {
+      return {
+          audio: undefined,
+          video: undefined,
+          text: textTrack,
+          id3: id3Track,
+          initSegment: undefined
+      };
+    }
+
+    const initSegment: InitSegmentData = {};
     let initData = this.initData;
-    const initSegment = {} as InitSegmentData;
     if (!initData) {
-      this.generateInitSegment(data);
-      initData = this.initData;
+        this.generateInitSegment(data);
+        initData = this.initData;
+    }
+    if (this.emitInitSegment) {
+        initSegment.tracks = this.initTracks;
+        this.emitInitSegment = false;
     }
 
     let startDTS = timeOffset;
     let initPTS = this.initPTS;
     if (!Number.isFinite(initPTS as number)) {
-      let startDTS = getStartDTS(initData, data);
-      this.initPTS = initPTS = startDTS - timeOffset;
-      initSegment.initPTS = initPTS;
+        let startDTS = getStartDTS(initData, data);
+        this.initPTS = initPTS = startDTS - timeOffset;
+        initSegment.initPTS = initPTS;
     }
     offsetStartDTS(initData, data, initPTS);
-
-    if (this.emitInitSegment) {
-      initSegment.tracks = this.initTracks;
-      this.emitInitSegment = false;
-    }
 
     const duration = getDuration(data, initData);
     const endDTS = duration + startDTS;
 
-    let track = {
-      data1: data,
-      startPTS: startDTS,
-      startDTS,
-      endPTS: endDTS,
-      endDTS,
-      type: '',
-      hasAudio: !!audioTrack,
-      hasVideo: !!videoTrack,
-      nb: 1,
-      dropped: 0
-    } as RemuxedTrack;
+    const track: RemuxedTrack = {
+        data1: data,
+        startPTS: startDTS,
+        startDTS,
+        endPTS: endDTS,
+        endDTS,
+        type: '',
+        hasAudio: !!audioTrack.data,
+        hasVideo: !!videoTrack.data,
+        nb: 1,
+        dropped: 0
+    };
 
     if (initData.audio) {
-      track.type += 'audio';
+        track.type += 'audio';
     }
 
     if (initData.video) {
-      track.type += 'video';
+        track.type += 'video';
     }
 
     return {

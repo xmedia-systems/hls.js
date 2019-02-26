@@ -32,47 +32,52 @@ export default function TransmuxerWorker (self) {
     const data = ev.data;
     // console.log('transmuxer cmd:' + data.cmd);
     switch (data.cmd) {
-    case 'init': {
-      const config = JSON.parse(data.config);
-      self.transmuxer = new Transmuxer(observer, data.typeSupported, config, data.vendor);
-      enableLogs(config.debug);
-      forwardMessage('init', null);
-      break;
-    }
-    case 'demux': {
-      const transmuxResult = self.transmuxer.push(data.data,
-        data.decryptdata,
-        data.initSegment,
-        data.audioCodec,
-        data.videoCodec,
-        data.timeOffset,
-        data.discontinuity,
-        data.trackSwitch,
-        data.contiguous,
-        data.duration,
-        data.accurateTimeOffset,
-        data.defaultInitPTS,
-        data.transmuxIdentifier
-      );
+      case 'init': {
+        const config = JSON.parse(data.config);
+        self.transmuxer = new Transmuxer(observer, data.typeSupported, config, data.vendor);
+        enableLogs(config.debug);
+        forwardMessage('init', null);
+        break;
+      }
+      case 'demux': {
+        const transmuxResult: TransmuxerResult = self.transmuxer.push(data.data,
+          data.decryptdata,
+          data.initSegment,
+          data.audioCodec,
+          data.videoCodec,
+          data.timeOffset,
+          data.discontinuity,
+          data.trackSwitch,
+          data.contiguous,
+          data.duration,
+          data.accurateTimeOffset,
+          data.defaultInitPTS,
+          data.transmuxIdentifier
+        );
 
-      if (!transmuxResult) {
-        return;
+        if (!transmuxResult) {
+          return;
+        }
+        // @ts-ignore
+        if (transmuxResult.then) {
+          // @ts-ignore
+          transmuxResult.then(data => {
+            emitTransmuxComplete(self, data);
+          });
+        } else {
+            emitTransmuxComplete(self, transmuxResult);
+        }
+        break;
       }
-      if (transmuxResult.then) {
-        transmuxResult.then(data => {
-          emitTransmuxComplete(self, data);
-        });
-      } else {
-        // debugger;
-        emitTransmuxComplete(self, transmuxResult as TransmuxerResult);
-        // const remainderMux = self.transmuxer.flush(data.duration, data.contiguous, false, data.transmuxIdentifier);
-        // emitTransmuxComplete(self, remainderMux as TransmuxerResult);
+        case 'flush': {
+          const transmuxResult = self.transmuxer.flush(data.duration, data.contiguous, data.accurateTimeOffset, data.transmuxIdentifier);
+          emitTransmuxComplete(self, transmuxResult);
+          self.postMessage({ event: 'flush' });
+          break;
+        }
+      default:
+        break;
       }
-      break;
-    }
-    default:
-      break;
-    }
   });
 }
 

@@ -22,11 +22,13 @@ export default class TransmuxerInterface {
   private onwmsg?: Function;
   private transmuxer?: Transmuxer | null;
   private onTransmuxComplete: Function;
+  private onFlush: Function;
 
-  constructor (hls, id, onTransmuxComplete) {
+  constructor (hls, id, onTransmuxComplete, onFlush) {
     this.hls = hls;
     this.id = id;
     this.onTransmuxComplete = onTransmuxComplete;
+    this.onFlush = onFlush;
 
     const observer = this.observer = new Observer();
     const config = hls.config;
@@ -96,7 +98,7 @@ export default class TransmuxerInterface {
     }
   }
 
-  push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, defaultInitPTS: number): void {
+  push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, defaultInitPTS: number, transmuxIdentifier: TransmuxIdentifier): void {
     const timeOffset = Number.isFinite(frag.startPTS) ? frag.startPTS : frag.start;
     const decryptdata = frag.decryptdata;
     const lastFrag = this.frag;
@@ -113,7 +115,6 @@ export default class TransmuxerInterface {
     }
 
     // Frags with sn of 'initSegment' are not transmuxed
-    const transmuxIdentifier: TransmuxIdentifier = { level: frag.level, sn: frag.sn as number };
     const { transmuxer, worker } = this;
     if (worker) {
       // post fragment payload as transferable objects for ArrayBuffer (no copy)
@@ -165,29 +166,47 @@ export default class TransmuxerInterface {
     }
   }
 
+  flush (duration: number, transmuxIdentifier: TransmuxIdentifier) {
+    const { transmuxer, worker } = this;
+    if (worker) {
+      worker.postMessage({
+        cmd: 'flush',
+        duration,
+        contiguous: true,
+        accurateTimeOffset: true,
+        transmuxIdentifier
+      });
+    }
+  }
+
   private onWorkerMessage (ev: any): void {
     const data = ev.data;
     const hls = this.hls;
     switch (data.event) {
-    case 'init': {
-      // revoke the Object URL that was used to create transmuxer worker, so as not to leak it
-      global.URL.revokeObjectURL(this.worker.objectURL);
-      break;
-    }
-
-    case 'transmuxComplete': {
-        this.onTransmuxComplete(data.data);
+      case 'init': {
+        // revoke the Object URL that was used to create transmuxer worker, so as not to leak it
+        global.URL.revokeObjectURL(this.worker.objectURL);
         break;
-    }
+      }
 
-    /* falls through */
-    default: {
-      data.data = data.data || {};
-      data.data.frag = this.frag;
-      data.data.id = this.id;
-      hls.trigger(data.event, data.data);
-      break;
-    }
+      case 'transmuxComplete': {
+          this.onTransmuxComplete(data.data);
+          break;
+      }
+
+      case 'flush': {
+        this.onFlush();
+        break;
+      }
+
+      /* falls through */
+      default: {
+        data.data = data.data || {};
+        data.data.frag = this.frag;
+        data.data.id = this.id;
+        hls.trigger(data.event, data.data);
+        break;
+      }
     }
   }
 }
