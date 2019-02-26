@@ -2,10 +2,12 @@
  * MP4 demuxer
  */
 import { logger } from '../utils/logger';
-import { Demuxer, DemuxerResult } from '../types/demuxer';
-import { findBox } from '../utils/mp4-tools';
+import { Demuxer, DemuxerResult, DemuxedTrack } from '../types/demuxer';
+import { findBox, segmentValidRange, prependUint8Array, getDuration } from '../utils/mp4-tools';
 
 class MP4Demuxer implements Demuxer {
+  private remainderData: Uint8Array | null = null;
+
   resetTimeStamp () {
   }
 
@@ -19,13 +21,32 @@ class MP4Demuxer implements Demuxer {
 
   demux (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
     // Load all data into the avc track. The CMAF remuxer will look for the data in the samples object; the rest of the fields do not matter
+    let avcSamples = data;
+    if (this.remainderData) {
+      // avcSamples = prependUint8Array(data, this.remainderData);
+    }
     const avcTrack = dummyTrack();
+    const segmentedData = segmentValidRange(avcSamples);
+    this.remainderData = segmentedData.remainder;
     avcTrack.samples = data;
+
     return {
       audioTrack: dummyTrack(),
       avcTrack,
       id3Track: dummyTrack(),
       textTrack: dummyTrack()
+    };
+  }
+
+  flush() {
+    const avcTrack: DemuxedTrack = dummyTrack();
+    avcTrack.samples = this.remainderData;
+
+    return {
+        audioTrack: dummyTrack(),
+        avcTrack,
+        id3Track: dummyTrack(),
+        textTrack: dummyTrack()
     };
   }
 

@@ -1273,7 +1273,7 @@ class StreamController extends BaseStreamController {
 
   _handleTransmuxComplete (transmuxResult) {
     const id = 'main';
-    const { hls, levels } = this;
+    const { hls, levels, fragCurrent } = this;
     const { remuxResult, transmuxIdentifier: { level, sn } } = transmuxResult;
 
     // Check if the current fragment has been aborted. We check this by first seeing if we're still playing the current level.
@@ -1282,8 +1282,9 @@ class StreamController extends BaseStreamController {
     if (!levels) {
       return;
     }
+    // TODO: Figure out why fragCurrent reference sometimes isn't equal to frag, even when objects look equal
     const frag = LevelHelper.getFragmentWithSN(levels[level], sn);
-    if (!frag || frag !== this.fragCurrent) {
+    if (!frag || frag.sn !== this.fragCurrent.sn) {
       return;
     }
 

@@ -1,5 +1,5 @@
 import { InitSegmentData, RemuxedTrack, Remuxer, RemuxerResult } from '../types/remuxer';
-import { getStartDTS, offsetStartDTS, parseInitSegment } from '../utils/mp4-tools';
+import { getDuration, getStartDTS, offsetStartDTS, parseInitSegment } from '../utils/mp4-tools';
 import { TrackSet } from '../types/track';
 
 class PassThroughRemuxer implements Remuxer {
@@ -85,10 +85,15 @@ class PassThroughRemuxer implements Remuxer {
       this.emitInitSegment = false;
     }
 
+    const duration = getDuration(data, initData);
+    const endDTS = duration + startDTS;
+
     let track = {
       data1: data,
       startPTS: startDTS,
       startDTS,
+      endPTS: endDTS,
+      endDTS,
       type: '',
       hasAudio: !!audioTrack,
       hasVideo: !!videoTrack,

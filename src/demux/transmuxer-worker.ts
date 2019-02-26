@@ -63,7 +63,10 @@ export default function TransmuxerWorker (self) {
           emitTransmuxComplete(self, data);
         });
       } else {
+        // debugger;
         emitTransmuxComplete(self, transmuxResult as TransmuxerResult);
+        // const remainderMux = self.transmuxer.flush(data.duration, data.contiguous, false, data.transmuxIdentifier);
+        // emitTransmuxComplete(self, remainderMux as TransmuxerResult);
       }
       break;
     }

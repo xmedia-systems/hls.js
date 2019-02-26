@@ -1,3 +1,4 @@
+// Todo: Optimize by using loops instead of array methods
 const UINT32_MAX = Math.pow(2, 32) - 1;
 
 export function bin2str (buffer) {
@@ -285,6 +286,18 @@ export function getStartDTS (initData, fragment) {
   return isFinite(result) ? result : 0;
 }
 
+// TODO: Check for default present flags in tf_flags. This assumes that base_data_offset & sample_description_index do not exist
+// TODO: Optimize if constant framerate (some field should say if all durations are default duration). default_sample_duration * trun.sample.size()
+export function getDuration (data, initData) {
+  return findBox(data, ['moof', 'traf', 'tfhd']).reduce((acc, tfhd) => {
+    const id = readUint32(tfhd, 4);
+    // assume a 90kHz clock if no timescale was specified
+    const scale = initData[id].timescale || 90e3;
+    const sampleDuration = readUint32(tfhd, 8);
+    return acc + ((sampleDuration) / scale);
+  }, 0);
+}
+
 export function offsetStartDTS (initData, fragment, timeOffset) {
   findBox(fragment, ['moof', 'traf']).map(function (traf) {
     return findBox(traf, ['tfhd']).map(function (tfhd) {
@@ -312,4 +325,38 @@ export function offsetStartDTS (initData, fragment, timeOffset) {
       });
     });
   });
+}
+
+export function segmentValidRange (data: Uint8Array): SegmentedRange {
+  const segmentedRange: SegmentedRange = {
+    valid: new Uint8Array(0),
+    remainder: new Uint8Array(0)
+  };
+
+  const moofs = findBox(data, ['moof']);
+  if (!moofs) {
+    return segmentedRange;
+  } else if (moofs.length < 2) {
+    segmentedRange.remainder = data;
+    return segmentedRange;
+  }
+  // debugger;
+  const first = moofs[0];
+  const last = moofs[moofs.length - 1];
+  const lastLast = moofs[moofs.length - 2];
+  segmentedRange.valid = data.slice(0, lastLast.end);
+  segmentedRange.remainder = data.slice(lastLast.end);
+  return segmentedRange;
+}
+
+export interface SegmentedRange {
+  valid: Uint8Array,
+  remainder: Uint8Array,
+}
+
+export function prependUint8Array (data: Uint8Array, remainderData: Uint8Array) : Uint8Array {
+    const temp = new Uint8Array(data.length + remainderData.length);
+    temp.set(remainderData);
+    temp.set(data, remainderData.length);
+    return temp;
 }
