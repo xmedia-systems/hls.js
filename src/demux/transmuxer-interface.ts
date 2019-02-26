@@ -175,6 +175,11 @@ export default class TransmuxerInterface {
       break;
     }
 
+    case 'transmuxComplete': {
+        this.onTransmuxComplete(data.data);
+        break;
+    }
+
     /* falls through */
     default: {
       data.data = data.data || {};

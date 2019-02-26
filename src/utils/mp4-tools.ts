@@ -249,7 +249,7 @@ export function parseInitSegment (initSegment) {
 export function getStartDTS (initData, fragment) {
   let trafs, baseTimes, result;
 
-  // we need info from two childrend of each track fragment box
+  // we need info from two children of each track fragment box
   trafs = findBox(fragment, ['moof', 'traf']);
 
   // determine the start times for each track
