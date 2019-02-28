@@ -99,10 +99,12 @@ class Transmuxer {
     return result;
   }
 
-  flush (timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier) {
+  flush (transmuxIdentifier: TransmuxIdentifier) {
       const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush();
+      // Force flushed data to remux contiguously with the end of the last remuxed chunk
+      // TODO: ensure that remuxers use last DTS as the timeOffset when passed null
       return {
-          remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset),
+          remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, null, true, true),
           transmuxIdentifier
       }
   }

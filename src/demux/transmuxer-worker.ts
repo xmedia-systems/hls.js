@@ -70,7 +70,7 @@ export default function TransmuxerWorker (self) {
         break;
       }
         case 'flush': {
-          const transmuxResult = self.transmuxer.flush(data.duration, data.contiguous, data.accurateTimeOffset, data.transmuxIdentifier);
+          const transmuxResult = self.transmuxer.flush(data.transmuxIdentifier);
           emitTransmuxComplete(self, transmuxResult);
           self.postMessage({ event: 'flush' });
           break;
