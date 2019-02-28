@@ -341,7 +341,7 @@ export function segmentValidRange (data: Uint8Array): SegmentedRange {
     return segmentedRange;
   }
   const last = moofs[moofs.length - 1];
-  // Offset by 1 byte; findBox offsets the start by as much
+  // Offset by 8 bytes; findBox offsets the start by as much
   segmentedRange.valid = data.slice(0, last.start - 8);
   segmentedRange.remainder = data.slice(last.start - 8);
   return segmentedRange;
