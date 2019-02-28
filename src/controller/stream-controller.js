@@ -827,7 +827,7 @@ class StreamController extends BaseStreamController {
     }
   }
 
-  _handleFragmentLoad (frag, payload, stats) {
+  _handleFragmentLoadProgress (frag, payload, stats) {
     const { fragCurrent, levels, media } = this;
     const currentLevel = levels[fragCurrent.level];
     const details = currentLevel.details;
@@ -844,7 +844,7 @@ class StreamController extends BaseStreamController {
     // transmux the MPEG-TS data to ISO-BMFF segments
     logger.log(`Parsing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
     const transmuxer = this.transmuxer = this.transmuxer ||
-        new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
+          new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
     const transmuxIdentifier = { level: frag.level, sn: frag.sn };
     transmuxer.push(
       payload,
@@ -857,7 +857,11 @@ class StreamController extends BaseStreamController {
       null,
       transmuxIdentifier
     );
-    transmuxer.flush(transmuxIdentifier);
+  }
+
+  _handleFragmentLoadComplete (frag, payload, stats) {
+    const transmuxIdentifier = { level: frag.level, sn: frag.sn };
+    this.transmuxer.flush(transmuxIdentifier);
   }
 
   onAudioTrackSwitching (data) {
@@ -1172,7 +1176,7 @@ class StreamController extends BaseStreamController {
 
   _handleTransmuxComplete (transmuxResult) {
     const id = 'main';
-    const { hls, levels, fragCurrent } = this;
+    const { hls, levels } = this;
     const { remuxResult, transmuxIdentifier: { level, sn } } = transmuxResult;
 
     // Check if the current fragment has been aborted. We check this by first seeing if we're still playing the current level.
@@ -1218,6 +1222,10 @@ class StreamController extends BaseStreamController {
       text.id = id;
       hls.trigger(Event.FRAG_PARSING_USERDATA, text);
     }
+  }
+
+  _handleTransmuxerFlush () {
+    this._endParsing();
   }
 
   _bufferInitSegment (frag, tracks) {
@@ -1325,10 +1333,6 @@ class StreamController extends BaseStreamController {
     this.stats.tparsed = window.performance.now();
     this.state = State.PARSED;
     this._checkAppendedParsed();
-  }
-
-  _handleTransmuxerFlush () {
-    this._endParsing();
   }
 
   _backtrack (frag, nextLoadPosition) {

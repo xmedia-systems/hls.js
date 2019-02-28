@@ -116,6 +116,7 @@ export default class TransmuxerInterface {
 
     // Frags with sn of 'initSegment' are not transmuxed
     const { transmuxer, worker } = this;
+    this.frag = frag;
     if (worker) {
       // post fragment payload as transferable objects for ArrayBuffer (no copy)
       worker.postMessage({

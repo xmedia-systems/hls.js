@@ -129,18 +129,20 @@ export default class BaseStreamController extends TaskLoop {
   }
 
   _loadFragForPlayback (frag) {
-    this._doFragLoad(frag)
+    const progressCallback = (stats, context, payload, networkDetails) => {
+      this._handleFragmentLoadProgress(frag, payload, stats);
+    };
+    this._doFragLoad(frag, progressCallback)
       .then((data) => {
         this.fragLoadError = 0;
         if (this._fragLoadAborted(frag)) {
           return;
         }
-        const { payload, stats } = data;
         logger.log(`Loaded ${frag.sn} of level ${frag.level}`);
         // For compatibility, emit the FRAG_LOADED with the same signature
         data.frag = frag;
         this.hls.trigger(Event.FRAG_LOADED, data);
-        this._handleFragmentLoad(frag, payload, stats);
+        this._handleFragmentLoadComplete(frag, data.stats);
       })
       .catch((e) => {
         if (e.data.details === ErrorDetails.INTERNAL_ABORTED) {
@@ -174,14 +176,16 @@ export default class BaseStreamController extends TaskLoop {
   }
 
   _fragLoadAborted (frag) {
-    return this.state !== State.FRAG_LOADING || frag !== this.fragCurrent;
+    const { level, sn } = this.fragCurrent;
+    return frag.level !== level && frag.sn !== sn;
   }
 
-  _doFragLoad (frag) {
+  _doFragLoad (frag, progressCallback = () => {}) {
     this.state = State.FRAG_LOADING;
     this.hls.trigger(Event.FRAG_LOADING, { frag });
-    return this.fragmentLoader.load(frag);
+    return this.fragmentLoader.load(frag, progressCallback);
   }
 
-  _handleFragmentLoad (frag, payload, stats) {}
+  _handleFragmentLoadComplete (frag, stats) {}
+  _handleFragmentLoadProgress (frag, payload) {}
 }
