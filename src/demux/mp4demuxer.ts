@@ -6,7 +6,7 @@ import { Demuxer, DemuxerResult, DemuxedTrack } from '../types/demuxer';
 import { findBox, segmentValidRange, prependUint8Array, getDuration } from '../utils/mp4-tools';
 
 class MP4Demuxer implements Demuxer {
-  private remainderData: Uint8Array | null = new Uint8Array(0);
+  private remainderData?: Uint8Array = new Uint8Array(0);
 
   resetTimeStamp () {
   }
@@ -25,10 +25,12 @@ class MP4Demuxer implements Demuxer {
     if (this.remainderData) {
       avcSamples = prependUint8Array(data, this.remainderData);
     }
+    // Split the bytestream into two ranges: one encompassing all data up until the start of the last moof, and everything else.
+    // This is done to guarantee that we're sending valid data to MSE - when demuxing progressively, we have no guarantee
+    // that the fetch loader gives us flush moof+mdat pairs. If we push jagged data to MSE, it will throw an exception.
     const segmentedData = segmentValidRange(avcSamples);
     this.remainderData = segmentedData.remainder;
-    const avcTrack = dummyTrack();
-    avcTrack.samples = segmentedData.valid;
+    const avcTrack = dummyTrack(segmentedData.valid);
 
     return {
       audioTrack: dummyTrack(),
@@ -38,13 +40,14 @@ class MP4Demuxer implements Demuxer {
     };
   }
 
+  // TODO: Re-validate remainder data? Or we can assume that the segmented remainder is always valid CMAF
   flush () {
-    const avcTrack: DemuxedTrack = dummyTrack();
-    avcTrack.samples = this.remainderData;
+    const avcTrack: DemuxedTrack = dummyTrack(this.remainderData);
+    this.remainderData = undefined;
 
     return {
         audioTrack: dummyTrack(),
-        avcTrack: dummyTrack(),
+        avcTrack,
         id3Track: dummyTrack(),
         textTrack: dummyTrack()
     };
@@ -57,6 +60,6 @@ class MP4Demuxer implements Demuxer {
   destroy () {}
 }
 
-const dummyTrack = () => ({ type: '', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] });
+const dummyTrack = (samples = new Uint8Array(0)) => ({ type: '', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples });
 
 export default MP4Demuxer;

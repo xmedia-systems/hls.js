@@ -860,113 +860,6 @@ class StreamController extends BaseStreamController {
     transmuxer.flush(details.totalduration, transmuxIdentifier);
   }
 
-  _bufferInitSegment (frag, tracks) {
-    if (this.state !== State.PARSING) {
-      return;
-    }
-    // if audio track is expected to come from audio stream controller, discard any coming from main
-    if (tracks.audio && this.altAudio) {
-      delete tracks.audio;
-    }
-    // include levelCodec in audio and video tracks
-    const { audio, video } = tracks;
-    const currentLevel = this.levels[this.level];
-    if (audio) {
-      let audioCodec = currentLevel.audioCodec;
-      const ua = navigator.userAgent.toLowerCase();
-      if (audioCodec && this.audioCodecSwap) {
-        logger.log('swapping playlist audio codec');
-        if (audioCodec.indexOf('mp4a.40.5') !== -1) {
-          audioCodec = 'mp4a.40.2';
-        } else {
-          audioCodec = 'mp4a.40.5';
-        }
-      }
-      // In the case that AAC and HE-AAC audio codecs are signalled in manifest,
-      // force HE-AAC, as it seems that most browsers prefers it.
-      if (this.audioCodecSwitch) {
-        // don't force HE-AAC if mono stream, or in Firefox
-        if (audio.metadata.channelCount !== 1 && ua.indexOf('firefox') === -1) {
-          audioCodec = 'mp4a.40.5';
-        }
-      }
-      // HE-AAC is broken on Android, always signal audio codec as AAC even if variant manifest states otherwise
-      if (ua.indexOf('android') !== -1 && audio.container !== 'audio/mpeg') { // Exclude mpeg audio
-        audioCodec = 'mp4a.40.2';
-        logger.log(`Android: force audio codec to ${audioCodec}`);
-      }
-      audio.levelCodec = audioCodec;
-      audio.id = 'main';
-    }
-    if (video) {
-      video.levelCodec = currentLevel.videoCodec;
-      video.id = 'main';
-    }
-    this.hls.trigger(Event.BUFFER_CODECS, tracks);
-    // loop through tracks that are going to be provided to bufferController
-    Object.keys(tracks).forEach(trackName => {
-      const track = tracks[trackName];
-      const initSegment = track.initSegment;
-      logger.log(`main track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]`);
-      if (initSegment) {
-        this.appended = true;
-        // arm pending Buffering flag before appending a segment
-        this.pendingBuffering = true;
-        this.hls.trigger(Event.BUFFER_APPENDING, { type: trackName, data: initSegment, parent: 'main', content: 'initSegment' });
-      }
-    });
-    // trigger handler right now
-    this.tick();
-  }
-
-  _bufferFragmentData (frag, data) {
-    // Filter out main audio if audio track is loaded through audio stream controller
-    if ((data.type === 'audio' && this.altAudio) || this.state !== State.PARSING) {
-      return;
-    }
-
-    if (!Number.isFinite(data.endPTS)) {
-      data.endPTS = data.startPTS + frag.duration;
-      data.endDTS = data.startDTS + frag.duration;
-    }
-
-    if (data.hasAudio === true) {
-      frag.addElementaryStream(ElementaryStreamTypes.AUDIO);
-    }
-
-    if (data.hasVideo === true) {
-      frag.addElementaryStream(ElementaryStreamTypes.VIDEO);
-    }
-    logger.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb},dropped:${data.dropped || 0}`);
-
-    const { hls, level, levels } = this;
-    const currentLevel = levels[level];
-    const drift = LevelHelper.updateFragPTSDTS(currentLevel.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
-    hls.trigger(Event.LEVEL_PTS_UPDATED, { details: currentLevel.details, level, drift, type: data.type, start: data.startPTS, end: data.endPTS });
-    // has remuxer dropped video frames located before first keyframe ?
-    [data.data1, data.data2].forEach(buffer => {
-      // only append in PARSING state (rationale is that an appending error could happen synchronously on first segment appending)
-      // in that case it is useless to append following segments
-      if (buffer && buffer.length && this.state === State.PARSING) {
-        this.appended = true;
-        // arm pending Buffering flag before appending a segment
-        this.pendingBuffering = true;
-        hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
-      }
-    });
-    // trigger handler right now
-    this.tick();
-  }
-
-  _endParsing () {
-    if (this.state !== State.PARSING) {
-      return;
-    }
-    this.stats.tparsed = window.performance.now();
-    this.state = State.PARSED;
-    this._checkAppendedParsed();
-  }
-
   onAudioTrackSwitching (data) {
     // if any URL found on new audio track, it is an alternate audio track
     let altAudio = !!data.url,
@@ -1325,6 +1218,113 @@ class StreamController extends BaseStreamController {
       text.id = id;
       hls.trigger(Event.FRAG_PARSING_USERDATA, text);
     }
+  }
+
+  _bufferInitSegment (frag, tracks) {
+    if (this.state !== State.PARSING) {
+      return;
+    }
+    // if audio track is expected to come from audio stream controller, discard any coming from main
+    if (tracks.audio && this.altAudio) {
+      delete tracks.audio;
+    }
+    // include levelCodec in audio and video tracks
+    const { audio, video } = tracks;
+    const currentLevel = this.levels[this.level];
+    if (audio) {
+      let audioCodec = currentLevel.audioCodec;
+      const ua = navigator.userAgent.toLowerCase();
+      if (audioCodec && this.audioCodecSwap) {
+        logger.log('swapping playlist audio codec');
+        if (audioCodec.indexOf('mp4a.40.5') !== -1) {
+          audioCodec = 'mp4a.40.2';
+        } else {
+          audioCodec = 'mp4a.40.5';
+        }
+      }
+      // In the case that AAC and HE-AAC audio codecs are signalled in manifest,
+      // force HE-AAC, as it seems that most browsers prefers it.
+      if (this.audioCodecSwitch) {
+        // don't force HE-AAC if mono stream, or in Firefox
+        if (audio.metadata.channelCount !== 1 && ua.indexOf('firefox') === -1) {
+          audioCodec = 'mp4a.40.5';
+        }
+      }
+      // HE-AAC is broken on Android, always signal audio codec as AAC even if variant manifest states otherwise
+      if (ua.indexOf('android') !== -1 && audio.container !== 'audio/mpeg') { // Exclude mpeg audio
+        audioCodec = 'mp4a.40.2';
+        logger.log(`Android: force audio codec to ${audioCodec}`);
+      }
+      audio.levelCodec = audioCodec;
+      audio.id = 'main';
+    }
+    if (video) {
+      video.levelCodec = currentLevel.videoCodec;
+      video.id = 'main';
+    }
+    this.hls.trigger(Event.BUFFER_CODECS, tracks);
+    // loop through tracks that are going to be provided to bufferController
+    Object.keys(tracks).forEach(trackName => {
+      const track = tracks[trackName];
+      const initSegment = track.initSegment;
+      logger.log(`main track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]`);
+      if (initSegment) {
+        this.appended = true;
+        // arm pending Buffering flag before appending a segment
+        this.pendingBuffering = true;
+        this.hls.trigger(Event.BUFFER_APPENDING, { type: trackName, data: initSegment, parent: 'main', content: 'initSegment' });
+      }
+    });
+    // trigger handler right now
+    this.tick();
+  }
+
+  _bufferFragmentData (frag, data) {
+    // Filter out main audio if audio track is loaded through audio stream controller
+    if ((data.type === 'audio' && this.altAudio) || this.state !== State.PARSING) {
+      return;
+    }
+
+    if (!Number.isFinite(data.endPTS)) {
+      data.endPTS = data.startPTS + frag.duration;
+      data.endDTS = data.startDTS + frag.duration;
+    }
+
+    if (data.hasAudio === true) {
+      frag.addElementaryStream(ElementaryStreamTypes.AUDIO);
+    }
+
+    if (data.hasVideo === true) {
+      frag.addElementaryStream(ElementaryStreamTypes.VIDEO);
+    }
+    logger.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb},dropped:${data.dropped || 0}`);
+
+    const { hls, level, levels } = this;
+    const currentLevel = levels[level];
+    const drift = LevelHelper.updateFragPTSDTS(currentLevel.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
+    hls.trigger(Event.LEVEL_PTS_UPDATED, { details: currentLevel.details, level, drift, type: data.type, start: data.startPTS, end: data.endPTS });
+    // has remuxer dropped video frames located before first keyframe ?
+    [data.data1, data.data2].forEach(buffer => {
+      // only append in PARSING state (rationale is that an appending error could happen synchronously on first segment appending)
+      // in that case it is useless to append following segments
+      if (buffer && buffer.length && this.state === State.PARSING) {
+        this.appended = true;
+        // arm pending Buffering flag before appending a segment
+        this.pendingBuffering = true;
+        hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
+      }
+    });
+    // trigger handler right now
+    this.tick();
+  }
+
+  _endParsing () {
+    if (this.state !== State.PARSING) {
+      return;
+    }
+    this.stats.tparsed = window.performance.now();
+    this.state = State.PARSED;
+    this._checkAppendedParsed();
   }
 
   _handleTransmuxerFlush () {
