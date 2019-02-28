@@ -857,7 +857,7 @@ class StreamController extends BaseStreamController {
       null,
       transmuxIdentifier
     );
-    transmuxer.flush(details.totalduration, transmuxIdentifier);
+    transmuxer.flush(transmuxIdentifier);
   }
 
   onAudioTrackSwitching (data) {
