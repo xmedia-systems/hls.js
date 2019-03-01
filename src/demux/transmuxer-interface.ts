@@ -176,6 +176,9 @@ export default class TransmuxerInterface {
         accurateTimeOffset: true,
         transmuxIdentifier
       });
+    } else if (transmuxer) {
+      this.onTransmuxComplete(transmuxer.flush(transmuxIdentifier));
+      this.onFlush();
     }
   }
 
