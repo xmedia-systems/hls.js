@@ -175,6 +175,9 @@ export default class TransmuxerInterface {
         cmd: 'flush',
         transmuxIdentifier
       });
+    } else if (transmuxer) {
+      this.onTransmuxComplete(transmuxer.flush(transmuxIdentifier));
+      this.onFlush();
     }
   }
 

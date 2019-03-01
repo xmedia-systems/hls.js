@@ -68,13 +68,17 @@ class PassThroughRemuxer implements Remuxer {
   remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
     let { initPTS, lastEndDTS } = this;
 
+    // If we haven't yet set a lastEndDTS, or it was reset, set it to the provided timeOffset. We want to use the
+    // lastEndDTS over timeOffset whenever possible; during progressive playback, the media source will not update
+    // the media duration (which is what timeOffset is provided as) before we need to process the next chunk.
+    if (!Number.isFinite(lastEndDTS)) {
+      lastEndDTS = this.lastEndDTS = timeOffset || 0;
+    }
+
     // The binary segment data is added to the videoTrack in the mp4demuxer. We don't check to see if the data is only
     // audio or video (or both); adding it to video was an arbitrary choice.
     const data = videoTrack.samples;
     if (!data || !data.length) {
-      if (!Number.isFinite(lastEndDTS)) {
-        this.lastEndDTS = timeOffset;
-      }
       return {
           audio: undefined,
           video: undefined,
@@ -100,7 +104,7 @@ class PassThroughRemuxer implements Remuxer {
     }
 
     const duration = getDuration(data, initData);
-    const startDTS = Number.isFinite(lastEndDTS) ? lastEndDTS : (timeOffset || 0);
+    const startDTS = lastEndDTS as number;
     const endDTS = duration + startDTS;
     offsetStartDTS(initData, data, initPTS);
     this.lastEndDTS = endDTS;
