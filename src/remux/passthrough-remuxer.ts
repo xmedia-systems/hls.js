@@ -66,10 +66,15 @@ class PassThroughRemuxer implements Remuxer {
 
   // TODO: Handle unsignaled discontinuities; contiguous and accurateTimeOffset flags are currently unused
   remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
+    let { initPTS, lastEndDTS } = this;
+
     // The binary segment data is added to the videoTrack in the mp4demuxer. We don't check to see if the data is only
     // audio or video (or both); adding it to video was an arbitrary choice.
     const data = videoTrack.samples;
     if (!data || !data.length) {
+      if (!Number.isFinite(lastEndDTS)) {
+        this.lastEndDTS = timeOffset;
+      }
       return {
           audio: undefined,
           video: undefined,
@@ -90,15 +95,14 @@ class PassThroughRemuxer implements Remuxer {
         this.emitInitSegment = false;
     }
 
-    let { initPTS, lastEndDTS } = this;
     if (!Number.isFinite(initPTS as number)) {
         this.initPTS = initSegment.initPTS = initPTS = computeInitPTS(initData, data, timeOffset);
     }
-    const startDTS = lastEndDTS || timeOffset;
-    offsetStartDTS(initData, data, initPTS);
 
     const duration = getDuration(data, initData);
+    const startDTS = Number.isFinite(lastEndDTS) ? lastEndDTS : (timeOffset || 0);
     const endDTS = duration + startDTS;
+    offsetStartDTS(initData, data, initPTS);
     this.lastEndDTS = endDTS;
 
     const track: RemuxedTrack = {

@@ -859,9 +859,8 @@ class StreamController extends BaseStreamController {
     );
   }
 
-  _handleFragmentLoadComplete (frag, payload, stats) {
-    const transmuxIdentifier = { level: frag.level, sn: frag.sn };
-    this.transmuxer.flush(transmuxIdentifier);
+  _handleFragmentLoadComplete (frag, stats) {
+    super._handleFragmentLoadComplete(frag, stats);
   }
 
   onAudioTrackSwitching (data) {
@@ -1228,6 +1227,15 @@ class StreamController extends BaseStreamController {
     this._endParsing();
   }
 
+  _endParsing () {
+    if (this.state !== State.PARSING) {
+      return;
+    }
+    this.stats.tparsed = window.performance.now();
+    this.state = State.PARSED;
+    this._checkAppendedParsed();
+  }
+
   _bufferInitSegment (frag, tracks) {
     if (this.state !== State.PARSING) {
       return;
@@ -1324,15 +1332,6 @@ class StreamController extends BaseStreamController {
     });
     // trigger handler right now
     this.tick();
-  }
-
-  _endParsing () {
-    if (this.state !== State.PARSING) {
-      return;
-    }
-    this.stats.tparsed = window.performance.now();
-    this.state = State.PARSED;
-    this._checkAppendedParsed();
   }
 
   _backtrack (frag, nextLoadPosition) {

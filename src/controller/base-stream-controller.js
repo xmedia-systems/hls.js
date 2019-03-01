@@ -186,6 +186,10 @@ export default class BaseStreamController extends TaskLoop {
     return this.fragmentLoader.load(frag, progressCallback);
   }
 
-  _handleFragmentLoadComplete (frag, stats) {}
+  _handleFragmentLoadComplete (frag, stats) {
+    const transmuxIdentifier = { level: frag.level, sn: frag.sn };
+    this.transmuxer.flush(transmuxIdentifier);
+  }
+
   _handleFragmentLoadProgress (frag, payload) {}
 }

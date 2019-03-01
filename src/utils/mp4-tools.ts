@@ -286,16 +286,31 @@ export function getStartDTS (initData, fragment) {
   return isFinite(result) ? result : 0;
 }
 
-// TODO: Check for default present flags in tf_flags. This assumes that base_data_offset & sample_description_index do not exist
-// TODO: Optimize if constant framerate (some field should say if all durations are default duration). default_sample_duration * trun.sample.size()
+// TODO: Handle non-constant sample duration
 export function getDuration (data, initData) {
-  return findBox(data, ['moof', 'traf', 'tfhd']).reduce((acc, tfhd) => {
+  let duration = 0;
+  const trafs = findBox(data, ['moof', 'traf']);
+  for (let i = 0; i < trafs.length; i++) {
+    const traf = trafs[i];
+    // There must be only one tfhd & trun per traf
+    const tfhd = findBox(traf, ['tfhd'])[0];
+    const trun = findBox(traf, ['trun'])[0];
+
+    const tfhdFlags = readUint32(tfhd, 0);
+    let sampleDuration;
+    if (tfhdFlags & 0x00002) {
+      sampleDuration = readUint32(tfhd, 12);
+    } else {
+      sampleDuration = readUint32(tfhd, 8);
+    }
+
     const id = readUint32(tfhd, 4);
-    // assume a 90kHz clock if no timescale was specified
     const scale = initData[id].timescale || 90e3;
-    const sampleDuration = readUint32(tfhd, 8);
-    return acc + ((sampleDuration) / scale);
-  }, 0);
+    const sampleCount = readUint32(trun, 4);
+
+    duration += ((sampleDuration * sampleCount) / scale);
+  }
+  return duration;
 }
 
 export function offsetStartDTS (initData, fragment, timeOffset) {
@@ -327,6 +342,7 @@ export function offsetStartDTS (initData, fragment, timeOffset) {
   });
 }
 
+// TODO: Check if the last moof+mdat pair is part of the valid range
 export function segmentValidRange (data: Uint8Array): SegmentedRange {
   const segmentedRange: SegmentedRange = {
     valid: new Uint8Array(0),
