@@ -31,8 +31,8 @@ class StreamController extends BaseStreamController {
   private level: number = -1;
   private startFragRequested: boolean = false;
   private forceStartLoad: boolean = false;
-  private retryDate?: number;
-  private levelLastLoaded?: number;
+  private retryDate: number = 0;
+  private levelLastLoaded: number | null = null;
   private altAudio: boolean = false;
   private fragPlaying: Fragment | null = null;
   private previouslyPaused: boolean = false;
@@ -40,14 +40,14 @@ class StreamController extends BaseStreamController {
   private onvseeking: Function | null = null;
   private onvseeked: Function | null = null;
   private onvended: Function | null = null;
-  private fragLastKbps?: number;
+  private fragLastKbps: number = 0;
   private stalled: boolean = false;
   private audioCodecSwitch: boolean = false;
-  private stats?: LoaderStats;
+  private stats: LoaderStats | null = null;
   private pendingBuffering: boolean = false;
   private appended: boolean = false;
-  private videoBuffer?: any;
-  private _liveSyncPosition?: number;
+  private videoBuffer: any | null = null;
+  private _liveSyncPosition: number | null = null;
 
   constructor (hls, fragmentTracker) {
     super(hls,
@@ -175,7 +175,7 @@ class StreamController extends BaseStreamController {
     // if start level not parsed yet OR
     // if video not attached AND start fragment already requested OR start frag prefetch disable
     // exit loop, as we either need more info (level not parsed) or we need media to be attached to load new fragment
-    if (levelLastLoaded === undefined || (
+    if (levelLastLoaded === null || (
       !media && (this.startFragRequested || !config.startFragPrefetch))) {
       return;
     }
@@ -860,9 +860,6 @@ class StreamController extends BaseStreamController {
     const currentLevel = levels[fragCurrent.level];
     const details = currentLevel.details;
     this.stats = stats;
-    this.state = State.PARSING;
-    this.pendingBuffering = true;
-    this.appended = false;
 
     // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live) and if media is not seeking (this is to overcome potential timestamp drifts between playlists and fragments)
     const accurateTimeOffset = !(media && media.seeking) && (details.PTSKnown || !details.live);
@@ -1227,6 +1224,10 @@ class StreamController extends BaseStreamController {
       this._backtrack(frag, video.startPTS);
       return;
     }
+
+    this.state = State.PARSING;
+    this.pendingBuffering = true;
+    this.appended = false;
 
     if (initSegment) {
       if (initSegment.tracks) {
