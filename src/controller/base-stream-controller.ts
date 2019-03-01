@@ -4,6 +4,9 @@ import { BufferHelper } from '../utils/buffer-helper';
 import { logger } from '../utils/logger';
 import Event from '../events';
 import { ErrorDetails } from '../errors';
+import Fragment from '../loader/fragment';
+import TransmuxerInterface from '../demux/transmuxer-interface';
+import FragmentLoader, { FragLoadSuccessResult, FragmentLoadProgressCallback } from '../loader/fragment-loader';
 
 export const State = {
   STOPPED: 'STOPPED',
@@ -24,11 +27,27 @@ export const State = {
 };
 
 export default class BaseStreamController extends TaskLoop {
-  doTick () {}
+  protected fragPrevious: Fragment | null = null;
+  protected fragCurrent: Fragment | null = null;
+  protected fragmentTracker: any;
+  protected transmuxer: TransmuxerInterface | null = null;
+  protected _state: string = State.STOPPED;
+  protected media?: any;
+  protected mediaBuffer?: any;
+  protected config: any;
+  protected lastCurrentTime: number = 0;
+  protected nextLoadPosition: number = 0;
+  protected startPosition: number = 0;
+  protected loadedmetadata: boolean = false;
+  protected fragLoadError: number = 0;
+  protected levels?: Array<any>;
+  protected fragmentLoader!: FragmentLoader;
 
-  startLoad () {}
+  protected doTick () {}
 
-  stopLoad () {
+  public startLoad (startPosition: number) : void {}
+
+  public stopLoad () {
     let frag = this.fragCurrent;
     if (frag) {
       if (frag.loader) {
@@ -36,9 +55,9 @@ export default class BaseStreamController extends TaskLoop {
       }
       this.fragmentTracker.removeFragment(frag);
     }
-    if (this.demuxer) {
-      this.demuxer.destroy();
-      this.demuxer = null;
+    if (this.transmuxer) {
+      this.transmuxer.destroy();
+      this.transmuxer = null;
     }
     this.fragCurrent = null;
     this.fragPrevious = null;
@@ -47,7 +66,7 @@ export default class BaseStreamController extends TaskLoop {
     this.state = State.STOPPED;
   }
 
-  _streamEnded (bufferInfo, levelDetails) {
+  protected _streamEnded (bufferInfo, levelDetails) {
     const { fragCurrent, fragmentTracker } = this;
     // we just got done loading the final fragment and there is no other buffered range after ...
     // rationale is that in case there are any buffered ranges after, it means that there are unbuffered portion in between
@@ -60,7 +79,7 @@ export default class BaseStreamController extends TaskLoop {
     return false;
   }
 
-  onMediaSeeking () {
+  protected onMediaSeeking () {
     const { config, media, mediaBuffer, state } = this;
     const currentTime = media ? media.currentTime : null;
     const bufferInfo = BufferHelper.bufferInfo(mediaBuffer || media, currentTime, this.config.maxBufferHole);
@@ -113,35 +132,36 @@ export default class BaseStreamController extends TaskLoop {
     this.tick();
   }
 
-  onMediaEnded () {
+  protected onMediaEnded () {
     // reset startPosition and lastCurrentTime to restart playback @ stream beginning
     this.startPosition = this.lastCurrentTime = 0;
   }
 
-  onHandlerDestroying () {
+  protected onHandlerDestroying () {
     this.stopLoad();
     super.onHandlerDestroying();
   }
 
-  onHandlerDestroyed () {
+  protected onHandlerDestroyed () {
     this.state = State.STOPPED;
     this.fragmentTracker = null;
   }
 
-  _loadFragForPlayback (frag) {
-    const progressCallback = (stats, context, payload, networkDetails) => {
+  protected _loadFragForPlayback (frag) {
+    const progressCallback: FragmentLoadProgressCallback = (stats, context, payload, networkDetails) => {
       this._handleFragmentLoadProgress(frag, payload, stats);
     };
     this._doFragLoad(frag, progressCallback)
-      .then((data) => {
+      .then((data: FragLoadSuccessResult) => {
         this.fragLoadError = 0;
         if (this._fragLoadAborted(frag)) {
           return;
         }
         logger.log(`Loaded ${frag.sn} of level ${frag.level}`);
         // For compatibility, emit the FRAG_LOADED with the same signature
-        data.frag = frag;
-        this.hls.trigger(Event.FRAG_LOADED, data);
+        const compatibilityEventData: any = data;
+        compatibilityEventData.frag = frag;
+        this.hls.trigger(Event.FRAG_LOADED, compatibilityEventData);
         this._handleFragmentLoadComplete(frag, data.stats);
       })
       .catch((e) => {
@@ -152,12 +172,12 @@ export default class BaseStreamController extends TaskLoop {
       });
   }
 
-  _loadInitSegment (frag) {
+  protected _loadInitSegment (frag) {
     this._doFragLoad(frag)
-      .then((data) => {
+      .then((data: FragLoadSuccessResult) => {
         const { stats, payload } = data;
         const { fragCurrent, hls, levels } = this;
-        if (this._fragLoadAborted(frag)) {
+        if (this._fragLoadAborted(frag) || !levels) {
           return;
         }
         this.state = State.IDLE;
@@ -175,21 +195,40 @@ export default class BaseStreamController extends TaskLoop {
       });
   }
 
-  _fragLoadAborted (frag) {
-    const { level, sn } = this.fragCurrent;
+  protected _fragLoadAborted (frag) {
+    const { fragCurrent } = this;
+    if (!frag || !fragCurrent) {
+      return;
+    }
+    const { level, sn } = fragCurrent;
     return frag.level !== level && frag.sn !== sn;
   }
 
-  _doFragLoad (frag, progressCallback = () => {}) {
+  protected _handleFragmentLoadComplete (frag, stats) {
+    const { transmuxer } = this;
+    if (!transmuxer) {
+      return;
+    }
+    transmuxer.flush({ level: frag.level, sn: frag.sn });
+  }
+
+  protected _handleFragmentLoadProgress (frag, payload, stats) {}
+
+  protected _doFragLoad (frag, progressCallback?: FragmentLoadProgressCallback) {
     this.state = State.FRAG_LOADING;
     this.hls.trigger(Event.FRAG_LOADING, { frag });
     return this.fragmentLoader.load(frag, progressCallback);
   }
 
-  _handleFragmentLoadComplete (frag, stats) {
-    const transmuxIdentifier = { level: frag.level, sn: frag.sn };
-    this.transmuxer.flush(transmuxIdentifier);
+  set state (nextState) {
+    if (this.state !== nextState) {
+      const previousState = this.state;
+      this._state = nextState;
+      logger.log(`controller:${previousState}->${nextState}`);
+    }
   }
 
-  _handleFragmentLoadProgress (frag, payload) {}
+  get state () {
+    return this._state;
+  }
 }

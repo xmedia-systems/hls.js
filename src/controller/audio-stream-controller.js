@@ -83,18 +83,6 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  set state (nextState) {
-    if (this.state !== nextState) {
-      const previousState = this.state;
-      this._state = nextState;
-      logger.log(`audio stream:${previousState}->${nextState}`);
-    }
-  }
-
-  get state () {
-    return this._state;
-  }
-
   doTick () {
     let pos, track, trackDetails, hls = this.hls, config = hls.config;
     // logger.log('audioStream:' + this.state);
