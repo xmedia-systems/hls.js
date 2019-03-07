@@ -11,6 +11,7 @@ import KeyLoader from './loader/key-loader';
 import { FragmentTracker } from './controller/fragment-tracker';
 import StreamController from './controller/stream-controller';
 import LevelController from './controller/level-controller';
+import PlaybackRateController from './controller/playback-rate-controller';
 
 import { isSupported } from './is-supported';
 import { logger, enableLogs } from './utils/logger';
@@ -124,6 +125,7 @@ export default class Hls extends Observer {
     const playListLoader = new PlaylistLoader(this);
     // const fragmentLoader = new FragmentLoader(this);
     const keyLoader = new KeyLoader(this);
+    const playbackRateController = new PlaybackRateController(this);
 
     // network controllers
 
@@ -167,7 +169,8 @@ export default class Hls extends Observer {
       bufferController,
       capLevelController,
       fpsController,
-      fragmentTracker
+      fragmentTracker,
+      playbackRateController
     ];
 
     // optional audio track and subtitle controller

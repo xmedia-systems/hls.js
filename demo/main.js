@@ -47,6 +47,9 @@ let configEditor = null;
 
 $(document).ready(function() {
   setupConfigEditor();
+  setInterval(() => {
+    $('.utcSeconds').text(new Date().getUTCSeconds());
+  }, 500);
 
   Object.keys(testStreams).forEach((key) => {
     const stream = testStreams[key];
