@@ -7,9 +7,10 @@ import EventHandler from '../event-handler';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { getMediaSource } from '../utils/mediasource-helper';
-
+import { getFragmentKey } from './fragment-tracker';
 import { TrackSet } from '../types/track';
 import { Segment } from '../types/segment';
+import Fragment from '../loader/fragment';
 
 // Add extension properties to SourceBuffers from the DOM API.
 type ExtendedSourceBuffer = SourceBuffer & {
@@ -25,10 +26,10 @@ interface SourceBufferFlushRange {
   type: SourceBufferName
 }
 
-interface FragmentChunk {
+interface Chunk {
   key: string
+  frag: Fragment
   data: ArrayBuffer
-  fragType: string
   dataType: string
 }
 
@@ -55,6 +56,8 @@ class BufferController extends EventHandler {
 
   private fragmentTracker: any;
 
+  private completed: any = {};
+
   // this is optional because this property is removed from the class sometimes
   public audioTimestampOffset?: number;
 
@@ -68,7 +71,7 @@ class BufferController extends EventHandler {
   public mediaSource: MediaSource | null = null;
 
   // List of pending segments to be appended to source buffer
-  public segments: FragmentChunk[] = [];
+  public segments: Chunk[] = [];
 
   // A guard to see if we are currently appending to the source buffer
   public appending: boolean = false;
@@ -287,10 +290,15 @@ class BufferController extends EventHandler {
     let flushBackbuffer = false;
     const appendedChunk = this.segments.shift();
     if (appendedChunk) {
-      const parent = appendedChunk.fragType;
-      const pending = segments.reduce((counter, segment) => (segment.fragType === parent) ? counter + 1 : counter, 0);
+      const { frag, key } = appendedChunk;
+      const pending = segments.reduce((counter, segment) => (segment.frag.type === frag.type) ? counter + 1 : counter, 0);
       flushBackbuffer = !!pending;
       hls.trigger(Events.BUFFER_APPENDED, { parent, pending, timeRanges });
+
+      if (this._isFragComplete(key)) {
+        console.log('>>> frag buffered', appendedChunk);
+        delete this.completed[key];
+      }
     } else {
       logger.error('The chunk corresponding to the sourceBuffer updateend does not exist . The BUFFER_APPENDED event will not be emitted for this chunk.');
     }
@@ -391,12 +399,10 @@ class BufferController extends EventHandler {
   }
 
   onBufferAppending ({ data, frag, type }) {
-    const { fragmentTracker } = this;
-    const chunk: FragmentChunk = {
-      key: `${frag.sn}_${frag.level}_${frag.type}`,
+    const chunk: Chunk = {
+      frag,
       data,
       dataType: type,
-      fragType: frag.type
     };
 
     if (!this._needsFlush) {
@@ -625,7 +631,6 @@ class BufferController extends EventHandler {
 
       if (sb.updating) {
         // if we are still updating the source buffer from the last segment, place this back at the front of the queue
-        segments.unshift(segment);
         return;
       }
 
@@ -639,7 +644,7 @@ class BufferController extends EventHandler {
       // in case any error occured while appending, put back segment in segments table
       logger.error(`error while trying to append buffer:${err.message}`);
       segments.unshift(segment);
-      let event = { type: ErrorTypes.MEDIA_ERROR, parent: segment.fragType, details: '', fatal: false };
+      let event = { type: ErrorTypes.MEDIA_ERROR, parent: segment.frag.type, details: '', fatal: false };
       if (err.code === 22) {
         // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
         // let's stop appending any segments, and report BUFFER_FULL_ERROR error
@@ -744,6 +749,19 @@ class BufferController extends EventHandler {
     }
 
     return false;
+  }
+
+
+  private _isFragComplete(key: string) {
+    const nextInQueue = this.segments[0];
+    if (!nextInQueue) {
+      return true;
+    }
+    return this.completed[key] && nextInQueue.key !== key;
+  }
+
+  onFragParsed(frag) {
+    this.completed[getFragmentKey(frag)] = true;
   }
 }
 

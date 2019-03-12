@@ -99,7 +99,7 @@ export class FragmentTracker extends EventHandler {
    * @param {Object} fragment Check the fragment against all sourceBuffers loaded
    */
   detectPartialFragments (fragment) {
-    let fragKey = this.getFragmentKey(fragment);
+    let fragKey = getFragmentKey(fragment);
     let fragmentEntity = this.fragments[fragKey];
     if (fragmentEntity) {
       fragmentEntity.buffered = true;
@@ -150,10 +150,6 @@ export class FragmentTracker extends EventHandler {
     };
   }
 
-  getFragmentKey (fragment) {
-    return `${fragment.type}_${fragment.level}_${fragment.urlId}_${fragment.sn}`;
-  }
-
   /**
    * Gets the partial fragment for a certain time
    * @param {Number} time
@@ -186,7 +182,7 @@ export class FragmentTracker extends EventHandler {
    * @returns {String} Returns the fragment state when a fragment never loaded or if it partially loaded
    */
   getState (fragment) {
-    const fragKey = this.getFragmentKey(fragment);
+    const fragKey = getFragmentKey(fragment);
     const fragmentEntity = this.fragments[fragKey];
     let state = FragmentState.NOT_LOADED;
 
@@ -238,7 +234,7 @@ export class FragmentTracker extends EventHandler {
       return;
     }
 
-    this.fragments[this.getFragmentKey(fragment)] = {
+    this.fragments[getFragmentKey(fragment)] = {
       body: fragment,
       range: Object.create(null),
       buffered: false
@@ -270,7 +266,7 @@ export class FragmentTracker extends EventHandler {
    * @returns {boolean}
    */
   hasFragment (fragment) {
-    const fragKey = this.getFragmentKey(fragment);
+    const fragKey = getFragmentKey(fragment);
     return this.fragments[fragKey] !== undefined;
   }
 
@@ -279,7 +275,7 @@ export class FragmentTracker extends EventHandler {
    * @param {Object} fragment The fragment to remove
    */
   removeFragment (fragment) {
-    let fragKey = this.getFragmentKey(fragment);
+    let fragKey = getFragmentKey(fragment);
     delete this.fragments[fragKey];
   }
 
@@ -289,4 +285,8 @@ export class FragmentTracker extends EventHandler {
   removeAllFragments () {
     this.fragments = Object.create(null);
   }
+}
+
+export function getFragmentKey (fragment) {
+  return `${fragment.type}_${fragment.level}_${fragment.urlId}_${fragment.sn}`;
 }
