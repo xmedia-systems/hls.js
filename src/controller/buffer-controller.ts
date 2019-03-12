@@ -25,6 +25,13 @@ interface SourceBufferFlushRange {
   type: SourceBufferName
 }
 
+interface FragmentChunk {
+  key: string
+  data: ArrayBuffer
+  fragType: string
+  dataType: string
+}
+
 const MediaSource = getMediaSource();
 
 class BufferController extends EventHandler {
@@ -46,7 +53,7 @@ class BufferController extends EventHandler {
   // signals that mediaSource should have endOfStream called
   private _needsEos: boolean = false;
 
-  private hls: any;
+  private fragmentTracker: any;
 
   // this is optional because this property is removed from the class sometimes
   public audioTimestampOffset?: number;
@@ -61,9 +68,7 @@ class BufferController extends EventHandler {
   public mediaSource: MediaSource | null = null;
 
   // List of pending segments to be appended to source buffer
-  public segments: Segment[] = [];
-
-  public parent?: string;
+  public segments: FragmentChunk[] = [];
 
   // A guard to see if we are currently appending to the source buffer
   public appending: boolean = false;
@@ -78,7 +83,7 @@ class BufferController extends EventHandler {
   public sourceBuffer: SourceBuffers = {};
   public flushRange: SourceBufferFlushRange[] = [];
 
-  constructor (hls: any) {
+  constructor (hls: any, fragmentTracker: any) {
     super(hls,
       Events.MEDIA_ATTACHING,
       Events.MEDIA_DETACHING,
@@ -90,7 +95,7 @@ class BufferController extends EventHandler {
       Events.BUFFER_FLUSHING,
       Events.LEVEL_PTS_UPDATED,
       Events.LEVEL_UPDATED);
-    this.hls = hls;
+    this.fragmentTracker = fragmentTracker;
   }
 
   destroy () {
@@ -249,11 +254,13 @@ class BufferController extends EventHandler {
 
   private _onSBUpdateEnd = () => {
     // update timestampOffset
-    if (this.audioTimestampOffset && this.sourceBuffer.audio) {
-      let audioBuffer = this.sourceBuffer.audio;
 
-      logger.warn(`change mpeg audio timestamp offset from ${audioBuffer.timestampOffset} to ${this.audioTimestampOffset}`);
-      audioBuffer.timestampOffset = this.audioTimestampOffset;
+    const { audioTimestampOffset, hls, segments, sourceBuffer } = this;
+    if (audioTimestampOffset && sourceBuffer.audio) {
+      let audioBuffer = sourceBuffer.audio;
+
+      logger.warn(`change mpeg audio timestamp offset from ${audioBuffer.timestampOffset} to ${audioTimestampOffset}`);
+      audioBuffer.timestampOffset = audioTimestampOffset;
       delete this.audioTimestampOffset;
     }
 
@@ -266,22 +273,28 @@ class BufferController extends EventHandler {
     }
 
     this.appending = false;
-    let parent = this.parent;
-    // count nb of pending segments waiting for appending on this sourcebuffer
-    let pending = this.segments.reduce((counter, segment) => (segment.parent === parent) ? counter + 1 : counter, 0);
 
     // this.sourceBuffer is better to use than media.buffered as it is closer to the PTS data from the fragments
     const timeRanges: Partial<Record<SourceBufferName, TimeRanges>> = {};
-    const sbSet = this.sourceBuffer;
-    for (let streamType in sbSet) {
-      const sb = sbSet[streamType as SourceBufferName];
+    for (let streamType in sourceBuffer) {
+      const sb = sourceBuffer[streamType as SourceBufferName];
       if (!sb) {
         throw Error(`handling source buffer update end error: source buffer for ${streamType} uninitilized and unable to update buffered TimeRanges.`);
       }
       timeRanges[streamType as SourceBufferName] = sb.buffered;
     }
 
-    this.hls.trigger(Events.BUFFER_APPENDED, { parent, pending, timeRanges });
+    let flushBackbuffer = false;
+    const appendedChunk = this.segments.shift();
+    if (appendedChunk) {
+      const parent = appendedChunk.fragType;
+      const pending = segments.reduce((counter, segment) => (segment.fragType === parent) ? counter + 1 : counter, 0);
+      flushBackbuffer = !!pending;
+      hls.trigger(Events.BUFFER_APPENDED, { parent, pending, timeRanges });
+    } else {
+      logger.error('The chunk corresponding to the sourceBuffer updateend does not exist . The BUFFER_APPENDED event will not be emitted for this chunk.');
+    }
+
     // don't append in flushing mode
     if (!this._needsFlush) {
       this.doAppending();
@@ -290,7 +303,7 @@ class BufferController extends EventHandler {
     this.updateMediaElementDuration();
 
     // appending goes first
-    if (pending === 0) {
+    if (flushBackbuffer) {
       this.flushLiveBackBuffer();
     }
   }
@@ -377,14 +390,17 @@ class BufferController extends EventHandler {
     this.hls.trigger(Events.BUFFER_CREATED, { tracks: this.tracks });
   }
 
-  onBufferAppending (data: Segment) {
-    if (!this._needsFlush) {
-      if (!this.segments) {
-        this.segments = [ data ];
-      } else {
-        this.segments.push(data);
-      }
+  onBufferAppending ({ data, frag, type }) {
+    const { fragmentTracker } = this;
+    const chunk: FragmentChunk = {
+      key: `${frag.sn}_${frag.level}_${frag.type}`,
+      data,
+      dataType: type,
+      fragType: frag.type
+    };
 
+    if (!this._needsFlush) {
+      this.segments.push(chunk);
       this.doAppending();
     }
   }
@@ -581,9 +597,9 @@ class BufferController extends EventHandler {
       return;
     }
 
-    if (!this.media || this.media.error) {
+    if (!media || media.error) {
       this.segments = [];
-      logger.error('trying to append although a media error occured, flush segment and abort');
+      logger.error('A media error before appending the current segment. The operation has been aborted.');
       return;
     }
 
@@ -592,13 +608,13 @@ class BufferController extends EventHandler {
       return;
     }
 
-    const segment = segments.shift();
+    const segment = segments[0];
     if (!segment) { // handle undefined shift
       return;
     }
 
     try {
-      const sb = sourceBuffer[segment.type];
+      const sb = sourceBuffer[segment.dataType];
       if (!sb) {
         // in case we don't have any source buffer matching with this segment type,
         // it means that Mediasource fails to create sourcebuffer
@@ -615,8 +631,6 @@ class BufferController extends EventHandler {
 
       // reset sourceBuffer ended flag before appending segment
       sb.ended = false;
-      // logger.log(`appending ${segment.content} ${type} SB, size:${segment.data.length}, ${segment.parent}`);
-      this.parent = segment.parent;
       sb.appendBuffer(segment.data);
       this.appendError = 0;
       this.appended++;
@@ -625,7 +639,7 @@ class BufferController extends EventHandler {
       // in case any error occured while appending, put back segment in segments table
       logger.error(`error while trying to append buffer:${err.message}`);
       segments.unshift(segment);
-      let event = { type: ErrorTypes.MEDIA_ERROR, parent: segment.parent, details: '', fatal: false };
+      let event = { type: ErrorTypes.MEDIA_ERROR, parent: segment.fragType, details: '', fatal: false };
       if (err.code === 22) {
         // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
         // let's stop appending any segments, and report BUFFER_FULL_ERROR error

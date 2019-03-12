@@ -186,11 +186,11 @@ export class FragmentTracker extends EventHandler {
    * @returns {String} Returns the fragment state when a fragment never loaded or if it partially loaded
    */
   getState (fragment) {
-    let fragKey = this.getFragmentKey(fragment);
-    let fragmentEntity = this.fragments[fragKey];
+    const fragKey = this.getFragmentKey(fragment);
+    const fragmentEntity = this.fragments[fragKey];
     let state = FragmentState.NOT_LOADED;
 
-    if (fragmentEntity !== undefined) {
+    if (fragmentEntity) {
       if (!fragmentEntity.buffered) {
         state = FragmentState.APPENDING;
       } else if (this.isPartial(fragmentEntity) === true) {
@@ -205,8 +205,8 @@ export class FragmentTracker extends EventHandler {
 
   isPartial (fragmentEntity) {
     return fragmentEntity.buffered === true &&
-      ((fragmentEntity.range.video !== undefined && fragmentEntity.range.video.partial === true) ||
-        (fragmentEntity.range.audio !== undefined && fragmentEntity.range.audio.partial === true));
+      ((fragmentEntity.range.video && fragmentEntity.range.video.partial) ||
+        (fragmentEntity.range.audio && fragmentEntity.range.audio.partial));
   }
 
   isTimeBuffered (startPTS, endPTS, timeRange) {

@@ -665,14 +665,14 @@ class AudioStreamController extends BaseStreamController {
     logger.log(`audio track:audio,container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]`);
     let initSegment = track.initSegment;
     if (initSegment) {
-      let appendObj = { type: 'audio', data: initSegment, parent: 'audio', content: 'initSegment' };
+      const appendingEventData = { type: 'audio', data: initSegment, frag };
       if (this.audioSwitch) {
-        this.pendingData = [appendObj];
+        this.pendingData = [appendingEventData];
       } else {
         this.appended = true;
         // arm pending Buffering flag before appending a segment
         this.pendingBuffering = true;
-        this.hls.trigger(Event.BUFFER_APPENDING, appendObj);
+        this.hls.trigger(Event.BUFFER_APPENDING, appendingEventData);
       }
     }
     // trigger handler right now
@@ -721,7 +721,7 @@ class AudioStreamController extends BaseStreamController {
     if (!this.audioSwitch) {
       [data.data1, data.data2].forEach(buffer => {
         if (buffer && buffer.length) {
-          pendingData.push({ type: data.type, data: buffer, parent: 'audio', content: 'data' });
+          pendingData.push({ type: data.type, data: buffer, frag });
         }
       });
       if (!appendOnBufferFlush && pendingData.length) {

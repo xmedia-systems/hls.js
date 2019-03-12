@@ -20,6 +20,7 @@ import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader, { FragLoadSuccessResult } from '../loader/fragment-loader';
 import { TransmuxIdentifier } from '../types/transmuxer';
 import { LoaderStats } from '../types/loader';
+import { Segment } from '../types/segment';
 
 const TICK_INTERVAL = 100; // how often to tick in ms
 
@@ -69,14 +70,13 @@ class StreamController extends BaseStreamController {
 
     this.audioCodecSwap = false;
     this.bitrateTest = false;
-    this.fragmentLoader = new FragmentLoader(hls.config);
     this.config = hls.config;
+    this.fragmentLoader = new FragmentLoader(hls.config);
     this.fragmentTracker = fragmentTracker;
     this.gapController = null;
     this.stallReported = false;
-    this.state = State.STOPPED;
     this.stallReported = false;
-    this.gapController = null;
+    this.state = State.STOPPED;
   }
 
   startLoad (startPosition): void {
@@ -246,12 +246,10 @@ class StreamController extends BaseStreamController {
   }
 
   _fetchPayloadOrEos (pos, bufferInfo, levelDetails) {
-    const fragPrevious = this.fragPrevious,
-      level = this.level,
-      fragments = levelDetails.fragments,
-      fragLen = fragments.length;
+    const { config, fragPrevious, level } = this;
+    const fragments = levelDetails.fragments;
 
-    // empty playlist
+    const fragLen = fragments.length;
     if (fragLen === 0) {
       return;
     }
@@ -266,15 +264,15 @@ class StreamController extends BaseStreamController {
       frag = levelDetails.initSegment;
     } else {
       // in case of live playlist we need to ensure that requested position is not located before playlist start
+      const initialLiveManifestSize = this.config.initialLiveManifestSize;
       if (levelDetails.live) {
-        let initialLiveManifestSize = this.config.initialLiveManifestSize;
         if (fragLen < initialLiveManifestSize) {
           logger.warn(`Can not start playback of a level, reason: not enough fragments ${fragLen} < ${initialLiveManifestSize}`);
           return;
         }
 
         frag = this._ensureFragmentAtLivePoint(levelDetails, bufferEnd, start, end, fragPrevious, fragments, fragLen);
-        // if it explicitely returns null don't load any fragment and exit function now
+        // if it explicitly returns null don't load any fragment and exit function now
         if (frag === null) {
           return;
         }
@@ -1267,7 +1265,7 @@ class StreamController extends BaseStreamController {
     if (this.stats) {
       this.stats.tparsed = window.performance.now();
     } else {
-      logger.warn(`Stats object was unset after fragment finished parsing. tparsed will not be recorded for ${this.fragCurrent}`);
+      logger.warn(`Stats object was unset after fragment finished parsing. tparsed will not be recorded for the current fragment`);
     }
     this.state = State.PARSED;
     this._checkAppendedParsed();
@@ -1279,7 +1277,7 @@ class StreamController extends BaseStreamController {
     }
     const { levels, level } = this;
     if (!levels) {
-      logger.warn(`Levels object was unset while buffering the init segment for fragment ${frag}. The init segment will not be buffered.`);
+      logger.warn(`Levels object was unset while buffering the init segment for level ${level}. The init segment will not be buffered.`);
       return;
     }
     // if audio track is expected to come from audio stream controller, discard any coming from main
@@ -1330,7 +1328,8 @@ class StreamController extends BaseStreamController {
         this.appended = true;
         // arm pending Buffering flag before appending a segment
         this.pendingBuffering = true;
-        this.hls.trigger(Event.BUFFER_APPENDING, { type: trackName, data: initSegment, parent: 'main', content: 'initSegment' });
+        const appendingEventData = { type: trackName, data: initSegment, frag };
+        this.hls.trigger(Event.BUFFER_APPENDING, appendingEventData);
       }
     });
     // trigger handler right now
@@ -1373,7 +1372,8 @@ class StreamController extends BaseStreamController {
         this.appended = true;
         // arm pending Buffering flag before appending a segment
         this.pendingBuffering = true;
-        hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
+        const appendingEventData = { type: data.type, data: buffer, frag };
+        hls.trigger(Event.BUFFER_APPENDING, appendingEventData);
       }
     });
     // trigger handler right now
