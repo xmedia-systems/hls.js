@@ -167,7 +167,6 @@ export default class TransmuxerInterface {
     }
   }
 
-  // TODO: handle non-worker flush return
   flush (transmuxIdentifier: TransmuxIdentifier) {
     const { transmuxer, worker } = this;
     if (worker) {
@@ -177,7 +176,7 @@ export default class TransmuxerInterface {
       });
     } else if (transmuxer) {
       this.onTransmuxComplete(transmuxer.flush(transmuxIdentifier));
-      this.onFlush();
+      this.onFlush(transmuxIdentifier);
     }
   }
 
@@ -197,7 +196,7 @@ export default class TransmuxerInterface {
       }
 
       case 'flush': {
-        this.onFlush();
+        this.onFlush(data.transmuxIdentifier);
         break;
       }
 

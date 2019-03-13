@@ -13,7 +13,8 @@ export class FragmentTracker extends EventHandler {
     super(hls,
       Event.BUFFER_APPENDED,
       Event.FRAG_BUFFERED,
-      Event.FRAG_LOADED
+      Event.FRAG_LOADED,
+      Event.FRAG_PARSED
     );
 
     this.bufferPadding = 0.2;
@@ -258,6 +259,10 @@ export class FragmentTracker extends EventHandler {
    */
   onFragBuffered (e) {
     this.detectPartialFragments(e.frag);
+  }
+
+  onFragParsed (e) {
+
   }
 
   /**

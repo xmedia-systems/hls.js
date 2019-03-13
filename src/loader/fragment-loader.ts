@@ -65,6 +65,7 @@ export default class FragmentLoader {
       const callbacks: LoaderCallbacks<FragmentLoaderContext> = {
           onSuccess: (response, stats, context, networkDetails) => {
               this._resetLoader(frag);
+              frag.stats = stats;
               resolve({
                   payload: response.data as ArrayBuffer,
                   stats,

@@ -255,13 +255,80 @@ class BufferController extends EventHandler {
     logger.log('media source ended');
   }
 
-  private _onSBUpdateEnd = () => {
-    // update timestampOffset
+  private doAppending () {
+    let { hls, segments, sourceBuffer, media } = this;
+    if (!Object.keys(sourceBuffer).length) {
+      // early exit if no source buffers have been initialized yet
+      return;
+    }
 
+    if (!media || media.error) {
+      this.segments = [];
+      logger.error('A media error before appending the current segment. The operation has been aborted.');
+      return;
+    }
+
+    if (this.appending) {
+      // logger.log(`sb appending in progress`);
+      return;
+    }
+
+    const segment = segments[0];
+    if (!segment) { // handle undefined shift
+      return;
+    }
+
+    const sb = sourceBuffer[segment.dataType];
+    if (!sb) {
+      // in case we don't have any source buffer matching with this segment type,
+      // it means that Mediasource fails to create sourcebuffer
+      // discard this segment, and trigger update end
+      this._onSBUpdateEnd();
+      return;
+    }
+
+    if (sb.updating) {
+      // if we are still updating the source buffer from the last segment, place this back at the front of the queue
+      return;
+    }
+
+    try {
+      // reset sourceBuffer ended flag before appending segment
+      sb.ended = false;
+      sb.appendBuffer(segment.data);
+      this.appendError = 0;
+      this.appended++;
+      this.appending = true;
+    } catch (err) {
+      // in case any error occured while appending, put back segment in segments table
+      logger.error(`error while trying to append buffer:${err.message}`);
+      segments.unshift(segment);
+      const event = { type: ErrorTypes.MEDIA_ERROR, parent: segment.frag.type, details: '', fatal: false };
+      if (err.code === 22) {
+        // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
+        // let's stop appending any segments, and report BUFFER_FULL_ERROR error
+        this.segments = [];
+        event.details = ErrorDetails.BUFFER_FULL_ERROR;
+      } else {
+        this.appendError++;
+        event.details = ErrorDetails.BUFFER_APPEND_ERROR;
+        /* with UHD content, we could get loop of quota exceeded error until
+          browser is able to evict some data from sourcebuffer. retrying help recovering this
+        */
+        if (this.appendError > hls.config.appendErrorMaxRetry) {
+          logger.log(`fail ${hls.config.appendErrorMaxRetry} times to append segment in sourceBuffer`);
+          this.segments = [];
+          event.fatal = true;
+        }
+      }
+      hls.trigger(Events.ERROR, event);
+    }
+  }
+
+  private _onSBUpdateEnd = () => {
     const { audioTimestampOffset, hls, segments, sourceBuffer } = this;
     if (audioTimestampOffset && sourceBuffer.audio) {
       let audioBuffer = sourceBuffer.audio;
-
       logger.warn(`change mpeg audio timestamp offset from ${audioBuffer.timestampOffset} to ${audioTimestampOffset}`);
       audioBuffer.timestampOffset = audioTimestampOffset;
       delete this.audioTimestampOffset;
@@ -275,8 +342,6 @@ class BufferController extends EventHandler {
       this.checkEos();
     }
 
-    this.appending = false;
-
     // this.sourceBuffer is better to use than media.buffered as it is closer to the PTS data from the fragments
     const timeRanges: Partial<Record<SourceBufferName, TimeRanges>> = {};
     for (let streamType in sourceBuffer) {
@@ -287,31 +352,32 @@ class BufferController extends EventHandler {
       timeRanges[streamType as SourceBufferName] = sb.buffered;
     }
 
-    let flushBackbuffer = false;
     const appendedChunk = this.segments.shift();
     if (appendedChunk) {
       const { frag, key } = appendedChunk;
-      const pending = segments.reduce((counter, segment) => (segment.frag.type === frag.type) ? counter + 1 : counter, 0);
-      flushBackbuffer = !!pending;
-      hls.trigger(Events.BUFFER_APPENDED, { parent, pending, timeRanges });
+      hls.trigger(Events.BUFFER_APPENDED, { frag, timeRanges });
 
       if (this._isFragComplete(key)) {
-        console.log('>>> frag buffered', appendedChunk);
+        console.log('>>> frag buffered', frag);
+        frag.stats.tbuffered = window.performance.now();
+        this.hls.trigger(Events.FRAG_BUFFERED, { frag });
+        // TODO: Use fragment tracker
         delete this.completed[key];
       }
     } else {
       logger.error('The chunk corresponding to the sourceBuffer updateend does not exist . The BUFFER_APPENDED event will not be emitted for this chunk.');
     }
-
-    // don't append in flushing mode
+    this.appending = false;
+    // Halt appending while the buffer is being flushed
     if (!this._needsFlush) {
       this.doAppending();
     }
 
     this.updateMediaElementDuration();
 
-    // appending goes first
-    if (flushBackbuffer) {
+    // TODO: During LHLS there may never be a moment when the append queue is empty - should make time to do this
+    // Flush the backbuffer if no more appends are queued
+    if (!segments.length) {
       this.flushLiveBackBuffer();
     }
   }
@@ -322,7 +388,7 @@ class BufferController extends EventHandler {
     // this error might not always be fatal (it is fatal if decode error is set, in that case
     // it will be followed by a mediaElement error ...)
     this.hls.trigger(Events.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_APPENDING_ERROR, fatal: false });
-    // we don't need to do more than that, as accordin to the spec, updateend will be fired just after
+    // we don't need to do more than that, as according to the spec, updateend will be fired just after
   }
 
   onBufferReset () {
@@ -593,76 +659,6 @@ class BufferController extends EventHandler {
       }
       this.appended = appended;
       this.hls.trigger(Events.BUFFER_FLUSHED);
-    }
-  }
-
-  doAppending () {
-    let { hls, segments, sourceBuffer, media } = this;
-    if (!Object.keys(sourceBuffer).length) {
-      // early exit if no source buffers have been initialized yet
-      return;
-    }
-
-    if (!media || media.error) {
-      this.segments = [];
-      logger.error('A media error before appending the current segment. The operation has been aborted.');
-      return;
-    }
-
-    if (this.appending) {
-      // logger.log(`sb appending in progress`);
-      return;
-    }
-
-    const segment = segments[0];
-    if (!segment) { // handle undefined shift
-      return;
-    }
-
-    try {
-      const sb = sourceBuffer[segment.dataType];
-      if (!sb) {
-        // in case we don't have any source buffer matching with this segment type,
-        // it means that Mediasource fails to create sourcebuffer
-        // discard this segment, and trigger update end
-        this._onSBUpdateEnd();
-        return;
-      }
-
-      if (sb.updating) {
-        // if we are still updating the source buffer from the last segment, place this back at the front of the queue
-        return;
-      }
-
-      // reset sourceBuffer ended flag before appending segment
-      sb.ended = false;
-      sb.appendBuffer(segment.data);
-      this.appendError = 0;
-      this.appended++;
-      this.appending = true;
-    } catch (err) {
-      // in case any error occured while appending, put back segment in segments table
-      logger.error(`error while trying to append buffer:${err.message}`);
-      segments.unshift(segment);
-      let event = { type: ErrorTypes.MEDIA_ERROR, parent: segment.frag.type, details: '', fatal: false };
-      if (err.code === 22) {
-        // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
-        // let's stop appending any segments, and report BUFFER_FULL_ERROR error
-        this.segments = [];
-        event.details = ErrorDetails.BUFFER_FULL_ERROR;
-      } else {
-        this.appendError++;
-        event.details = ErrorDetails.BUFFER_APPEND_ERROR;
-        /* with UHD content, we could get loop of quota exceeded error until
-          browser is able to evict some data from sourcebuffer. retrying help recovering this
-        */
-        if (this.appendError > hls.config.appendErrorMaxRetry) {
-          logger.log(`fail ${hls.config.appendErrorMaxRetry} times to append segment in sourceBuffer`);
-          this.segments = [];
-          event.fatal = true;
-        }
-      }
-      hls.trigger(Events.ERROR, event);
     }
   }
 

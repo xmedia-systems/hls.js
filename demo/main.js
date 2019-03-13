@@ -379,18 +379,20 @@ function loadSelectedStream() {
   });
 
   hls.on(Hls.Events.FRAG_BUFFERED, function(event, data) {
+    const frag = data.frag;
+    const fragStats = frag.stats;
     var event = {
-      type    : data.frag.type + ' fragment',
-      id      : data.frag.level,
-      id2     : data.frag.sn,
-      time    : data.stats.trequest - events.t0,
-      latency : data.stats.tfirst - data.stats.trequest,
-      load    : data.stats.tload - data.stats.tfirst,
-      parsing : data.stats.tparsed - data.stats.tload,
-      buffer  : data.stats.tbuffered - data.stats.tparsed,
-      duration: data.stats.tbuffered - data.stats.tfirst,
-      bw      : Math.round(8*data.stats.total/(data.stats.tbuffered - data.stats.trequest)),
-      size    : data.stats.total
+      type    : frag.type + ' fragment',
+      id      : frag.level,
+      id2     : frag.sn,
+      time    : fragStats.trequest - events.t0,
+      latency : fragStats.tfirst - fragStats.trequest,
+      load    : fragStats.tload - fragStats.tfirst,
+      parsing : fragStats.tparsed - fragStats.tload,
+      buffer  : fragStats.tbuffered - fragStats.tparsed,
+      duration: fragStats.tbuffered - fragStats.tfirst,
+      bw      : Math.round(8*fragStats.total/(fragStats.tbuffered - fragStats.trequest)),
+      size    : fragStats.total
     };
     events.load.push(event);
     events.bitrate.push({
@@ -411,10 +413,10 @@ function loadSelectedStream() {
     refreshCanvas();
     updateLevelInfo();
 
-    let latency = data.stats.tfirst - data.stats.trequest,
-      parsing = data.stats.tparsed - data.stats.tload,
-      process = data.stats.tbuffered - data.stats.trequest,
-      bitrate = Math.round(8 * data.stats.length / (data.stats.tbuffered - data.stats.tfirst));
+    let latency = fragStats.tfirst - fragStats.trequest,
+      parsing = fragStats.tparsed - fragStats.tload,
+      process = fragStats.tbuffered - fragStats.trequest,
+      bitrate = Math.round(8 * fragStats.length / (fragStats.tbuffered - fragStats.tfirst));
     if (stats.fragBuffered) {
       stats.fragMinLatency = Math.min(stats.fragMinLatency, latency);
       stats.fragMaxLatency = Math.max(stats.fragMaxLatency, latency);
@@ -447,7 +449,7 @@ function loadSelectedStream() {
     stats.fragLastKbps = bitrate;
     this.sumKbps += bitrate;
     stats.fragAvgKbps = Math.round(this.sumKbps / stats.fragBuffered);
-    stats.fragBufferedBytes += data.stats.total;
+    stats.fragBufferedBytes += fragStats.total;
     stats.fragparsingKbps = Math.round(8*stats.fragBufferedBytes / this.sumParsing);
     stats.fragparsingMs = Math.round(this.sumParsing);
     stats.autoLevelCappingLast = hls.autoLevelCapping;
