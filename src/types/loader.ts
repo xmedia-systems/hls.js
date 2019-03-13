@@ -46,6 +46,8 @@ export interface LoaderStats {
   // performance.now() on parse completion
   tparsed: number
   // number of loaded bytes
+  tbuffered: number
+  // performance.now() on fragment buffered
   loaded: number
   // total number of bytes
   total: number,

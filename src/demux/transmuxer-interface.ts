@@ -116,6 +116,7 @@ export default class TransmuxerInterface {
 
     // Frags with sn of 'initSegment' are not transmuxed
     const { transmuxer, worker } = this;
+    this.frag = frag;
     if (worker) {
       // post fragment payload as transferable objects for ArrayBuffer (no copy)
       worker.postMessage({
@@ -166,16 +167,17 @@ export default class TransmuxerInterface {
     }
   }
 
-  flush (duration: number, transmuxIdentifier: TransmuxIdentifier) {
+  // TODO: handle non-worker flush return
+  flush (transmuxIdentifier: TransmuxIdentifier) {
     const { transmuxer, worker } = this;
     if (worker) {
       worker.postMessage({
         cmd: 'flush',
-        duration,
-        contiguous: true,
-        accurateTimeOffset: true,
         transmuxIdentifier
       });
+    } else if (transmuxer) {
+      this.onTransmuxComplete(transmuxer.flush(transmuxIdentifier));
+      this.onFlush();
     }
   }
 

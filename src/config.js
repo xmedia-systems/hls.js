@@ -39,7 +39,7 @@ export const hlsDefaultConfig = {
   nudgeOffset: 0.1, // used by stream-controller
   nudgeMaxRetry: 3, // used by stream-controller
   maxFragLookUpTolerance: 0.25, // used by stream-controller
-  liveSyncDurationCount: 3, // used by stream-controller
+  liveSyncDurationCount: 0, // used by stream-controller
   liveMaxLatencyDurationCount: Infinity, // used by stream-controller
   liveSyncDuration: void 0, // used by stream-controller
   liveMaxLatencyDuration: void 0, // used by stream-controller
