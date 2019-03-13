@@ -46,6 +46,7 @@ class AudioStreamController extends BaseStreamController {
     this.videoTrackCC = null;
     this.fragmentLoader = new FragmentLoader(hls.config);
     this.levels = [];
+    this.logPrefix = 'audio-stream-controller';
   }
 
   // INIT_PTS_FOUND is triggered when the video track parsed in the stream-controller has a new PTS value

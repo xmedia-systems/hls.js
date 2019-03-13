@@ -77,6 +77,7 @@ class StreamController extends BaseStreamController {
     this.state = State.STOPPED;
     this.stallReported = false;
     this.gapController = null;
+    this.logPrefix = 'stream-controller';
   }
 
   startLoad (startPosition): void {
