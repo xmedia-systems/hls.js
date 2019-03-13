@@ -46,6 +46,8 @@ class BufferController extends EventHandler {
   // signals that mediaSource should have endOfStream called
   private _needsEos: boolean = false;
 
+  private hls: any;
+
   // this is optional because this property is removed from the class sometimes
   public audioTimestampOffset?: number;
 
@@ -88,6 +90,7 @@ class BufferController extends EventHandler {
       Events.BUFFER_FLUSHING,
       Events.LEVEL_PTS_UPDATED,
       Events.LEVEL_UPDATED);
+    this.hls = hls;
   }
 
   destroy () {

@@ -4,12 +4,15 @@
 import * as ADTS from './adts';
 import { logger } from '../utils/logger';
 import ID3 from '../demux/id3';
+import { Demuxer, DemuxerResult } from '../types/demuxer';
 
-class AACDemuxer {
-  constructor (observer, remuxer, config) {
+class AACDemuxer implements Demuxer {
+  private observer: any;
+  private config: any;
+  private _audioTrack!: any;
+  constructor (observer, config) {
     this.observer = observer;
     this.config = config;
-    this.remuxer = remuxer;
   }
 
   resetInitSegment (initSegment, audioCodec, videoCodec, duration) {
@@ -42,7 +45,7 @@ class AACDemuxer {
   }
 
   // feed incoming data to the front of the parsing pipeline
-  append (data, timeOffset, contiguous, accurateTimeOffset) {
+  demux (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
     let track = this._audioTrack;
     let id3Data = ID3.getID3Data(data, 0) || [];
     let timestamp = ID3.getTimeStamp(id3Data);
@@ -76,13 +79,16 @@ class AACDemuxer {
       }
     }
 
-    this.remuxer.remux(track,
-      { samples: [] },
-      { samples: id3Samples, inputTimeScale: 90000 },
-      { samples: [] },
-      timeOffset,
-      contiguous,
-      accurateTimeOffset);
+    return {
+      audioTrack: track,
+      avcTrack: { type: 'avc', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] },
+      id3Track: { type: 'id3', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] },
+      textTrack: { type: 'text', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] }
+    };
+  }
+
+  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number, contiguous: boolean): Promise<DemuxerResult> {
+    return Promise.reject(new Error('The AAC demuxer does not support Sample-AES decryption'));
   }
 
   destroy () {
