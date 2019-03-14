@@ -40,7 +40,7 @@ export default class BaseStreamController extends TaskLoop {
   protected startPosition: number = 0;
   protected loadedmetadata: boolean = false;
   protected fragLoadError: number = 0;
-  protected levels?: Array<any>;
+  protected levels: Array<any> = [];
   protected fragmentLoader!: FragmentLoader;
   protected logPrefix: string = '';
 
@@ -166,7 +166,7 @@ export default class BaseStreamController extends TaskLoop {
         this._handleFragmentLoadComplete(frag, data.stats);
       })
       .catch((e) => {
-        if (e.data.details === ErrorDetails.INTERNAL_ABORTED) {
+        if (e && e.data && e.data.details === ErrorDetails.INTERNAL_ABORTED) {
           return;
         }
         this.hls.trigger(Event.ERROR, e.data);

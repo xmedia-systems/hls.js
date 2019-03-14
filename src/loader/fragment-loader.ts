@@ -64,8 +64,10 @@ export default class FragmentLoader {
       }
       const callbacks: LoaderCallbacks<FragmentLoaderContext> = {
           onSuccess: (response, stats, context, networkDetails) => {
-              this._resetLoader(frag);
+            if (!frag.stats) {
               frag.stats = stats;
+            }
+            this._resetLoader(frag);
               resolve({
                   payload: response.data as ArrayBuffer,
                   stats,
@@ -85,6 +87,9 @@ export default class FragmentLoader {
           },
           onAbort: (stats, context, networkDetails) => {
               this._resetLoader(frag);
+              if (!frag.stats) {
+                frag.stats = stats;
+              }
               reject(new LoadError({
                   type: ErrorTypes.NETWORK_ERROR,
                   details: ErrorDetails.INTERNAL_ABORTED,
@@ -105,6 +110,9 @@ export default class FragmentLoader {
           },
           onProgress: (stats, context, data, networkDetails) => {
             if (onProgress) {
+              if (!frag.stats) {
+                frag.stats = stats;
+              }
               onProgress(stats, context, data as ArrayBuffer, networkDetails);
             }
           }

@@ -15,12 +15,30 @@ import { ElementaryStreamTypes } from '../loader/fragment';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
 import { findFragmentByPTS } from './fragment-finders';
+import Fragment from '../loader/fragment';
+import { LoaderStats } from '../types/loader';
 
 const { performance } = window;
 
 const TICK_INTERVAL = 100; // how often to tick in ms
 
 class AudioStreamController extends BaseStreamController {
+  private startFragRequested: boolean = false;
+  private retryDate: number = 0;
+  private onvseeking: Function | null = null;
+  private onvseeked: Function | null = null;
+  private onvended: Function | null = null;
+  private stats: LoaderStats | null = null;
+  private videoBuffer: any | null = null;
+  private initPTS: any = [];
+  private waitingFragment: Fragment | null = null;
+  private videoTrackCC: number = -1;
+  private audioSwitch: boolean = false;
+  private trackId: number = -1;
+  private appended: boolean = false;
+  private pendingBuffering: boolean = false;
+  private pendingData: Array<any> = [];
+
   constructor (hls, fragmentTracker) {
     super(hls,
       Event.MEDIA_ATTACHED,
@@ -37,15 +55,9 @@ class AudioStreamController extends BaseStreamController {
       Event.FRAG_BUFFERED
     );
 
-    this.fragmentTracker = fragmentTracker;
     this.config = hls.config;
-    this.audioCodecSwap = false;
-    this._state = State.STOPPED;
-    this.initPTS = [];
-    this.waitingFragment = null;
-    this.videoTrackCC = null;
+    this.fragmentTracker = fragmentTracker;
     this.fragmentLoader = new FragmentLoader(hls.config);
-    this.levels = [];
     this.logPrefix = '[audio-stream-controller]: ';
   }
 
@@ -64,7 +76,7 @@ class AudioStreamController extends BaseStreamController {
   }
 
   startLoad (startPosition) {
-    if (this.levels) {
+    if (this.levels.length) {
       let lastCurrentTime = this.lastCurrentTime;
       this.stopLoad();
       this.setInterval(TICK_INTERVAL);
@@ -183,11 +195,11 @@ class AudioStreamController extends BaseStreamController {
         } else if (bufferEnd <= start) {
           // If bufferEnd is before the start of the playlist, load the first fragment
           frag = fragments[0];
-          if (this.videoTrackCC !== null && frag.cc !== this.videoTrackCC) {
+          if (this.videoTrackCC > 0 && frag.cc !== this.videoTrackCC) {
             // Ensure we find a fragment which matches the continuity of the video track
             frag = findFragWithCC(fragments, this.videoTrackCC);
           }
-          if (trackDetails.live && frag.loadIdx && frag.loadIdx === this.fragLoadIdx) {
+          if (trackDetails.live) {
             // we just loaded this first fragment, and we are still lagging behind the start of the live playlist
             // let's force seek to start
             const nextBuffered = bufferInfo.nextStart ? bufferInfo.nextStart : start;
@@ -252,14 +264,14 @@ class AudioStreamController extends BaseStreamController {
         }
       }
       break;
-    case State.WAITING_TRACK:
-      track = this.levels[this.trackId];
-      // check if playlist is already loaded
-      if (track && track.details) {
+    case State.WAITING_TRACK: {
+      const {levels, trackId} = this;
+      if (levels && levels[trackId] && levels[trackId].details) {
+        // check if playlist is already loaded
         this.state = State.WAITING_INIT_PTS;
       }
-
       break;
+    }
     case State.FRAG_LOADING_WAITING_RETRY:
       var now = performance.now();
       var retryDate = this.retryDate;
@@ -295,7 +307,7 @@ class AudioStreamController extends BaseStreamController {
     media.addEventListener('seeking', this.onvseeking);
     media.addEventListener('ended', this.onvended);
     let config = this.config;
-    if (this.levels && config.autoStartLoad) {
+    if (this.levels.length && config.autoStartLoad) {
       this.startLoad(config.startPosition);
     }
   }
@@ -352,11 +364,11 @@ class AudioStreamController extends BaseStreamController {
   }
 
   onAudioTrackLoaded (data) {
-    let newDetails = data.details,
-      trackId = data.id,
-      track = this.levels[trackId],
-      duration = newDetails.totalduration,
-      sliding = 0;
+    let newDetails = data.details;
+    let trackId = data.id;
+    let track = this.levels[trackId];
+    let duration = newDetails.totalduration;
+    let sliding = 0;
 
     logger.log(`track ${trackId} loaded [${newDetails.startSN},${newDetails.endSN}],duration:${duration}`);
 
@@ -366,8 +378,7 @@ class AudioStreamController extends BaseStreamController {
         // we already have details for that level, merge them
         LevelHelper.mergeDetails(curDetails, newDetails);
         sliding = newDetails.fragments[0].start;
-        // TODO
-        // this.liveSyncPosition = this.computeLivePosition(sliding, curDetails);
+        // TODO : this.liveSyncPosition = this.computeLivePosition(sliding, curDetails);
         if (newDetails.PTSKnown) {
           logger.log(`live audio playlist sliding:${sliding.toFixed(3)}`);
         } else {
@@ -420,7 +431,6 @@ class AudioStreamController extends BaseStreamController {
     const track = levels[trackId];
     const details = track.details;
     const audioCodec = config.defaultAudioCodec || track.audioCodec || 'mp4a.40.2';
-    this.stats = stats;
     // transmux the MPEG-TS data to ISO-BMFF segments
     this.appended = false;
     if (!transmuxer) {
@@ -622,7 +632,7 @@ class AudioStreamController extends BaseStreamController {
     if (!frag || !fragCurrent || frag.sn !== fragCurrent.sn) {
       return;
     }
-    frag.stats.tparsed = this.stats.tparsed = window.performance.now();
+    frag.stats.tparsed = window.performance.now();
     this.state = State.IDLE;
     this.hls.trigger(Event.FRAG_PARSED, frag);
   }

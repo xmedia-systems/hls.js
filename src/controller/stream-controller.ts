@@ -73,13 +73,11 @@ class StreamController extends BaseStreamController {
     this.fragmentTracker = fragmentTracker;
     this.gapController = null;
     this.stallReported = false;
-    this.stallReported = false;
-    this.state = State.STOPPED;
     this.logPrefix = '[stream-controller]: ';
   }
 
   startLoad (startPosition): void {
-    if (this.levels) {
+    if (this.levels.length) {
       const { lastCurrentTime, hls } = this;
       this.stopLoad();
       this.setInterval(TICK_INTERVAL);
@@ -678,7 +676,7 @@ class StreamController extends BaseStreamController {
     media.addEventListener('seeked', this.onvseeked);
     media.addEventListener('ended', this.onvended);
     let config = this.config;
-    if (this.levels && config.autoStartLoad) {
+    if (this.levels.length && config.autoStartLoad) {
       this.hls.startLoad(config.startPosition);
     }
 
@@ -693,16 +691,14 @@ class StreamController extends BaseStreamController {
     }
 
     // reset fragment backtracked flag
-    let levels = this.levels;
-    if (levels) {
-      levels.forEach(level => {
-        if (level.details) {
-          level.details.fragments.forEach(fragment => {
-            fragment.backtracked = undefined;
-          });
-        }
-      });
-    }
+    this.levels.forEach(level => {
+      if (level.details) {
+        level.details.fragments.forEach(fragment => {
+          fragment.backtracked = undefined;
+        });
+      }
+    });
+
     // remove video listeners
     if (media) {
       media.removeEventListener('seeking', this.onvseeking);
@@ -784,6 +780,9 @@ class StreamController extends BaseStreamController {
     if (newDetails.live) {
       let curDetails = curLevel.details;
       if (curDetails && newDetails.fragments.length > 0) {
+        if (this.fragCurrent && this.fragCurrent.sn !== 'initSegment') {
+          console.log(`>>> fragCurrent in oldDetails`, curDetails.fragments.some(f => f === this.fragCurrent));
+        }
         // we already have details for that level, merge them
         LevelHelper.mergeDetails(curDetails, newDetails);
         sliding = newDetails.fragments[0].start;
@@ -804,6 +803,10 @@ class StreamController extends BaseStreamController {
     }
     // override level info
     curLevel.details = newDetails;
+    console.log('>>> assigned new details')
+    if (this.fragCurrent && this.fragCurrent.sn !== 'initSegment') {
+      console.log(`>>> fragCurrent in newDetails`, newDetails.fragments.some(f => f === this.fragCurrent));
+    }
     this.levelLastLoaded = newLevelId;
     this.hls.trigger(Event.LEVEL_UPDATED, { details: newDetails, level: newLevelId });
 
@@ -1189,10 +1192,11 @@ class StreamController extends BaseStreamController {
       return;
     }
     // TODO: Figure out why fragCurrent reference sometimes isn't equal to frag, even when objects look equal
-    const frag = LevelHelper.getFragmentWithSN(levels[level], sn);
+    let frag = LevelHelper.getFragmentWithSN(levels[level], sn);
     if (!frag || !fragCurrent || frag.sn !== fragCurrent.sn) {
       return;
     }
+    // frag = fragCurrent;
 
     const { audio, video, text, id3, initSegment } = remuxResult;
     if (_hasDroppedFrames(frag, video ? video.dropped : 0, levels[level].details.startSN)) {
@@ -1236,17 +1240,9 @@ class StreamController extends BaseStreamController {
     if (!frag || !fragCurrent || frag.sn !== fragCurrent.sn) {
       return;
     }
-    this._endParsing();
+    frag.stats.tparsed = window.performance.now();
     this.hls.trigger(Event.FRAG_PARSED, frag);
     this.state = State.IDLE;
-  }
-
-  _endParsing () {
-    if (this.stats) {
-      this.stats.tparsed = window.performance.now();
-    } else {
-      logger.warn(`Stats object was unset after fragment finished parsing. tparsed will not be recorded for the current fragment`);
-    }
   }
 
   _bufferInitSegment (frag, tracks) {

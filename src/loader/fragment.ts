@@ -2,6 +2,7 @@
 import { buildAbsoluteURL } from 'url-toolkit';
 import { logger } from '../utils/logger';
 import LevelKey from './level-key';
+import { LoaderStats } from '../types/loader';
 
 export enum ElementaryStreamTypes {
   AUDIO = 'audio',
@@ -61,6 +62,8 @@ export default class Fragment {
   public start: number = 0;
   // Set when the fragment was loaded and transmuxed, but was stopped from buffering due to dropped frames.
   public backtracked: boolean = false;
+
+  public stats: LoaderStats | null = null;
 
   // setByteRange converts a EXT-X-BYTERANGE attribute into a two element array
   setByteRange (value: string, previousFrag?: Fragment) {

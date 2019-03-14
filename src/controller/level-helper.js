@@ -115,18 +115,15 @@ export function mergeDetails (oldDetails, newDetails) {
   // loop through overlapping SN and update startPTS , cc, and duration if any found
   let ccOffset = 0;
   let PTSFrag;
-  mapFragmentIntersection(oldDetails, newDetails, (oldFrag, newFrag) => {
+  mapFragmentIntersection(oldDetails, newDetails, (newIndex, oldIndex) => {
+    const newFrag = newDetails.fragments[newIndex];
+    const oldFrag = oldDetails.fragments[oldIndex];
     ccOffset = oldFrag.cc - newFrag.cc;
-    if (Number.isFinite(oldFrag.startPTS)) {
-      newFrag.start = newFrag.startPTS = oldFrag.startPTS;
-      newFrag.endPTS = oldFrag.endPTS;
-      newFrag.duration = oldFrag.duration;
-      newFrag.backtracked = oldFrag.backtracked;
-      newFrag.dropped = oldFrag.dropped;
-      PTSFrag = newFrag;
+    newDetails.fragments[newIndex] = oldFrag;
+    if (oldFrag.startPTS) {
+      PTSFrag = oldFrag;
+      newDetails.PTSKnown = true;
     }
-    // PTS is known when there are overlapping segments
-    newDetails.PTSKnown = true;
   });
 
   if (!newDetails.PTSKnown) {
@@ -175,6 +172,7 @@ export function mergeSubtitlePlaylists (oldPlaylist, newPlaylist, referenceStart
   }
 }
 
+// TODO: update unit tests & fix subtitles now that the index is being passed through
 export function mapFragmentIntersection (oldPlaylist, newPlaylist, intersectionFn) {
   if (!oldPlaylist || !newPlaylist) {
     return;
@@ -190,7 +188,7 @@ export function mapFragmentIntersection (oldPlaylist, newPlaylist, intersectionF
     if (!oldFrag || !newFrag) {
       break;
     }
-    intersectionFn(oldFrag, newFrag, i);
+    intersectionFn(i, delta + i);
   }
 }
 
