@@ -17,6 +17,7 @@ import SampleAesDecrypter from './sample-aes';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { DemuxedAvcTrack, DemuxedAudioTrack, DemuxedTrack, Demuxer, DemuxerResult } from '../types/demuxer';
+import { prependUint8Array } from '../utils/mp4-tools';
 
 // We are using fixed track IDs for driving the MP4 remuxer
 // instead of following the TS PIDs.
@@ -55,6 +56,7 @@ class TSDemuxer implements Demuxer {
   private _txtTrack!: DemuxedTrack;
   private aacOverFlow: any;
   private avcSample: any;
+  private remainderData?: Uint8Array = new Uint8Array(0);
 
   constructor (observer, config, typeSupported) {
     this.observer = observer;
@@ -81,7 +83,7 @@ class TSDemuxer implements Demuxer {
     let i = 0;
     while (i < scanwindow) {
       // a TS fragment should contain at least 3 TS packets, a PAT, a PMT, and one PID, each starting with 0x47
-      if (data[i] === 0x47 && data[i + 188] === 0x47 && data[i + 2 * 188] === 0x47) {
+      if (data[i] === 0x47) {
         return i;
       } else {
         i++;
@@ -149,6 +151,7 @@ class TSDemuxer implements Demuxer {
 
   // feed incoming data to the front of the parsing pipeline
   demux (data, contiguous, timeOffset, isSampleAes = false): DemuxerResult {
+    console.log('>>> demux')
     if (!isSampleAes) {
       this.sampleAes = null;
     }
@@ -170,7 +173,6 @@ class TSDemuxer implements Demuxer {
     const parseAACPES = this._parseAACPES.bind(this);
     const parseMPEGPES = this._parseMPEGPES.bind(this);
     const parseID3PES = this._parseID3PES.bind(this);
-    const syncOffset = TSDemuxer._syncOffset(data);
 
     let avcId = avcTrack.pid;
     let avcData = avcTrack.pesData;
@@ -183,8 +185,17 @@ class TSDemuxer implements Demuxer {
     let pmtParsed = this.pmtParsed;
     let pmtId = this._pmtId;
 
-    // don't parse last TS packet if incomplete
+    if (this.remainderData) {
+      data = prependUint8Array(data, this.remainderData);
+      len = data.length;
+    }
+
+    const syncOffset = TSDemuxer._syncOffset(data);
+    if (syncOffset < 0) {
+      console.warn('>>> syncOffset < 0', syncOffset);
+    }
     len -= (len + syncOffset) % 188;
+    this.remainderData = data.slice(len);
 
     // loop through TS packets
     for (start = syncOffset; start < len; start += 188) {
@@ -300,20 +311,48 @@ class TSDemuxer implements Demuxer {
         this.observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47' });
       }
     }
+
+    avcTrack.pesData = avcData;
+    audioTrack.pesData = audioData;
+    id3Track.pesData = id3Data;
+
+    return {
+      audioTrack,
+      avcTrack,
+      id3Track,
+      textTrack: this._txtTrack
+    };
+  }
+
+  // TODO: re-check TS syncOffset before demuxing
+  flush () {
+    console.log('>>> flush');
+    const result = this.demux(this.remainderData, this.contiguous, -1);
+    this.squeezeRemainingSamples(result);
+    this.remainderData = undefined;
+    return result;
+  }
+
+  private squeezeRemainingSamples (demuxResult: DemuxerResult) {
+    const { audioTrack, avcTrack, id3Track } = demuxResult;
+    let avcData = avcTrack.pesData;
+    let audioData = audioTrack.pesData;
+    let id3Data = id3Track.pesData;
     // try to parse last PES packets
-    if (avcData && (pes = parsePES(avcData)) && pes.pts !== undefined) {
-      parseAVCPES(pes, true);
+    let pes;
+    if (avcData && (pes = this._parsePES(avcData)) && pes.pts !== undefined) {
+      this._parseAVCPES(pes, true);
       avcTrack.pesData = null;
     } else {
       // either avcData null or PES truncated, keep it for next frag parsing
       avcTrack.pesData = avcData;
     }
 
-    if (audioData && (pes = parsePES(audioData)) && pes.pts !== undefined) {
+    if (audioData && (pes = this._parsePES(audioData)) && pes.pts !== undefined) {
       if (audioTrack.isAAC) {
-        parseAACPES(pes);
+        this._parseAACPES(pes);
       } else {
-        parseMPEGPES(pes);
+        this._parseMPEGPES(pes);
       }
 
       audioTrack.pesData = null;
@@ -326,20 +365,13 @@ class TSDemuxer implements Demuxer {
       audioTrack.pesData = audioData;
     }
 
-    if (id3Data && (pes = parsePES(id3Data)) && pes.pts !== undefined) {
-      parseID3PES(pes);
+    if (id3Data && (pes = this._parsePES(id3Data)) && pes.pts !== undefined) {
+      this._parseID3PES(pes);
       id3Track.pesData = null;
     } else {
       // either id3Data null or PES truncated, keep it for next frag parsing
       id3Track.pesData = id3Data;
     }
-
-    return {
-      audioTrack,
-      avcTrack,
-      id3Track,
-      textTrack: this._txtTrack
-    };
   }
 
   demuxSampleAes (data, decryptData, timeOffset, contiguous): Promise <DemuxerResult> {
@@ -570,7 +602,7 @@ class TSDemuxer implements Demuxer {
       //    if keyframe already found in this fragment OR
       //       keyframe found in last fragment (track.sps) AND
       //          samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
-      if (!this.config.forceKeyFrameOnDiscontinuity ||
+      if (true ||
           avcSample.key === true ||
           (avcTrack.sps && (nbSamples || this.contiguous))) {
         avcSample.id = nbSamples;
@@ -589,7 +621,7 @@ class TSDemuxer implements Demuxer {
     // logger.log('parse new PES');
     let track = this._avcTrack,
       units = this._parseAVCNALu(pes.data) as Array<any>,
-      debug = false,
+      debug = true,
       expGolombDecoder,
       avcSample = this.avcSample,
       push,
@@ -827,7 +859,7 @@ class TSDemuxer implements Demuxer {
       let track = this._avcTrack, samples = track.samples;
       avcSample = samples[samples.length - 1];
     }
-    if (avcSample) {
+    if (avcSample && avcSample.units) {
       let units = avcSample.units;
       lastUnit = units[units.length - 1];
     }

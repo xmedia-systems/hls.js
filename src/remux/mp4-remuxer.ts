@@ -129,7 +129,7 @@ class MP4Remuxer implements Remuxer {
     const videoSamples = videoTrack.samples;
     const typeSupported = this.typeSupported;
     const tracks = {} as TrackSet;
-    const computePTSDTS = (this._initPTS === undefined);
+    const computePTSDTS = (!Number.isFinite(this._initPTS));
     let container = 'audio/mp4';
     let initPTS;
     let initDTS;

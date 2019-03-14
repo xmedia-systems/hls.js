@@ -1222,8 +1222,8 @@ class StreamController extends BaseStreamController {
 
     const { audio, video, text, id3, initSegment } = remuxResult;
     if (_hasDroppedFrames(frag, video ? video.dropped : 0, levels[level].details.startSN)) {
-      this._backtrack(frag, video.startPTS);
-      return;
+      // this._backtrack(frag, video.startPTS);
+      // return;
     }
 
     this.state = State.PARSING;
