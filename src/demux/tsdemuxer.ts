@@ -83,7 +83,7 @@ class TSDemuxer implements Demuxer {
     let i = 0;
     while (i < scanwindow) {
       // a TS fragment should contain at least 3 TS packets, a PAT, a PMT, and one PID, each starting with 0x47
-      if (data[i] === 0x47) {
+      if (data[i] === 0x47 && data[i + 188] === 0x47 && data[i + 2 * 188] === 0x47) {
         return i;
       } else {
         i++;
@@ -621,7 +621,7 @@ class TSDemuxer implements Demuxer {
     // logger.log('parse new PES');
     let track = this._avcTrack,
       units = this._parseAVCNALu(pes.data) as Array<any>,
-      debug = true,
+      debug = false,
       expGolombDecoder,
       avcSample = this.avcSample,
       push,

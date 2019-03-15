@@ -100,11 +100,11 @@ class Transmuxer {
   }
 
   flush (transmuxIdentifier: TransmuxIdentifier) {
-      const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush();
+      const demuxResult = this.demuxer!.flush();
       // Force flushed data to remux contiguously with the end of the last remuxed chunk
       // TODO: ensure that remuxers use last DTS as the timeOffset when passed null
       return {
-          remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, null, true, true),
+          remuxResult: this.remuxer!.remux(demuxResult, null, true, true),
           transmuxIdentifier
       }
   }
@@ -121,9 +121,9 @@ class Transmuxer {
   }
 
   private transmux (data: Uint8Array, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier): TransmuxerResult {
-    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.demux(data, timeOffset, contiguous, false);
+    const demuxResult = this.demuxer!.demux(data, timeOffset, contiguous, false);
     return {
-        remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset),
+        remuxResult: this.remuxer!.remux(demuxResult, timeOffset, contiguous, accurateTimeOffset),
         transmuxIdentifier
     }
   }
@@ -146,7 +146,7 @@ class Transmuxer {
   private transmuxSampleAes (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier) : Promise<TransmuxerResult> {
     return this.demuxer!.demuxSampleAes(data, decryptData, timeOffset, contiguous)
       .then(demuxResult => ({
-              remuxResult: this.remuxer!.remux(demuxResult.audioTrack, demuxResult.avcTrack, demuxResult.id3Track, demuxResult.textTrack, timeOffset, contiguous, accurateTimeOffset),
+              remuxResult: this.remuxer!.remux(demuxResult, timeOffset, contiguous, accurateTimeOffset),
               transmuxIdentifier
           })
       );

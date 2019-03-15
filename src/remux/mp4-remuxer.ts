@@ -45,13 +45,14 @@ class MP4Remuxer implements Remuxer {
     this.ISGenerated = false;
   }
 
-  remux (audioTrack: DemuxedAudioTrack, videoTrack: DemuxedAvcTrack, id3Track: DemuxedTrack, textTrack: DemuxedTrack, timeOffset, contiguous, accurateTimeOffset) : RemuxerResult {
+  remux (demuxResult, timeOffset, contiguous, accurateTimeOffset) {
     // generate Init Segment if needed
     let video;
     let audio;
     let initSegment;
     let text;
     let id3;
+    const { audioTrack, avcTrack: videoTrack, id3Track, textTrack } = demuxResult;
     if (!this.ISGenerated) {
       initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
     }
@@ -59,6 +60,7 @@ class MP4Remuxer implements Remuxer {
     if (this.ISGenerated) {
       const nbAudioSamples = audioTrack.samples.length;
       const nbVideoSamples = videoTrack.samples.length;
+
       let audioTimeOffset = timeOffset;
       let videoTimeOffset = timeOffset;
       if (nbAudioSamples && nbVideoSamples) {
