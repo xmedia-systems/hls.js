@@ -8,7 +8,7 @@ import Event from '../events';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { logger } from '../utils/logger';
 import { InitSegmentData, Remuxer, RemuxerResult, RemuxedMetadata, RemuxedTrack } from '../types/remuxer';
-import { DemuxedAudioTrack, DemuxedAvcTrack, DemuxedTrack } from '../types/demuxer';
+import { DemuxedAudioTrack, DemuxedAvcTrack, DemuxedTrack, DemuxerResult } from '../types/demuxer';
 import { TrackSet } from '../types/track';
 
 // 10 seconds
@@ -45,7 +45,7 @@ class MP4Remuxer implements Remuxer {
     this.ISGenerated = false;
   }
 
-  remux (demuxResult, timeOffset, contiguous, accurateTimeOffset) {
+  remux (demuxResult: DemuxerResult, timeOffset, contiguous, accurateTimeOffset) {
     // generate Init Segment if needed
     let video;
     let audio;

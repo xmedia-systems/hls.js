@@ -8,10 +8,10 @@ export interface Demuxer {
 }
 
 export interface DemuxerResult {
-  audioTrack?: DemuxedAudioTrack
-  avcTrack?: DemuxedAvcTrack
-  id3Track?: DemuxedTrack
-  textTrack?: DemuxedTrack
+  audioTrack: DemuxedAudioTrack
+  avcTrack: DemuxedAvcTrack
+  id3Track: DemuxedTrack
+  textTrack: DemuxedTrack
 }
 
 export interface DemuxedTrack {
