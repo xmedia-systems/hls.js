@@ -602,13 +602,14 @@ class TSDemuxer implements Demuxer {
       //    if keyframe already found in this fragment OR
       //       keyframe found in last fragment (track.sps) AND
       //          samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
-      if (true ||
+      if (this.config.forceKeyFrameOnDiscontinuity ||
           avcSample.key === true ||
           (avcTrack.sps && (nbSamples || this.contiguous))) {
         avcSample.id = nbSamples;
         samples.push(avcSample);
       } else {
         // dropped samples, track it
+        debugger
         avcTrack.dropped++;
       }
     }
@@ -621,7 +622,7 @@ class TSDemuxer implements Demuxer {
     // logger.log('parse new PES');
     let track = this._avcTrack,
       units = this._parseAVCNALu(pes.data) as Array<any>,
-      debug = false,
+      debug = true,
       expGolombDecoder,
       avcSample = this.avcSample,
       push,

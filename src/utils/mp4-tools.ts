@@ -374,3 +374,7 @@ export function prependUint8Array (data: Uint8Array, remainderData: Uint8Array) 
     temp.set(data, remainderData.length);
     return temp;
 }
+
+export function appendUint8Array (data: Uint8Array, remainderData: Uint8Array) : Uint8Array {
+  return prependUint8Array(remainderData, data);
+}
