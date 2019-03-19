@@ -63,6 +63,7 @@ class MP4Remuxer implements Remuxer {
 
       let audioTimeOffset = timeOffset;
       let videoTimeOffset = timeOffset;
+      // TODO: Should not be calculated during progressive remuxing
       if (nbAudioSamples && nbVideoSamples) {
         // timeOffset is expected to be the offset of the first timestamp of this fragment (first DTS)
         // if first audio DTS is not aligned with first video DTS then we need to take that into account
@@ -76,7 +77,7 @@ class MP4Remuxer implements Remuxer {
       // calculated in remuxAudio.
       // logger.log('nb AAC samples:' + audioTrack.samples.length);
       if (nbAudioSamples) {
-        // if initSegment was generated without video samples, regenerate it again
+        // if initSegment was generated without audio samples, regenerate it again
         if (!audioTrack.samplerate) {
           logger.warn('regenerate InitSegment as audio detected');
           initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
@@ -227,6 +228,7 @@ class MP4Remuxer implements Remuxer {
     if (nbSamples === 0) {
       return;
     }
+    console.log('>>> remux video');
 
     // Safari does not like overlapping DTS on consecutive fragments. let's use nextAvcDts to overcome this if fragments are consecutive
     if (isSafari) {
@@ -402,7 +404,7 @@ class MP4Remuxer implements Remuxer {
       outputSamples.push({
         size: mp4SampleLength,
         // constant duration
-        duration: mp4SampleDuration,
+        duration: 1500,
         cts: compositionTimeOffset,
         flags: {
           isLeading: 0,

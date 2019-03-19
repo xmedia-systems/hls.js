@@ -598,20 +598,21 @@ class TSDemuxer implements Demuxer {
     if (avcSample.units.length && avcSample.frame) {
       const samples = avcTrack.samples;
       const nbSamples = samples.length;
+      avcSample.id = nbSamples;
+      samples.push(avcSample);
       // only push AVC sample if starting with a keyframe is not mandatory OR
       //    if keyframe already found in this fragment OR
       //       keyframe found in last fragment (track.sps) AND
-      //          samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
-      if (this.config.forceKeyFrameOnDiscontinuity ||
-          avcSample.key === true ||
-          (avcTrack.sps && (nbSamples || this.contiguous))) {
-        avcSample.id = nbSamples;
-        samples.push(avcSample);
-      } else {
-        // dropped samples, track it
-        debugger
-        avcTrack.dropped++;
-      }
+      // //          samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
+      // if (this.config.forceKeyFrameOnDiscontinuity ||
+      //     avcSample.key === true ||
+      //     (avcTrack.sps && (nbSamples || this.contiguous))) {
+      //   avcSample.id = nbSamples;
+      //   samples.push(avcSample);
+      // } else {
+      //   // dropped samples, track it
+      //   avcTrack.dropped++;
+      // }
     }
     if (avcSample.debug.length) {
       logger.log(avcSample.pts + '/' + avcSample.dts + ':' + avcSample.debug);

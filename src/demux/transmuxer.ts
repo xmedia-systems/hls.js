@@ -41,6 +41,7 @@ class Transmuxer {
   private remuxer?: Remuxer;
   private decrypter: any;
   private probe!: Function;
+  private inTransmuxSession: boolean = false;
 
   constructor (observer, typeSupported, config, vendor) {
     this.observer = observer;
@@ -87,6 +88,11 @@ class Transmuxer {
       remuxer.resetTimeStamp(defaultInitPTS);
     }
 
+    if (this.inTransmuxSession) {
+      contiguous = true;
+    }
+    this.inTransmuxSession = true;
+
     let result;
     const encryptionType = getEncryptionType(uintData, decryptdata);
     if (encryptionType === 'AES-128') {
@@ -100,6 +106,7 @@ class Transmuxer {
   }
 
   flush (transmuxIdentifier: TransmuxIdentifier) {
+    this.inTransmuxSession = false;
       const demuxResult = this.demuxer!.flush();
       // Force flushed data to remux contiguously with the end of the last remuxed chunk
       // TODO: ensure that remuxers use last DTS as the timeOffset when passed null

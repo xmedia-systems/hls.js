@@ -75,7 +75,7 @@ export const hlsDefaultConfig = {
   bufferController: BufferController,
   capLevelController: CapLevelController,
   fpsController: FPSController,
-  stretchShortVideoTrack: false, // used by mp4-remuxer
+  stretchShortVideoTrack: true, // used by mp4-remuxer
   maxAudioFramesDrift: 1, // used by mp4-remuxer
   forceKeyFrameOnDiscontinuity: true, // used by ts-demuxer
   abrEwmaFastLive: 3, // used by abr-controller
