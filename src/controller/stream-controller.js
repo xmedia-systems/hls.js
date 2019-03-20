@@ -1168,9 +1168,6 @@ class StreamController extends BaseStreamController {
         stats.tparsed = stats.tbuffered = window.performance.now();
         hls.trigger(Event.FRAG_BUFFERED, { stats: stats, frag, id: 'main' });
         this.tick();
-      })
-      .catch((e) => {
-        this.hls.trigger(Event.ERROR, e.data);
       });
   }
 
@@ -1190,7 +1187,7 @@ class StreamController extends BaseStreamController {
     if (!frag || frag.sn !== this.fragCurrent.sn) {
       return;
     }
-    frag = this.fragCurrent;
+    frag = fragCurrent;
 
     const { audio, video, text, id3, initSegment } = remuxResult;
     if (_hasDroppedFrames(frag, video ? video.dropped : 0, levels[level].details.startSN)) {

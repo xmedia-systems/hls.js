@@ -16,7 +16,6 @@ import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
 import { findFragmentByPTS } from './fragment-finders';
 import { prependUint8Array } from '../utils/mp4-tools';
-const appendUint8Array = (data, remainder) => prependUint8Array(remainder, data);
 
 const { performance } = window;
 
@@ -424,7 +423,7 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  _handleFragmentLoadProgress (frag, payload, stats) {
+  _handleFragmentLoad (frag, payload, stats) {
     const { config, trackId, levels } = this;
     let { transmuxer } = this;
     const { cc, sn } = frag;
@@ -450,6 +449,7 @@ class AudioStreamController extends BaseStreamController {
     let accurateTimeOffset = false; // details.PTSKnown || !details.live;
     const transmuxIdentifier = { level: frag.level, sn: frag.sn };
     transmuxer.push(payload, initSegmentData, audioCodec, null, frag, details.totalduration, accurateTimeOffset, initPTS, transmuxIdentifier);
+    transmuxer.flush(transmuxIdentifier);
   }
 
   _handleFragmentLoadComplete (frag, stats) {

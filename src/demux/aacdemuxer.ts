@@ -5,12 +5,14 @@ import * as ADTS from './adts';
 import { logger } from '../utils/logger';
 import ID3 from '../demux/id3';
 import { Demuxer, DemuxerResult } from '../types/demuxer';
+import NonProgressiveDemuxer from './non-progressive-demuxer';
 
-class AACDemuxer implements Demuxer {
+class AACDemuxer extends NonProgressiveDemuxer {
   private observer: any;
   private config: any;
   private _audioTrack!: any;
   constructor (observer, config) {
+    super();
     this.observer = observer;
     this.config = config;
   }
@@ -45,7 +47,7 @@ class AACDemuxer implements Demuxer {
   }
 
   // feed incoming data to the front of the parsing pipeline
-  demux (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
+  demuxInternal (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
     let track = this._audioTrack;
     let id3Data = ID3.getID3Data(data, 0) || [];
     let timestamp = ID3.getTimeStamp(id3Data);

@@ -5,12 +5,14 @@ import ID3 from '../demux/id3';
 import { logger } from '../utils/logger';
 import MpegAudio from './mpegaudio';
 import { Demuxer, DemuxerResult } from '../types/demuxer';
+import NonProgressiveDemuxer from './non-progressive-demuxer';
 
-class MP3Demuxer implements Demuxer {
+class MP3Demuxer extends NonProgressiveDemuxer {
   private observer: any;
   private config: any;
   private _audioTrack!: any;
   constructor (observer, config) {
+    super();
     this.observer = observer;
     this.config = config;
   }

@@ -4,10 +4,9 @@
 import { logger } from '../utils/logger';
 import { Demuxer, DemuxerResult, DemuxedTrack } from '../types/demuxer';
 import { findBox, segmentValidRange, prependUint8Array, getDuration } from '../utils/mp4-tools';
+import NonProgressiveDemuxer from './non-progressive-demuxer';
 
-class MP4Demuxer implements Demuxer {
-  private remainderData: Uint8Array | null = new Uint8Array(0);
-
+class MP4Demuxer extends NonProgressiveDemuxer {
   resetTimeStamp () {
   }
 
@@ -19,7 +18,7 @@ class MP4Demuxer implements Demuxer {
     return findBox({ data: data, start: 0, end: Math.min(data.length, 16384) }, ['moof']).length > 0;
   }
 
-  demux (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
+  demuxInternal (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
       const avcTrack = dummyTrack();
       avcTrack.samples = data;
 
@@ -28,15 +27,6 @@ class MP4Demuxer implements Demuxer {
       avcTrack,
       id3Track: dummyTrack(),
       textTrack: dummyTrack()
-    };
-  }
-
-  flush () {
-    return {
-        audioTrack: dummyTrack(),
-        avcTrack: dummyTrack(),
-        id3Track: dummyTrack(),
-        textTrack: dummyTrack()
     };
   }
 
