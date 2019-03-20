@@ -97,7 +97,7 @@ class MP4Remuxer implements Remuxer {
       } else {
         // logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (nbVideoSamples) {
-          let video = this.remuxVideo(videoTrack, videoTimeOffset, contiguous, 0, accurateTimeOffset);
+          video = this.remuxVideo(videoTrack, videoTimeOffset, contiguous, 0, accurateTimeOffset);
           if (video && audioTrack.codec) {
             audio = this.remuxEmptyAudio(audioTrack, audioTimeOffset, contiguous, video);
           }

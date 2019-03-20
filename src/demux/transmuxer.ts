@@ -66,20 +66,42 @@ class Transmuxer {
     accurateTimeOffset: boolean,
     defaultInitPTS: number,
     transmuxIdentifier: TransmuxIdentifier
-  ): TransmuxerResult | Promise<TransmuxerResult> | null {
+  ): TransmuxerResult | Promise<TransmuxerResult> {
     const uintData = new Uint8Array(data);
-    const uintInitSegment = new Uint8Array(initSegment);
-    let { demuxer, remuxer } = this;
-    if (!demuxer ||
-      // in case of continuity change, or track switch
-      // we might switch from content type (AAC container to TS container, or TS to fmp4 for example)
-      // so let's check that current demuxer is still valid
-      ((discontinuity || trackSwitch) && !this.probe(data))) {
-      ({ demuxer, remuxer } = this.configureTransmuxer(uintData));
+    const encryptionType = getEncryptionType(uintData, decryptdata);
+
+    if (encryptionType === 'AES-128') {
+      return this.decryptAes128(uintData, decryptdata)
+        .then(decryptedData => {
+          return this.push(decryptedData,
+            null,
+            initSegment,
+            audioCodec,
+            videoCodec,
+            timeOffset,
+            discontinuity,
+            trackSwitch,
+            contiguous,
+            duration,
+            accurateTimeOffset,
+            defaultInitPTS,
+            transmuxIdentifier);
+        })
     }
+
+    const uintInitSegment = new Uint8Array(initSegment);
+    this.contiguous = contiguous;
+    this.timeOffset = timeOffset;
+    this.accurateTimeOffset = accurateTimeOffset;
+
+    const { demuxer, remuxer } = this.getMuxers(uintData, discontinuity, trackSwitch);
+
     if (!demuxer || !remuxer) {
       this.observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: true, reason: 'no demux matching with content found' });
-      return null;
+      return {
+        remuxResult: {},
+        transmuxIdentifier
+      };
     }
 
     if (discontinuity || trackSwitch) {
@@ -91,15 +113,8 @@ class Transmuxer {
       remuxer.resetTimeStamp(defaultInitPTS);
     }
 
-    this.contiguous = contiguous;
-    this.timeOffset = timeOffset;
-    this.accurateTimeOffset = accurateTimeOffset;
-
-    let result;
-    const encryptionType = getEncryptionType(uintData, decryptdata);
-    if (encryptionType === 'AES-128') {
-      result = this.transmuxAes128(uintData, decryptdata, timeOffset, contiguous, accurateTimeOffset, transmuxIdentifier);
-    } else if (encryptionType === 'SAMPLE-AES') {
+   let result;
+   if (encryptionType === 'SAMPLE-AES') {
       result = this.transmuxSampleAes(uintData, decryptdata, timeOffset, contiguous, accurateTimeOffset, transmuxIdentifier);
     } else {
       result = this.transmux(uintData, timeOffset, contiguous, accurateTimeOffset, transmuxIdentifier);
@@ -108,12 +123,18 @@ class Transmuxer {
   }
 
   flush (transmuxIdentifier: TransmuxIdentifier) {
-      const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush(this.timeOffset, this.contiguous);
-      // TODO: ensure that remuxers use last DTS as the timeOffset when passed null
+    if (!this.demuxer) {
       return {
-          remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, this.timeOffset, this.contiguous, this.accurateTimeOffset),
-          transmuxIdentifier
+        remuxResult: {},
+        transmuxIdentifier
       }
+    }
+    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush(this.timeOffset, this.contiguous);
+    // TODO: ensure that remuxers use last DTS as the timeOffset when passed null
+    return {
+        remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, this.timeOffset, this.contiguous, this.accurateTimeOffset),
+        transmuxIdentifier
+    }
   }
 
   destroy (): void {
@@ -135,7 +156,16 @@ class Transmuxer {
     }
   }
 
-  private transmuxAes128 (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier): Promise<TransmuxerResult> {
+  private transmuxSampleAes (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier) : Promise<TransmuxerResult> {
+    return this.demuxer!.demuxSampleAes(data, decryptData, timeOffset, contiguous)
+      .then(demuxResult => ({
+              remuxResult: this.remuxer!.remux(demuxResult.audioTrack, demuxResult.avcTrack, demuxResult.id3Track, demuxResult.textTrack, timeOffset, contiguous, accurateTimeOffset),
+              transmuxIdentifier
+          })
+      );
+  }
+
+  private decryptAes128 (data: Uint8Array, decryptData: any): Promise<ArrayBuffer> {
     let decrypter = this.decrypter;
     if (!decrypter) {
       decrypter = this.decrypter = new Decrypter(this.observer, this.config);
@@ -145,18 +175,21 @@ class Transmuxer {
       decrypter.decrypt(data, decryptData.key.buffer, decryptData.iv.buffer, (decryptedData) => {
         const endTime = now();
         this.observer.trigger(Event.FRAG_DECRYPTED, { stats: { tstart: startTime, tdecrypt: endTime } });
-        resolve(this.transmux(new Uint8Array(decryptedData), timeOffset, contiguous, accurateTimeOffset, transmuxIdentifier));
+        resolve(decryptedData);
       });
     });
   }
 
-  private transmuxSampleAes (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier) : Promise<TransmuxerResult> {
-    return this.demuxer!.demuxSampleAes(data, decryptData, timeOffset, contiguous)
-      .then(demuxResult => ({
-              remuxResult: this.remuxer!.remux(demuxResult.audioTrack, demuxResult.avcTrack, demuxResult.id3Track, demuxResult.textTrack, timeOffset, contiguous, accurateTimeOffset),
-              transmuxIdentifier
-          })
-      );
+  private getMuxers (data: Uint8Array, discontinuity, trackSwitch) {
+    let { demuxer, remuxer } = this;
+    if (!demuxer ||
+      // in case of continuity change, or track switch
+      // we might switch from content type (AAC container to TS container, or TS to fmp4 for example)
+      // so let's check that current demuxer is still valid
+      ((discontinuity || trackSwitch) && !this.probe(data))) {
+      ({ demuxer, remuxer } = this.configureTransmuxer(data));
+    }
+    return { demuxer, remuxer };
   }
 
   private configureTransmuxer (data: Uint8Array) {
