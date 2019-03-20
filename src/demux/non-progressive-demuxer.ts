@@ -1,4 +1,5 @@
 import { Demuxer, DemuxerResult } from '../types/demuxer';
+import { dummyTrack } from './dummy-demuxed-track';
 
 export default class NonProgressiveDemuxer implements Demuxer {
   private _chunks: Array<Uint8Array> = [];
@@ -56,7 +57,6 @@ function concatChunks (chunks: Array<Uint8Array>, dataLength: number) : Uint8Arr
   return result;
 }
 
-const dummyTrack = () => ({ type: '', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] });
 const dummyDemuxResult = () : DemuxerResult => ({
   audioTrack: dummyTrack(),
   avcTrack: dummyTrack(),

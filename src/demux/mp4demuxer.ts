@@ -2,9 +2,10 @@
  * MP4 demuxer
  */
 import { logger } from '../utils/logger';
-import { Demuxer, DemuxerResult, DemuxedTrack } from '../types/demuxer';
-import { findBox, segmentValidRange, prependUint8Array, getDuration } from '../utils/mp4-tools';
+import { DemuxerResult} from '../types/demuxer';
+import { findBox } from '../utils/mp4-tools';
 import NonProgressiveDemuxer from './non-progressive-demuxer';
+import { dummyTrack } from './dummy-demuxed-track';
 
 class MP4Demuxer extends NonProgressiveDemuxer {
   resetTimeStamp () {
@@ -36,7 +37,5 @@ class MP4Demuxer extends NonProgressiveDemuxer {
 
   destroy () {}
 }
-
-const dummyTrack = () => ({ type: '', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] });
 
 export default MP4Demuxer;
