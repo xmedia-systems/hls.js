@@ -1185,11 +1185,12 @@ class StreamController extends BaseStreamController {
     if (!levels) {
       return;
     }
-    // TODO: Figure out why fragCurrent reference sometimes isn't equal to frag, even when objects look equal
-    const frag = LevelHelper.getFragmentWithSN(levels[level], sn);
+
+    let frag = LevelHelper.getFragmentWithSN(levels[level], sn);
     if (!frag || frag.sn !== this.fragCurrent.sn) {
       return;
     }
+    frag = this.fragCurrent;
 
     const { audio, video, text, id3, initSegment } = remuxResult;
     if (_hasDroppedFrames(frag, video ? video.dropped : 0, levels[level].details.startSN)) {

@@ -114,6 +114,7 @@ export default class TransmuxerInterface {
       logger.log(`${this.id}:switch detected`);
     }
 
+    this.frag = frag;
     // Frags with sn of 'initSegment' are not transmuxed
     const { transmuxer, worker } = this;
     if (worker) {

@@ -125,6 +125,8 @@ class TSDemuxer extends NonProgressiveDemuxer {
    * @param {number} duration (in TS timescale = 90kHz)
    */
   resetInitSegment (initSegment, audioCodec, videoCodec, duration) {
+    super.resetInitSegment(initSegment, audioCodec, videoCodec, duration);
+
     this.pmtParsed = false;
     this._pmtId = -1;
 

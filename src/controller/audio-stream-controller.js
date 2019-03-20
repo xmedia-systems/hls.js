@@ -618,10 +618,11 @@ class AudioStreamController extends BaseStreamController {
     if (!levels) {
       return;
     }
-    const frag = LevelHelper.getFragmentWithSN(levels[level], sn);
+    let frag = LevelHelper.getFragmentWithSN(levels[level], sn);
     if (!frag || frag !== this.fragCurrent) {
       return;
     }
+    frag = this.fragCurrent;
 
     const { audio, text, id3, initSegment } = remuxResult;
     if (initSegment && initSegment.tracks) {

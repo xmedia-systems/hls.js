@@ -124,12 +124,11 @@ class MP4Remuxer implements Remuxer {
   }
 
   generateIS (audioTrack: DemuxedAudioTrack, videoTrack: DemuxedAvcTrack, timeOffset) : InitSegmentData | undefined {
-    const observer = this.observer;
     const audioSamples = audioTrack.samples;
     const videoSamples = videoTrack.samples;
     const typeSupported = this.typeSupported;
     const tracks = {} as TrackSet;
-    const computePTSDTS = (this._initPTS === undefined);
+    const computePTSDTS = (!Number.isFinite(this._initPTS));
     let container = 'audio/mp4';
     let initPTS;
     let initDTS;
@@ -198,7 +197,6 @@ class MP4Remuxer implements Remuxer {
         initPTS
       };
     }
-    // observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'no audio/video samples found' });
   }
 
   remuxVideo (track: DemuxedTrack, timeOffset, contiguous, audioTrackLength, accurateTimeOffset) : RemuxedTrack | undefined {
@@ -239,7 +237,7 @@ class MP4Remuxer implements Remuxer {
       );
     }
 
-    if (!contiguous) {
+    if (!contiguous || !Number.isFinite(nextAvcDts)) {
       // if not contiguous, let's use target timeOffset
       nextAvcDts = timeOffset * timeScale;
     }
@@ -493,7 +491,7 @@ class MP4Remuxer implements Remuxer {
       return;
     }
 
-    if (!contiguous) {
+    if (!contiguous || !Number.isFinite(nextAudioPts)) {
       if (!accurateTimeOffset) {
         // if frag are mot contiguous and if we cant trust time offset, let's use first sample PTS as next audio PTS
         nextAudioPts = inputSamples[0].pts;

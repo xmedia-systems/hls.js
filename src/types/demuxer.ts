@@ -1,10 +1,10 @@
 export interface Demuxer {
   demux (data: Uint8Array, timeOffset: number, contiguous: boolean, isSampleAes?: boolean) : DemuxerResult
   demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number, contiguous: boolean) : Promise<DemuxerResult>
-  flush(): DemuxerResult
+  flush(timeOffset?: number, contiguous?: boolean): DemuxerResult
   destroy() : void
   resetInitSegment(initSegment: Uint8Array, audioCodec: string, videoCodec: string, duration: number);
-  resetTimeStamp(defaultInitPTS): void
+  resetTimeStamp(defaultInitPTS?: number | null): void
 }
 
 export interface DemuxerResult {

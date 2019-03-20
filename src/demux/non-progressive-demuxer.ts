@@ -1,41 +1,22 @@
 import { Demuxer, DemuxerResult } from '../types/demuxer';
 
-const dummyTrack = () => ({ type: '', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] });
-const dummyDemuxResult: DemuxerResult = {
-  audioTrack: dummyTrack(),
-  avcTrack: dummyTrack(),
-  id3Track: dummyTrack(),
-  textTrack: dummyTrack()
-};
-
 export default class NonProgressiveDemuxer implements Demuxer {
   private _chunks: Array<Uint8Array> = [];
   private _dataLength: number = 0;
-  private _contiguous: boolean = false;
-  private _timeOffset: number = 0;
-  private _isSampleAes: boolean = false;
+  public _isSampleAes: boolean = false;
 
   demux (data: Uint8Array, timeOffset: number, contiguous: boolean, isSampleAes?: boolean): DemuxerResult {
-    this._contiguous = contiguous;
-    this._timeOffset = timeOffset;
     this._isSampleAes = !!isSampleAes;
     this._dataLength += data.length;
     this._chunks.push(data);
 
-    return dummyDemuxResult;
+    return dummyDemuxResult();
   }
 
-  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number, contiguous: boolean): Promise<DemuxerResult> {
-    return undefined;
-  }
-
-  destroy (): void {
-  }
-
-  flush (): DemuxerResult {
-    const { _chunks, _dataLength, _timeOffset, _contiguous, _isSampleAes } = this;
+  flush (timeOffset, contiguous): DemuxerResult {
+    const { _chunks, _dataLength, _isSampleAes } = this;
     const data = concatChunks(_chunks, _dataLength);
-    const result = this.demuxInternal(data, _timeOffset, _contiguous, _isSampleAes);
+    const result = this.demuxInternal(data, timeOffset, contiguous, _isSampleAes);
     this.reset();
 
     return result;
@@ -45,16 +26,21 @@ export default class NonProgressiveDemuxer implements Demuxer {
     this.reset();
   }
 
-  resetTimeStamp (defaultInitPTS): void {
+  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number, contiguous: boolean): Promise<DemuxerResult> {
+    return Promise.resolve(dummyDemuxResult());
   }
 
-  protected demuxInternal (data: Uint8Array, timeOffset: number, contiguous: boolean, isSampleAes?: boolean) : DemuxerResult {}
+  resetTimeStamp (defaultInitPTS): void {}
+
+  destroy (): void {}
+
+  protected demuxInternal (data: Uint8Array, timeOffset: number, contiguous: boolean, isSampleAes?: boolean) : DemuxerResult {
+    return dummyDemuxResult();
+  }
 
   private reset () {
     this._chunks = [];
     this._dataLength = 0;
-    this._timeOffset = 0;
-    this._contiguous = false;
     this._isSampleAes = false;
   }
 }
@@ -69,3 +55,11 @@ function concatChunks (chunks: Array<Uint8Array>, dataLength: number) : Uint8Arr
   }
   return result;
 }
+
+const dummyTrack = () => ({ type: '', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] });
+const dummyDemuxResult = () : DemuxerResult => ({
+  audioTrack: dummyTrack(),
+  avcTrack: dummyTrack(),
+  id3Track: dummyTrack(),
+  textTrack: dummyTrack()
+});
