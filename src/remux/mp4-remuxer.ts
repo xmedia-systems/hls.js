@@ -198,7 +198,7 @@ class MP4Remuxer implements Remuxer {
         initPTS
       };
     }
-    observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'no audio/video samples found' });
+    // observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'no audio/video samples found' });
   }
 
   remuxVideo (track: DemuxedTrack, timeOffset, contiguous, audioTrackLength, accurateTimeOffset) : RemuxedTrack | undefined {

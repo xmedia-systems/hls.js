@@ -17,6 +17,7 @@ import SampleAesDecrypter from './sample-aes';
 import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { DemuxedAvcTrack, DemuxedAudioTrack, DemuxedTrack, Demuxer, DemuxerResult } from '../types/demuxer';
+import NonProgressiveDemuxer from './non-progressive-demuxer';
 
 // We are using fixed track IDs for driving the MP4 remuxer
 // instead of following the TS PIDs.
@@ -33,7 +34,7 @@ const RemuxerTrackIdConfig = {
   text: 4
 };
 
-class TSDemuxer implements Demuxer {
+class TSDemuxer extends NonProgressiveDemuxer {
   private observer: any;
   private config: any;
   private typeSupported: any;
@@ -57,6 +58,7 @@ class TSDemuxer implements Demuxer {
   private avcSample: any;
 
   constructor (observer, config, typeSupported) {
+    super();
     this.observer = observer;
     this.config = config;
     this.typeSupported = typeSupported;
@@ -148,7 +150,7 @@ class TSDemuxer implements Demuxer {
   resetTimeStamp () {}
 
   // feed incoming data to the front of the parsing pipeline
-  demux (data, contiguous, timeOffset, isSampleAes = false): DemuxerResult {
+  demuxInternal (data, contiguous, timeOffset, isSampleAes = false): DemuxerResult {
     if (!isSampleAes) {
       this.sampleAes = null;
     }
