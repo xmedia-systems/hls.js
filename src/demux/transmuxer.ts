@@ -115,10 +115,8 @@ class Transmuxer {
         remuxResult: {},
         transmuxIdentifier
       };
-    } else {
-      if (cache.dataLength) {
-        uintData = prependUint8Array(uintData, cache.flush());
-      }
+    } else if (cache.dataLength) {
+      uintData = prependUint8Array(uintData, cache.flush());
     }
 
     const uintInitSegment = new Uint8Array(initSegment);

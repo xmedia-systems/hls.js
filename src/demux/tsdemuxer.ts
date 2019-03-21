@@ -50,10 +50,10 @@ class TSDemuxer extends NonProgressiveDemuxer {
   private _initDTS?: number | null = null;
   private _pmtId: number = -1;
 
-  private _avcTrack!: DemuxedAvcTrack;
-  private _audioTrack!: DemuxedAudioTrack;
-  private _id3Track!: DemuxedTrack;
-  private _txtTrack!: DemuxedTrack;
+  private _avcTrack: DemuxedAvcTrack = TSDemuxer.createTrack('video', undefined);
+  private _audioTrack: DemuxedAudioTrack = TSDemuxer.createTrack('audio', undefined);
+  private _id3Track: DemuxedTrack = TSDemuxer.createTrack('id3', undefined);
+  private _txtTrack: DemuxedTrack = TSDemuxer.createTrack('text', undefined);
   private aacOverFlow: any;
   private avcSample: any;
 

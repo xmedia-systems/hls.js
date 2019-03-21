@@ -4,13 +4,14 @@
 import * as ADTS from './adts';
 import { logger } from '../utils/logger';
 import ID3 from '../demux/id3';
-import { Demuxer, DemuxerResult } from '../types/demuxer';
+import { DemuxerResult } from '../types/demuxer';
 import NonProgressiveDemuxer from './non-progressive-demuxer';
+import { dummyTrack } from './dummy-demuxed-track';
 
 class AACDemuxer extends NonProgressiveDemuxer {
   private observer: any;
   private config: any;
-  private _audioTrack!: any;
+  private _audioTrack?: any = dummyTrack;
   constructor (observer, config) {
     super();
     this.observer = observer;
@@ -83,9 +84,9 @@ class AACDemuxer extends NonProgressiveDemuxer {
 
     return {
       audioTrack: track,
-      avcTrack: { type: 'avc', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] },
-      id3Track: { type: 'id3', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] },
-      textTrack: { type: 'text', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples: [] }
+      avcTrack: dummyTrack(),
+      id3Track: dummyTrack(),
+      textTrack: dummyTrack()
     };
   }
 
