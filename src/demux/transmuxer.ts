@@ -16,6 +16,8 @@ import PassThroughRemuxer from '../remux/passthrough-remuxer';
 import { Demuxer } from '../types/demuxer';
 import { Remuxer } from '../types/remuxer';
 import { TransmuxerResult, TransmuxIdentifier } from '../types/transmuxer';
+import ChunkCache from './chunk-cache';
+import { prependUint8Array } from '../utils/mp4-tools';
 
 import { getSelfScope } from '../utils/get-self-scope';
 import { logger } from '../utils/logger';
@@ -32,6 +34,18 @@ try {
   now = global.Date.now;
 }
 
+const muxConfig = [
+  { demux: TSDemuxer, remux: MP4Remuxer },
+  { demux: MP4Demuxer, remux: PassThroughRemuxer },
+  { demux: AACDemuxer, remux: MP4Remuxer },
+  { demux: MP3Demuxer, remux: MP4Remuxer }
+];
+
+let minProbeByteLength = 1024;
+muxConfig.forEach(({ demux }) => {
+  minProbeByteLength = Math.max(minProbeByteLength, demux.minProbeByteLength);
+});
+
 class Transmuxer {
   private observer: any;
   private typeSupported: any;
@@ -45,6 +59,8 @@ class Transmuxer {
   private contiguous: boolean = false;
   private timeOffset: number = 0;
   private accurateTimeOffset: boolean = false;
+
+  private cache: ChunkCache = new ChunkCache();
 
   constructor (observer, typeSupported, config, vendor) {
     this.observer = observer;
@@ -67,7 +83,7 @@ class Transmuxer {
     defaultInitPTS: number,
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
-    const uintData = new Uint8Array(data);
+    let uintData = new Uint8Array(data);
     const encryptionType = getEncryptionType(uintData, decryptdata);
 
     if (encryptionType === 'AES-128') {
@@ -89,12 +105,31 @@ class Transmuxer {
         })
     }
 
+    const cache = this.cache;
+    const needsProbing = this.needsProbing(data, discontinuity, trackSwitch);
+    if (needsProbing && (uintData.length + cache.dataLength < minProbeByteLength)) {
+      logger.log(`The transmuxer received ${uintData.length} bytes, but at least ${minProbeByteLength} are required to probe for demuxer types\n` +
+        'This data will be cached until the minimum amount is met.');
+      cache.push(uintData);
+      return {
+        remuxResult: {},
+        transmuxIdentifier
+      };
+    } else {
+      if (cache.dataLength) {
+        uintData = prependUint8Array(uintData, cache.flush());
+      }
+    }
+
     const uintInitSegment = new Uint8Array(initSegment);
     this.contiguous = contiguous;
     this.timeOffset = timeOffset;
     this.accurateTimeOffset = accurateTimeOffset;
 
-    const { demuxer, remuxer } = this.getMuxers(uintData, discontinuity, trackSwitch);
+    let { demuxer, remuxer } = this;
+    if (needsProbing) {
+      ({ demuxer, remuxer } = this.configureTransmuxer(uintData));
+    }
 
     if (!demuxer || !remuxer) {
       this.observer.trigger(Event.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: true, reason: 'no demux matching with content found' });
@@ -122,7 +157,9 @@ class Transmuxer {
     return result;
   }
 
+  // TODO: Probe for demuxer on flush
   flush (transmuxIdentifier: TransmuxIdentifier) {
+    this.cache.reset();
     if (!this.demuxer) {
       return {
         remuxResult: {},
@@ -180,29 +217,9 @@ class Transmuxer {
     });
   }
 
-  private getMuxers (data: Uint8Array, discontinuity, trackSwitch) {
-    let { demuxer, remuxer } = this;
-    if (!demuxer ||
-      // in case of continuity change, or track switch
-      // we might switch from content type (AAC container to TS container, or TS to fmp4 for example)
-      // so let's check that current demuxer is still valid
-      ((discontinuity || trackSwitch) && !this.probe(data))) {
-      ({ demuxer, remuxer } = this.configureTransmuxer(data));
-    }
-    return { demuxer, remuxer };
-  }
-
   private configureTransmuxer (data: Uint8Array) {
     const { config, observer, typeSupported, vendor } = this;
     let demuxer, remuxer;
-    // probing order is TS/MP4/AAC/MP3
-    const muxConfig = [
-      { demux: TSDemuxer, remux: MP4Remuxer },
-      { demux: MP4Demuxer, remux: PassThroughRemuxer },
-      { demux: AACDemuxer, remux: MP4Remuxer },
-      { demux: MP3Demuxer, remux: MP4Remuxer }
-    ];
-
     // probe for content type
     for (let i = 0, len = muxConfig.length; i < len; i++) {
       const mux = muxConfig[i];
@@ -216,6 +233,13 @@ class Transmuxer {
     }
 
     return { demuxer, remuxer };
+  }
+
+  private needsProbing (data, discontinuity, trackSwitch) {
+    // in case of continuity change, or track switch
+    // we might switch from content type (AAC container to TS container, or TS to fmp4 for example)
+    // so let's check that current demuxer is still valid
+    return !this.demuxer || ((discontinuity || trackSwitch) && !this.probe(data));
   }
 }
 

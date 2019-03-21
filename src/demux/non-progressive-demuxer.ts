@@ -1,22 +1,21 @@
 import { Demuxer, DemuxerResult } from '../types/demuxer';
 import { dummyTrack } from './dummy-demuxed-track';
+import ChunkCache from './chunk-cache';
 
 export default class NonProgressiveDemuxer implements Demuxer {
-  private _chunks: Array<Uint8Array> = [];
-  private _dataLength: number = 0;
+  private cache = new ChunkCache();
   public _isSampleAes: boolean = false;
+  static readonly minProbeByteLength: number = 1024; // 1Kb
 
   demux (data: Uint8Array, timeOffset: number, contiguous: boolean, isSampleAes?: boolean): DemuxerResult {
     this._isSampleAes = !!isSampleAes;
-    this._dataLength += data.length;
-    this._chunks.push(data);
-
+    this.cache.push(data);
     return dummyDemuxResult();
   }
 
   flush (timeOffset, contiguous): DemuxerResult {
-    const { _chunks, _dataLength, _isSampleAes } = this;
-    const data = concatChunks(_chunks, _dataLength);
+    const { _isSampleAes } = this;
+    const data = this.cache.flush();
     const result = this.demuxInternal(data, timeOffset, contiguous, _isSampleAes);
     this.reset();
 
@@ -40,22 +39,12 @@ export default class NonProgressiveDemuxer implements Demuxer {
   }
 
   private reset () {
-    this._chunks = [];
-    this._dataLength = 0;
+    this.cache.reset();
     this._isSampleAes = false;
   }
 }
 
-function concatChunks (chunks: Array<Uint8Array>, dataLength: number) : Uint8Array {
-  const result = new Uint8Array(dataLength);
-  let offset = 0;
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return result;
-}
+
 
 const dummyDemuxResult = () : DemuxerResult => ({
   audioTrack: dummyTrack(),

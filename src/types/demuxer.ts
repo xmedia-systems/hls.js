@@ -4,7 +4,7 @@ export interface Demuxer {
   flush(timeOffset?: number, contiguous?: boolean): DemuxerResult
   destroy() : void
   resetInitSegment(initSegment: Uint8Array, audioCodec: string, videoCodec: string, duration: number);
-  resetTimeStamp(defaultInitPTS?: number | null): void
+  resetTimeStamp(defaultInitPTS?: number | null): void;
 }
 
 export interface DemuxerResult {

@@ -7,7 +7,10 @@ import { findBox } from '../utils/mp4-tools';
 import NonProgressiveDemuxer from './non-progressive-demuxer';
 import { dummyTrack } from './dummy-demuxed-track';
 
+const minProbeLength = 16384; // 16Kb
 class MP4Demuxer extends NonProgressiveDemuxer {
+  static readonly minProbeByteLength = 16384;
+
   resetTimeStamp () {
   }
 
@@ -16,7 +19,7 @@ class MP4Demuxer extends NonProgressiveDemuxer {
 
   static probe (data) {
     // ensure we find a moof box in the first 16 kB
-    return findBox({ data: data, start: 0, end: Math.min(data.length, 16384) }, ['moof']).length > 0;
+    return findBox({ data: data, start: 0, end: Math.min(data.length, minProbeLength) }, ['moof']).length > 0;
   }
 
   demuxInternal (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
