@@ -36,9 +36,9 @@ export default class BaseStreamController extends TaskLoop {
       }
       this.fragmentTracker.removeFragment(frag);
     }
-    if (this.demuxer) {
-      this.demuxer.destroy();
-      this.demuxer = null;
+    if (this.transmuxer) {
+      this.transmuxer.destroy();
+      this.transmuxer = null;
     }
     this.fragCurrent = null;
     this.fragPrevious = null;
