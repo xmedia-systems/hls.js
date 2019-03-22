@@ -84,13 +84,15 @@ class Transmuxer {
     defaultInitPTS: number,
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
+    console.log('>>> push', timeOffset, contiguous, accurateTimeOffset, transmuxIdentifier);
+
     let uintData = new Uint8Array(data);
     const cache = this.cache;
     const encryptionType = getEncryptionType(uintData, decryptdata);
 
     // TODO: Handle progressive AES-128 decryption
     if (encryptionType === 'AES-128') {
-      this.decryptionPromise = this.decryptionPromise = this.decryptAes128(uintData, decryptdata)
+      this.decryptionPromise = this.decryptAes128(uintData, decryptdata)
         .then(decryptedData => {
           const result = this.push(decryptedData,
             null,
@@ -115,7 +117,7 @@ class Transmuxer {
     this.timeOffset = timeOffset;
     this.accurateTimeOffset = accurateTimeOffset;
 
-    const needsProbing = this.needsProbing(data, discontinuity, trackSwitch);
+    const needsProbing = this.needsProbing(uintData, discontinuity, trackSwitch);
     if (needsProbing && (uintData.length + cache.dataLength < minProbeByteLength)) {
       logger.log(`The transmuxer received ${uintData.length} bytes, but at least ${minProbeByteLength} are required to probe for demuxer types\n` +
         'This data will be cached until the minimum amount is met.');
@@ -175,6 +177,7 @@ class Transmuxer {
         transmuxIdentifier
       }
     }
+    console.log('>>> flush', this.timeOffset, this.contiguous, this.accurateTimeOffset, transmuxIdentifier);
     const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush(this.timeOffset, this.contiguous);
     // TODO: ensure that remuxers use last DTS as the timeOffset when passed null
     return {
@@ -245,7 +248,7 @@ class Transmuxer {
     return { demuxer, remuxer };
   }
 
-  private needsProbing (data, discontinuity, trackSwitch) {
+  private needsProbing (data: Uint8Array, discontinuity: boolean, trackSwitch: boolean) : boolean {
     // in case of continuity change, or track switch
     // we might switch from content type (AAC container to TS container, or TS to fmp4 for example)
     // so let's check that current demuxer is still valid
