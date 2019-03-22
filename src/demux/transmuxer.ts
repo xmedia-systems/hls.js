@@ -84,8 +84,6 @@ class Transmuxer {
     defaultInitPTS: number,
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
-    console.log('>>> push', timeOffset, contiguous, accurateTimeOffset, transmuxIdentifier);
-
     let uintData = new Uint8Array(data);
     const cache = this.cache;
     const encryptionType = getEncryptionType(uintData, decryptdata);
@@ -177,7 +175,6 @@ class Transmuxer {
         transmuxIdentifier
       }
     }
-    console.log('>>> flush', this.timeOffset, this.contiguous, this.accurateTimeOffset, transmuxIdentifier);
     const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush(this.timeOffset, this.contiguous);
     // TODO: ensure that remuxers use last DTS as the timeOffset when passed null
     return {
