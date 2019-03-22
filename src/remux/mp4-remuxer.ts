@@ -753,8 +753,10 @@ class MP4Remuxer implements Remuxer {
       sample.pts = ((sample.pts - initPTS) / inputTimeScale);
       sample.dts = ((sample.dts - initDTS) / inputTimeScale);
     }
+    const samples = track.samples;
+    track.samples = [];
     return {
-      samples: track.samples
+      samples
     };
   }
 
@@ -773,8 +775,10 @@ class MP4Remuxer implements Remuxer {
       // using this._initPTS and this._initDTS to calculate relative time
       sample.pts = ((sample.pts - initPTS) / inputTimeScale);
     }
+    const samples = track.samples;
+    track.samples = [];
     return {
-      samples: track.samples
+      samples
     };
   }
 
