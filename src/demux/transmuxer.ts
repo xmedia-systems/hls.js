@@ -90,7 +90,7 @@ class Transmuxer {
 
     // TODO: Handle progressive AES-128 decryption
     if (encryptionType === 'AES-128') {
-      this.decryptionPromise = this.decryptAes128(uintData, decryptdata)
+      this.decryptionPromise = this.decryptAes128(data, decryptdata)
         .then(decryptedData => {
           const result = this.push(decryptedData,
             null,
@@ -212,7 +212,7 @@ class Transmuxer {
       );
   }
 
-  private decryptAes128 (data: Uint8Array, decryptData: any): Promise<ArrayBuffer> {
+  private decryptAes128 (data: ArrayBuffer, decryptData: any): Promise<ArrayBuffer> {
     let decrypter = this.decrypter;
     if (!decrypter) {
       decrypter = this.decrypter = new Decrypter(this.observer, this.config);
