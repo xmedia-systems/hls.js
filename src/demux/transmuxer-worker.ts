@@ -71,8 +71,16 @@ export default function TransmuxerWorker (self) {
       }
         case 'flush': {
           const transmuxResult = self.transmuxer.flush(data.transmuxIdentifier);
-          emitTransmuxComplete(self, transmuxResult);
-          self.postMessage({ event: 'flush' });
+          if (transmuxResult.then) {
+            // @ts-ignore
+            transmuxResult.then(data => {
+              emitTransmuxComplete(self, data);
+              self.postMessage({ event: 'flush' });
+            });
+          } else {
+            emitTransmuxComplete(self, transmuxResult);
+            self.postMessage({ event: 'flush' });
+          }
           break;
         }
       default:

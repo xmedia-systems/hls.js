@@ -176,8 +176,18 @@ export default class TransmuxerInterface {
         transmuxIdentifier
       });
     } else if (transmuxer) {
-      this.onTransmuxComplete(transmuxer.flush(transmuxIdentifier));
-      this.onFlush();
+      const transmuxResult = transmuxer.flush(transmuxIdentifier);
+      // @ts-ignore
+      if (transmuxResult.then) {
+        // @ts-ignore
+        transmuxResult.then(data => {
+          this.onTransmuxComplete(data);
+          this.onFlush();
+        });
+      } else {
+        this.onTransmuxComplete(transmuxResult);
+        this.onFlush();
+      }
     }
   }
 

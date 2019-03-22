@@ -55,6 +55,7 @@ class Transmuxer {
   private remuxer?: Remuxer;
   private decrypter: any;
   private probe!: Function;
+  private decryptionPromise: Promise<TransmuxerResult> | null = null;
 
   private contiguous: boolean = false;
   private timeOffset: number = 0;
@@ -84,12 +85,14 @@ class Transmuxer {
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
     let uintData = new Uint8Array(data);
+    const cache = this.cache;
     const encryptionType = getEncryptionType(uintData, decryptdata);
 
+    // TODO: Handle progressive AES-128 decryption
     if (encryptionType === 'AES-128') {
-      return this.decryptAes128(uintData, decryptdata)
+      this.decryptionPromise = this.decryptionPromise = this.decryptAes128(uintData, decryptdata)
         .then(decryptedData => {
-          return this.push(decryptedData,
+          const result = this.push(decryptedData,
             null,
             initSegment,
             audioCodec,
@@ -102,10 +105,16 @@ class Transmuxer {
             accurateTimeOffset,
             defaultInitPTS,
             transmuxIdentifier);
-        })
+          this.decryptionPromise = null;
+          return result;
+        });
+      return this.decryptionPromise;
     }
 
-    const cache = this.cache;
+    this.contiguous = contiguous;
+    this.timeOffset = timeOffset;
+    this.accurateTimeOffset = accurateTimeOffset;
+
     const needsProbing = this.needsProbing(data, discontinuity, trackSwitch);
     if (needsProbing && (uintData.length + cache.dataLength < minProbeByteLength)) {
       logger.log(`The transmuxer received ${uintData.length} bytes, but at least ${minProbeByteLength} are required to probe for demuxer types\n` +
@@ -120,10 +129,6 @@ class Transmuxer {
     }
 
     const uintInitSegment = new Uint8Array(initSegment);
-    this.contiguous = contiguous;
-    this.timeOffset = timeOffset;
-    this.accurateTimeOffset = accurateTimeOffset;
-
     let { demuxer, remuxer } = this;
     if (needsProbing) {
       ({ demuxer, remuxer } = this.configureTransmuxer(uintData));
@@ -156,7 +161,13 @@ class Transmuxer {
   }
 
   // TODO: Probe for demuxer on flush
-  flush (transmuxIdentifier: TransmuxIdentifier) {
+  flush (transmuxIdentifier: TransmuxIdentifier) : TransmuxerResult | Promise<TransmuxerResult>  {
+    if (this.decryptionPromise) {
+      return this.decryptionPromise.then(() => {
+        return this.flush(transmuxIdentifier);
+      });
+    }
+
     this.cache.reset();
     if (!this.demuxer) {
       return {
@@ -191,6 +202,7 @@ class Transmuxer {
     }
   }
 
+  // TODO: Handle flush with Sample-AES
   private transmuxSampleAes (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier) : Promise<TransmuxerResult> {
     return this.demuxer!.demuxSampleAes(data, decryptData, timeOffset, contiguous)
       .then(demuxResult => ({
