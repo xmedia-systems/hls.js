@@ -1189,11 +1189,15 @@ class StreamController extends BaseStreamController {
     }
     frag = fragCurrent;
 
-    const { audio, video, text, id3, initSegment } = remuxResult;
-    if (_hasDroppedFrames(frag, video ? video.dropped : 0, levels[level].details.startSN)) {
-      this._backtrack(frag, video.startPTS);
-      return;
+    let { audio, video, text, id3, initSegment } = remuxResult;
+    // The audio-stream-controller handles audio buffering if Hls.js is playing an alternate audio track
+    if (this.altAudio) {
+      audio = null;
     }
+
+    // Update timing before a potential backtrack
+    this._updateTiming(frag, audio);
+    this._updateTiming(frag, video);
 
     if (initSegment) {
       if (initSegment.tracks) {
@@ -1204,12 +1208,16 @@ class StreamController extends BaseStreamController {
         hls.trigger(Event.INIT_PTS_FOUND, { frag, id, initPTS: initSegment.initPTS });
       }
     }
-    if (audio) {
-      this._bufferFragmentData(frag, audio);
+
+    // Avoid buffering if backtracking this fragment
+    if (_hasDroppedFrames(frag, video ? video.dropped : 0, levels[level].details.startSN)) {
+      this._backtrack(frag, video.startPTS);
+      return;
     }
-    if (video) {
-      this._bufferFragmentData(frag, video);
-    }
+
+    this._bufferFragmentData(frag, audio);
+    this._bufferFragmentData(frag, video);
+
     if (id3) {
       id3.frag = frag;
       id3.id = id;
@@ -1295,11 +1303,28 @@ class StreamController extends BaseStreamController {
   }
 
   _bufferFragmentData (frag, data) {
-    // Filter out main audio if audio track is loaded through audio stream controller
-    if ((data.type === 'audio' && this.altAudio) || this.state !== State.PARSING) {
+    if (!data || this.state !== State.PARSING) {
       return;
     }
+    // has remuxer dropped video frames located before first keyframe ?
+    [data.data1, data.data2].forEach(buffer => {
+      // only append in PARSING state (rationale is that an appending error could happen synchronously on first segment appending)
+      // in that case it is useless to append following segments
+      if (buffer && buffer.length && this.state === State.PARSING) {
+        this.appended = true;
+        // arm pending Buffering flag before appending a segment
+        this.pendingBuffering = true;
+        this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
+      }
+    });
+    // trigger handler right now
+    this.tick();
+  }
 
+  _updateTiming (frag, data) {
+    if (!data) {
+      return;
+    }
     if (!Number.isFinite(data.endPTS)) {
       data.endPTS = data.startPTS + frag.duration;
       data.endDTS = data.startDTS + frag.duration;
@@ -1318,19 +1343,6 @@ class StreamController extends BaseStreamController {
     const currentLevel = levels[level];
     const drift = LevelHelper.updateFragPTSDTS(currentLevel.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
     hls.trigger(Event.LEVEL_PTS_UPDATED, { details: currentLevel.details, level, drift, type: data.type, start: data.startPTS, end: data.endPTS });
-    // has remuxer dropped video frames located before first keyframe ?
-    [data.data1, data.data2].forEach(buffer => {
-      // only append in PARSING state (rationale is that an appending error could happen synchronously on first segment appending)
-      // in that case it is useless to append following segments
-      if (buffer && buffer.length && this.state === State.PARSING) {
-        this.appended = true;
-        // arm pending Buffering flag before appending a segment
-        this.pendingBuffering = true;
-        hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
-      }
-    });
-    // trigger handler right now
-    this.tick();
   }
 
   _backtrack (frag, nextLoadPosition) {
