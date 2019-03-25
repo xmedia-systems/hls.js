@@ -332,10 +332,8 @@ class Row {
     }
 
     if (this.pos < 0) {
-      logger.log('ERROR', 'Negative cursor position ' + this.pos);
       this.pos = 0;
     } else if (this.pos > NR_COLS) {
-      logger.log('ERROR', 'Too large cursor position ' + this.pos);
       this.pos = NR_COLS;
     }
   }
