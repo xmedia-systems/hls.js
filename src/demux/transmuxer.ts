@@ -84,6 +84,7 @@ class Transmuxer {
     defaultInitPTS: number,
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
+    console.log('>>> push', trackSwitch, discontinuity, timeOffset)
     let uintData = new Uint8Array(data);
     const cache = this.cache;
     const encryptionType = getEncryptionType(uintData, decryptdata);
@@ -131,7 +132,7 @@ class Transmuxer {
     const uintInitSegment = new Uint8Array(initSegment);
     let { demuxer, remuxer } = this;
     if (needsProbing) {
-      ({ demuxer, remuxer } = this.configureTransmuxer(uintData));
+      ({ demuxer, remuxer } = this.configureTransmuxer(uintData, audioCodec, videoCodec, duration));
     }
 
     if (!demuxer || !remuxer) {
@@ -142,6 +143,7 @@ class Transmuxer {
       };
     }
 
+    console.log('>>>', discontinuity, trackSwitch);
     if (discontinuity || trackSwitch) {
       demuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec, duration);
       remuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec);
@@ -162,6 +164,7 @@ class Transmuxer {
 
   // TODO: Probe for demuxer on flush
   flush (transmuxIdentifier: TransmuxIdentifier) : TransmuxerResult | Promise<TransmuxerResult>  {
+    console.log('>>> flush')
     if (this.decryptionPromise) {
       return this.decryptionPromise.then(() => {
         return this.flush(transmuxIdentifier);
@@ -227,7 +230,7 @@ class Transmuxer {
     });
   }
 
-  private configureTransmuxer (data: Uint8Array) {
+  private configureTransmuxer (data: Uint8Array, audioCodec: string, videoCodec: string, duration: number) {
     const { config, observer, typeSupported, vendor } = this;
     let demuxer, remuxer;
     // probe for content type
@@ -237,6 +240,10 @@ class Transmuxer {
       if (probe(data)) {
         remuxer = this.remuxer = new mux.remux(observer, config, typeSupported, vendor);
         demuxer = this.demuxer = new mux.demux(observer, config, typeSupported);
+
+        // Ensure that muxers are always initialized with an initSegment
+        demuxer.resetInitSegment(null, audioCodec, videoCodec, duration);
+        remuxer.resetInitSegment(null, audioCodec, videoCodec);
         this.probe = probe;
         break;
       }

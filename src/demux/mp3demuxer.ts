@@ -11,7 +11,7 @@ import { dummyTrack } from './dummy-demuxed-track';
 class MP3Demuxer extends NonProgressiveDemuxer {
   private observer: any;
   private config: any;
-  private _audioTrack: any = dummyTrack();
+  private _audioTrack!: any;
   constructor (observer, config) {
     super();
     this.observer = observer;
