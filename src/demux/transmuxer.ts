@@ -131,7 +131,7 @@ class Transmuxer {
     const uintInitSegment = new Uint8Array(initSegment);
     let { demuxer, remuxer } = this;
     if (needsProbing) {
-      ({ demuxer, remuxer } = this.configureTransmuxer(uintData, audioCodec, videoCodec, duration));
+      ({ demuxer, remuxer } = this.configureTransmuxer(uintData, uintInitSegment, audioCodec, videoCodec, duration));
     }
 
     if (!demuxer || !remuxer) {
@@ -227,7 +227,7 @@ class Transmuxer {
     });
   }
 
-  private configureTransmuxer (data: Uint8Array, audioCodec: string, videoCodec: string, duration: number) {
+  private configureTransmuxer (data: Uint8Array, initSegmentData: Uint8Array, audioCodec: string, videoCodec: string, duration: number) {
     const { config, observer, typeSupported, vendor } = this;
     let demuxer, remuxer;
     // probe for content type
@@ -239,8 +239,8 @@ class Transmuxer {
         demuxer = this.demuxer = new mux.demux(observer, config, typeSupported);
 
         // Ensure that muxers are always initialized with an initSegment
-        demuxer.resetInitSegment(null, audioCodec, videoCodec, duration);
-        remuxer.resetInitSegment(null, audioCodec, videoCodec);
+        demuxer.resetInitSegment(initSegmentData, audioCodec, videoCodec, duration);
+        remuxer.resetInitSegment(initSegmentData, audioCodec, videoCodec);
         this.probe = probe;
         break;
       }
