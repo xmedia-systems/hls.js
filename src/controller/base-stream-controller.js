@@ -172,6 +172,13 @@ export default class BaseStreamController extends TaskLoop {
       .catch((e) => {
         const errorData = e ? e.data : null;
         if (errorData && errorData.details === ErrorDetails.INTERNAL_ABORTED) {
+          const fragPrev = this.fragPrevious;
+          if (fragPrev) {
+            this.nextLoadPosition = fragPrev.start + fragPrev.duration;
+          } else {
+            this.nextLoadPosition = this.lastCurrentTime;
+          }
+          logger.log(`Frag load aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
           return;
         }
         this.hls.trigger(Event.ERROR, errorData);
