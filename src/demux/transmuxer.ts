@@ -84,7 +84,6 @@ class Transmuxer {
     defaultInitPTS: number,
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
-    console.log('>>> push', trackSwitch, discontinuity, timeOffset)
     let uintData = new Uint8Array(data);
     const cache = this.cache;
     const encryptionType = getEncryptionType(uintData, decryptdata);
@@ -143,7 +142,6 @@ class Transmuxer {
       };
     }
 
-    console.log('>>>', discontinuity, trackSwitch);
     if (discontinuity || trackSwitch) {
       demuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec, duration);
       remuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec);
@@ -164,7 +162,6 @@ class Transmuxer {
 
   // TODO: Probe for demuxer on flush
   flush (transmuxIdentifier: TransmuxIdentifier) : TransmuxerResult | Promise<TransmuxerResult>  {
-    console.log('>>> flush')
     if (this.decryptionPromise) {
       return this.decryptionPromise.then(() => {
         return this.flush(transmuxIdentifier);
