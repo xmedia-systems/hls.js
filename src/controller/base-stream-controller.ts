@@ -42,6 +42,7 @@ export default class BaseStreamController extends TaskLoop {
   protected fragLoadError: number = 0;
   protected levels: Array<any> = [];
   protected fragmentLoader!: FragmentLoader;
+  protected readonly logPrefix: string = '';
 
   protected doTick () {}
 
@@ -85,7 +86,7 @@ export default class BaseStreamController extends TaskLoop {
     const bufferInfo = BufferHelper.bufferInfo(mediaBuffer || media, currentTime, this.config.maxBufferHole);
 
     if (Number.isFinite(currentTime)) {
-      logger.log(`media seeking to ${currentTime.toFixed(3)}`);
+      this.log(`media seeking to ${currentTime.toFixed(3)}`);
     }
 
     if (state === State.FRAG_LOADING) {
@@ -98,7 +99,7 @@ export default class BaseStreamController extends TaskLoop {
         // check if we seek position will be out of currently loaded frag range : if out cancel frag load, if in, don't do anything
         if (currentTime < fragStartOffset || currentTime > fragEndOffset) {
           if (fragCurrent.loader) {
-            logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
+            this.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
             fragCurrent.loader.abort();
           }
           this.fragCurrent = null;
@@ -106,7 +107,7 @@ export default class BaseStreamController extends TaskLoop {
           // switch to IDLE state to load new fragment
           this.state = State.IDLE;
         } else {
-          logger.log('seeking outside of buffer but within currently loaded fragment range');
+          this.log('seeking outside of buffer but within currently loaded fragment range');
         }
       }
     } else if (state === State.ENDED) {
@@ -157,12 +158,12 @@ export default class BaseStreamController extends TaskLoop {
         if (this._fragLoadAborted(frag)) {
           return;
         }
-        logger.log(`Loaded fragment ${frag.sn} of level ${frag.level}`);
+        this.log(`Loaded fragment ${frag.sn} of level ${frag.level}`);
         // For compatibility, emit the FRAG_LOADED with the same signature
         const compatibilityEventData: any = data;
         compatibilityEventData.frag = frag;
         this.hls.trigger(Event.FRAG_LOADED, compatibilityEventData);
-        this._handleFragmentLoadComplete(frag, data.stats);
+        this._handleFragmentLoadComplete(frag);
       });
   }
 
@@ -188,11 +189,10 @@ export default class BaseStreamController extends TaskLoop {
     if (!frag || !fragCurrent) {
       return true;
     }
-    const { level, sn } = fragCurrent;
-    return frag.level !== level || frag.sn !== sn;
+    return frag.level !== fragCurrent.level || frag.sn !== fragCurrent.sn;
   }
 
-  protected _handleFragmentLoadComplete (frag, stats) {
+  protected _handleFragmentLoadComplete (frag) {
     const { transmuxer } = this;
     if (!transmuxer) {
       return;
@@ -215,18 +215,22 @@ export default class BaseStreamController extends TaskLoop {
           } else {
             this.nextLoadPosition = this.lastCurrentTime;
           }
-          logger.log(`Frag load aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
+          this.log(`Frag load aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
           return;
         }
         this.hls.trigger(Event.ERROR, errorData);
       });
   }
 
+  protected log (msg) {
+    logger.log(`${this.logPrefix}: ${msg}`);
+  }
+
   set state (nextState) {
     if (this.state !== nextState) {
       const previousState = this.state;
       this._state = nextState;
-      logger.log(`controller:${previousState}->${nextState}`);
+      this.log(`${previousState}->${nextState}`);
     }
   }
 
