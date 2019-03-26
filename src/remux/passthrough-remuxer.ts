@@ -65,7 +65,7 @@ class PassThroughRemuxer implements Remuxer {
     this.initTracks = tracks;
   }
 
-  // TODO: Handle unsignaled discontinuities; contiguous and accurateTimeOffset flags are currently unused
+  // TODO: utilize accurateTimeOffset
   remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
     let { initPTS, lastEndDTS } = this;
     const result: RemuxerResult =  {
@@ -79,7 +79,7 @@ class PassThroughRemuxer implements Remuxer {
     // If we haven't yet set a lastEndDTS, or it was reset, set it to the provided timeOffset. We want to use the
     // lastEndDTS over timeOffset whenever possible; during progressive playback, the media source will not update
     // the media duration (which is what timeOffset is provided as) before we need to process the next chunk.
-    if (!Number.isFinite(lastEndDTS)) {
+    if (!Number.isFinite(lastEndDTS) || !contiguous) {
       lastEndDTS = this.lastEndDTS = timeOffset || 0;
     }
 

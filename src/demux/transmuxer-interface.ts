@@ -24,6 +24,8 @@ export default class TransmuxerInterface {
   private onTransmuxComplete: Function;
   private onFlush: Function;
 
+  private currentTransmuxSession: TransmuxIdentifier | null = null;
+
   constructor (hls, id, onTransmuxComplete, onFlush) {
     this.hls = hls;
     this.id = id;
@@ -99,13 +101,24 @@ export default class TransmuxerInterface {
   }
 
   push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, defaultInitPTS: number, transmuxIdentifier: TransmuxIdentifier): void {
+    const { currentTransmuxSession, transmuxer, worker } = this;
     const timeOffset = Number.isFinite(frag.startPTS) ? frag.startPTS : frag.start;
     const decryptdata = frag.decryptdata;
     const lastFrag = this.frag;
-    const discontinuity = !(lastFrag && (frag.cc === lastFrag.cc));
-    const trackSwitch = !(lastFrag && (frag.level === lastFrag.level));
-    const nextSN = lastFrag && (frag.sn === (lastFrag.sn as number + 1));
-    const contiguous = !trackSwitch && nextSN;
+
+    let contiguous = true;
+    let discontinuity = false;
+    let trackSwitch = false;
+
+    if (startingNewTransmuxSession(currentTransmuxSession, transmuxIdentifier)) {
+     discontinuity = !(lastFrag && (frag.cc === lastFrag.cc));
+     trackSwitch = !(lastFrag && (frag.level === lastFrag.level));
+     const nextSN = !!(lastFrag && (frag.sn === (lastFrag.sn as number + 1)));
+     contiguous = !trackSwitch && nextSN;
+
+     this.currentTransmuxSession = transmuxIdentifier;
+    }
+
     if (discontinuity) {
       logger.log(`${this.id}:discontinuity detected`);
     }
@@ -116,7 +129,6 @@ export default class TransmuxerInterface {
 
     this.frag = frag;
     // Frags with sn of 'initSegment' are not transmuxed
-    const { transmuxer, worker } = this;
     if (worker) {
       // post fragment payload as transferable objects for ArrayBuffer (no copy)
       worker.postMessage({
@@ -221,4 +233,11 @@ export default class TransmuxerInterface {
       }
     }
   }
+}
+
+function startingNewTransmuxSession (currentIdentifier: TransmuxIdentifier | null, newIdentifier: TransmuxIdentifier) {
+  if (!currentIdentifier) {
+    return true;
+  }
+  return currentIdentifier.sn !== newIdentifier.sn || currentIdentifier.level !== newIdentifier.level;
 }
