@@ -17,7 +17,7 @@ import { Demuxer } from '../types/demuxer';
 import { Remuxer } from '../types/remuxer';
 import { TransmuxerResult, TransmuxIdentifier } from '../types/transmuxer';
 import ChunkCache from './chunk-cache';
-import { prependUint8Array } from '../utils/mp4-tools';
+import { appendUint8Array } from '../utils/mp4-tools';
 
 import { getSelfScope } from '../utils/get-self-scope';
 import { logger } from '../utils/logger';
@@ -117,7 +117,7 @@ class Transmuxer {
 
     const needsProbing = this.needsProbing(uintData, discontinuity, trackSwitch);
     if (needsProbing && (uintData.length + cache.dataLength < minProbeByteLength)) {
-      logger.log(`The transmuxer received ${uintData.length} bytes, but at least ${minProbeByteLength} are required to probe for demuxer types\n` +
+      logger.log(`[transmuxer.ts]: Received ${uintData.length} bytes, but at least ${minProbeByteLength} are required to probe for demuxer types\n` +
         'This data will be cached until the minimum amount is met.');
       cache.push(uintData);
       return {
@@ -125,7 +125,8 @@ class Transmuxer {
         transmuxIdentifier
       };
     } else if (cache.dataLength) {
-      uintData = prependUint8Array(uintData, cache.flush());
+      logger.log(`[transmuxer.ts]: Cache now has enough data to probe.`);
+      uintData = appendUint8Array(cache.flush(), uintData);
     }
 
     const uintInitSegment = new Uint8Array(initSegment);
@@ -241,6 +242,7 @@ class Transmuxer {
         // Ensure that muxers are always initialized with an initSegment
         demuxer.resetInitSegment(initSegmentData, audioCodec, videoCodec, duration);
         remuxer.resetInitSegment(initSegmentData, audioCodec, videoCodec);
+        logger.log(`[transmuxer.ts]: Probe succeeded with a data length of ${data.length}.`);
         this.probe = probe;
         break;
       }

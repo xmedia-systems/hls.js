@@ -59,6 +59,8 @@ export default class Fragment {
   public startPTS!: number;
   // The start time of the fragment, as listed in the manifest. Updated after transmuxing.
   public start: number = 0;
+  // Set when the fragment was loaded and transmuxed, but was stopped from buffering due to dropped frames.
+  public backtracked: boolean = false;
   // LHLS prefetch flag
   public prefetch?: boolean;
 

@@ -182,11 +182,11 @@ export default class TransmuxerInterface {
         // @ts-ignore
         transmuxResult.then(data => {
           this.onTransmuxComplete(data);
-          this.onFlush();
+          this.onFlush(transmuxIdentifier);
         });
       } else {
         this.onTransmuxComplete(transmuxResult);
-        this.onFlush();
+        this.onFlush(transmuxIdentifier);
       }
     }
   }
@@ -207,7 +207,7 @@ export default class TransmuxerInterface {
       }
 
       case 'flush': {
-        this.onFlush();
+        this.onFlush(data.data);
         break;
       }
 

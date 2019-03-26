@@ -75,11 +75,11 @@ export default function TransmuxerWorker (self) {
             // @ts-ignore
             transmuxResult.then(data => {
               emitTransmuxComplete(self, data);
-              self.postMessage({ event: 'flush' });
+              self.postMessage({ event: 'flush', data: transmuxResult });
             });
           } else {
             emitTransmuxComplete(self, transmuxResult);
-            self.postMessage({ event: 'flush' });
+            self.postMessage({ event: 'flush', data: transmuxResult });
           }
           break;
         }
