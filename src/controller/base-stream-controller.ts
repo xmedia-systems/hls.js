@@ -40,7 +40,7 @@ export default class BaseStreamController extends TaskLoop {
   protected startPosition: number = 0;
   protected loadedmetadata: boolean = false;
   protected fragLoadError: number = 0;
-  protected levels: Array<any> = [];
+  protected levels: Array<any> | null = null;
   protected fragmentLoader!: FragmentLoader;
   protected readonly logPrefix: string = '';
 
@@ -150,6 +150,10 @@ export default class BaseStreamController extends TaskLoop {
 
   protected _loadFragForPlayback (frag) {
     const progressCallback: FragmentLoadProgressCallback = (stats, context, payload, networkDetails) => {
+      if (this._fragLoadAborted(frag)) {
+        logger.warn(`Fragment ${frag.sn} of level ${frag.level} was aborted during progressive download.`);
+        return;
+      }
       this._handleFragmentLoadProgress(frag, payload, stats);
     };
     this._doFragLoad(frag, progressCallback)
@@ -224,6 +228,10 @@ export default class BaseStreamController extends TaskLoop {
 
   protected log (msg) {
     logger.log(`${this.logPrefix}: ${msg}`);
+  }
+
+  protected warn (msg) {
+    logger.warn(`${this.logPrefix}: ${msg}`);
   }
 
   set state (nextState) {

@@ -18,7 +18,6 @@ import { findFragmentByPDT, findFragmentByPTS } from './fragment-finders';
 import GapController from './gap-controller';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader, { FragLoadSuccessResult } from '../loader/fragment-loader';
-import { TransmuxIdentifier } from '../types/transmuxer';
 import { LoaderStats } from '../types/loader';
 
 const TICK_INTERVAL = 100; // how often to tick in ms
@@ -43,7 +42,7 @@ export default class StreamController extends BaseStreamController {
   private fragLastKbps: number = 0;
   private stalled: boolean = false;
   private audioCodecSwitch: boolean = false;
-  private stats: LoaderStats | null = null;
+  private stats!: LoaderStats;
   private pendingBuffering: boolean = false;
   private appended: boolean = false;
   private videoBuffer: any | null = null;
@@ -271,7 +270,7 @@ export default class StreamController extends BaseStreamController {
       if (levelDetails.live) {
         let initialLiveManifestSize = this.config.initialLiveManifestSize;
         if (fragLen < initialLiveManifestSize) {
-          logger.warn(`Can not start playback of a level, reason: not enough fragments ${fragLen} < ${initialLiveManifestSize}`);
+          this.warn(`Can not start playback of a level, reason: not enough fragments ${fragLen} < ${initialLiveManifestSize}`);
           return;
         }
 
@@ -414,7 +413,7 @@ export default class StreamController extends BaseStreamController {
             // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
             if (deltaPTS && deltaPTS > config.maxBufferHole && fragPrevious.dropped && curSNIdx && !frag.backtracked) {
               frag = prevFrag;
-              logger.warn('SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this');
+              this.warn('SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this');
             } else {
               frag = nextFrag;
               this.log(`SN just loaded, load next one: ${frag.sn}`);
@@ -425,12 +424,12 @@ export default class StreamController extends BaseStreamController {
         } else if (frag.backtracked) {
           // Only backtrack a max of 1 consecutive fragment to prevent sliding back too far when little or no frags start with keyframes
           if (nextFrag && nextFrag.backtracked) {
-            logger.warn(`Already backtracked from fragment ${nextFrag.sn}, will not backtrack to fragment ${frag.sn}. Loading fragment ${nextFrag.sn}`);
+            this.warn(`Already backtracked from fragment ${nextFrag.sn}, will not backtrack to fragment ${frag.sn}. Loading fragment ${nextFrag.sn}`);
             frag = nextFrag;
           } else {
             // If a fragment has dropped frames and it's in a same level/sequence, load the previous fragment to try and find the keyframe
             // Reset the dropped count now since it won't be reset until we parse the fragment again, which prevents infinite backtracking on the same segment
-            logger.warn('Loaded fragment with dropped frames, backtracking 1 segment to find a keyframe');
+            this.warn('Loaded fragment with dropped frames, backtracking 1 segment to find a keyframe');
             frag.dropped = 0;
             if (prevFrag) {
               frag = prevFrag;
@@ -691,14 +690,13 @@ export default class StreamController extends BaseStreamController {
   }
 
   onMediaDetaching () {
-    let media = this.media;
+    const { levels, media } = this;
     if (media && media.ended) {
       this.log('MSE detaching and video ended, reset startPosition');
       this.startPosition = this.lastCurrentTime = 0;
     }
 
     // reset fragment backtracked flag
-    let levels = this.levels;
     if (levels) {
       levels.forEach(level => {
         if (level.details) {
@@ -854,12 +852,11 @@ export default class StreamController extends BaseStreamController {
   }
 
   _handleFragmentLoadProgress (frag, payload, stats) {
-    const { fragCurrent, levels, media } = this;
-    if (!levels || !fragCurrent) {
-      logger.warn('Levels and fragCurrent became undefined during fragment load progress; this chunk will be discarded.');
+    const { levels, media } = this;
+    if (!levels) {
       return;
     }
-    const currentLevel = levels[fragCurrent.level];
+    const currentLevel = levels[frag.level];
     const details = currentLevel.details;
     this.stats = stats;
 
@@ -981,7 +978,7 @@ export default class StreamController extends BaseStreamController {
         this.fragPrevious = frag;
         const stats = this.stats;
         if (!stats) {
-          logger.warn(`Stats object was unset after fragment was buffered. tbuffered will not be recorded for ${this.fragCurrent}`);
+          this.warn(`Stats object was unset after fragment was buffered. tbuffered will not be recorded for ${this.fragCurrent}`);
         } else {
           stats.tbuffered = window.performance.now();
           // we should get rid of this.fragLastKbps
@@ -1014,7 +1011,7 @@ export default class StreamController extends BaseStreamController {
         if ((this.fragLoadError + 1) <= this.config.fragLoadingMaxRetry) {
           // exponential backoff capped to config.fragLoadingMaxRetryTimeout
           let delay = Math.min(Math.pow(2, this.fragLoadError) * this.config.fragLoadingRetryDelay, this.config.fragLoadingMaxRetryTimeout);
-          logger.warn(`mediaController: frag loading failed, retry in ${delay} ms`);
+          this.warn(`mediaController: frag loading failed, retry in ${delay} ms`);
           this.retryDate = window.performance.now() + delay;
           // retry loading state
           // if loadedmetadata is not set, it means that we are emergency switch down on first frag
@@ -1039,7 +1036,7 @@ export default class StreamController extends BaseStreamController {
         if (data.fatal) {
           // if fatal error, stop processing
           this.state = State.ERROR;
-          logger.warn(`streamController: ${data.details},switch to ${this.state} state ...`);
+          this.warn(`streamController: ${data.details},switch to ${this.state} state ...`);
         } else {
           // in case of non fatal error while loading level, if level controller is not retrying to load level , switch back to IDLE
           if (!data.levelRetry && this.state === State.WAITING_LEVEL) {
@@ -1059,7 +1056,7 @@ export default class StreamController extends BaseStreamController {
           // current position is not buffered, but browser is still complaining about buffer full error
           // this happens on IE/Edge, refer to https://github.com/video-dev/hls.js/pull/708
           // in that case flush the whole buffer to recover
-          logger.warn('buffer full error also media.currentTime is not buffered, flush everything');
+          this.warn('buffer full error also media.currentTime is not buffered, flush everything');
           this.fragCurrent = null;
           // flush everything
           this.flushMainBuffer(0, Number.POSITIVE_INFINITY);
@@ -1076,7 +1073,7 @@ export default class StreamController extends BaseStreamController {
     if (config.maxMaxBufferLength >= minLength) {
       // reduce max buffer length as it might be too high. we do this to avoid loop flushing ...
       config.maxMaxBufferLength /= 2;
-      logger.warn(`Reduce max buffer length to ${config.maxMaxBufferLength}s`);
+      this.warn(`Reduce max buffer length to ${config.maxMaxBufferLength}s`);
       return true;
     }
     return false;
@@ -1271,7 +1268,7 @@ export default class StreamController extends BaseStreamController {
     if (this.stats) {
       this.stats.tparsed = window.performance.now();
     } else {
-      logger.warn(`Stats object was unset after fragment finished parsing. tparsed will not be recorded for ${this.fragCurrent}`);
+      this.warn(`Stats object was unset after fragment finished parsing. tparsed will not be recorded for ${this.fragCurrent}`);
     }
     this.state = State.PARSED;
     this._checkAppendedParsed();
@@ -1283,7 +1280,7 @@ export default class StreamController extends BaseStreamController {
     }
     const { levels, level } = this;
     if (!levels) {
-      logger.warn(`Levels object was unset while buffering the init segment for fragment ${frag}. The init segment will not be buffered.`);
+      this.warn(`Levels object was unset while buffering the init segment for fragment ${frag}. The init segment will not be buffered.`);
       return;
     }
     // if audio track is expected to come from audio stream controller, discard any coming from main
@@ -1380,7 +1377,7 @@ export default class StreamController extends BaseStreamController {
 
     const { hls, level, levels } = this;
     if (!levels) {
-      logger.warn(`Levels object was unset while buffering fragment ${frag}. The current chunk will not be buffered.`);
+      this.warn(`Levels object was unset while buffering fragment ${frag}. The current chunk will not be buffered.`);
       return;
     }
     const currentLevel = levels[level];
@@ -1415,14 +1412,14 @@ function _hasDroppedFrames (frag, dropped, startSN) {
     frag.dropped = dropped;
     if (!frag.backtracked) {
       if (frag.sn === startSN) {
-        logger.warn('Missing video frame(s) on first frag, appending with gap', frag.sn);
+        this.warn('Missing video frame(s) on first frag, appending with gap', frag.sn);
         return false;
       } else {
-        logger.warn('Missing video frame(s), backtracking fragment', frag.sn);
+        this.warn('Missing video frame(s), backtracking fragment', frag.sn);
         return true;
       }
     } else {
-      logger.warn('Already backtracked on this fragment, appending with the gap', frag.sn);
+      this.warn('Already backtracked on this fragment, appending with the gap', frag.sn);
     }
   } else {
     // Only reset the backtracked flag if we've loaded the frag without any dropped frames

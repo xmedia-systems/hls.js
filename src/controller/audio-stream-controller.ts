@@ -28,7 +28,7 @@ class AudioStreamController extends BaseStreamController {
   private onvseeking: Function | null = null;
   private onvseeked: Function | null = null;
   private onvended: Function | null = null;
-  private stats: LoaderStats | null = null;
+  private stats!: LoaderStats;
   private videoBuffer: any | null = null;
   private initPTS: any = [];
   private waitingFragment: Fragment | null = null;
@@ -77,24 +77,24 @@ class AudioStreamController extends BaseStreamController {
   }
 
   startLoad (startPosition) {
-    if (this.levels.length) {
-      let lastCurrentTime = this.lastCurrentTime;
-      this.stopLoad();
-      this.setInterval(TICK_INTERVAL);
-      this.fragLoadError = 0;
-      if (lastCurrentTime > 0 && startPosition === -1) {
-        this.log(`Override startPosition with lastCurrentTime @${lastCurrentTime.toFixed(3)}`);
-        this.state = State.IDLE;
-      } else {
-        this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
-        this.state = State.STARTING;
-      }
-      this.nextLoadPosition = this.startPosition = this.lastCurrentTime;
-      this.tick();
-    } else {
+    if (!this.levels) {
       this.startPosition = startPosition;
       this.state = State.STOPPED;
+      return;
     }
+    let lastCurrentTime = this.lastCurrentTime;
+    this.stopLoad();
+    this.setInterval(TICK_INTERVAL);
+    this.fragLoadError = 0;
+    if (lastCurrentTime > 0 && startPosition === -1) {
+      this.log(`Override startPosition with lastCurrentTime @${lastCurrentTime.toFixed(3)}`);
+      this.state = State.IDLE;
+    } else {
+      this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
+      this.state = State.STARTING;
+    }
+    this.nextLoadPosition = this.startPosition = this.lastCurrentTime;
+    this.tick();
   }
 
   doTick () {
@@ -307,7 +307,7 @@ class AudioStreamController extends BaseStreamController {
     media.addEventListener('seeking', this.onvseeking);
     media.addEventListener('ended', this.onvended);
     let config = this.config;
-    if (this.levels.length && config.autoStartLoad) {
+    if (this.levels && config.autoStartLoad) {
       this.startLoad(config.startPosition);
     }
   }
@@ -364,10 +364,14 @@ class AudioStreamController extends BaseStreamController {
   }
 
   onAudioTrackLoaded (data) {
-    let newDetails = data.details;
-    let trackId = data.id;
-    let track = this.levels[trackId];
-    let duration = newDetails.totalduration;
+    const { levels } = this;
+    if (!levels) {
+      return;
+    }
+    const trackId = data.id;
+    const track = levels[trackId];
+    const newDetails = data.details;
+    const duration = newDetails.totalduration;
     let sliding = 0;
 
     this.log(`Track ${trackId} loaded [${newDetails.startSN},${newDetails.endSN}],duration:${duration}`);
@@ -426,13 +430,16 @@ class AudioStreamController extends BaseStreamController {
 
   _handleFragmentLoadProgress (frag, payload, stats) {
     const { config, trackId, levels } = this;
-    let { transmuxer } = this;
+    if (!levels) {
+      return;
+    }
     const { cc, sn } = frag;
     const track = levels[trackId];
     const details = track.details;
     const audioCodec = config.defaultAudioCodec || track.audioCodec || 'mp4a.40.2';
     this.stats = stats;
 
+    let transmuxer = this.transmuxer;
     if (!transmuxer) {
       transmuxer = this.transmuxer =
           new TransmuxerInterface(this.hls, 'audio', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
@@ -527,7 +534,7 @@ class AudioStreamController extends BaseStreamController {
           this.fragLoadError = loadError;
           // exponential backoff capped to config.fragLoadingMaxRetryTimeout
           const delay = Math.min(Math.pow(2, loadError - 1) * config.fragLoadingRetryDelay, config.fragLoadingMaxRetryTimeout);
-          logger.warn(`Frag loading failed, retry in ${delay} ms`);
+          this.warn(`Frag loading failed, retry in ${delay} ms`);
           this.retryDate = performance.now() + delay;
           // retry loading state
           this.state = State.FRAG_LOADING_WAITING_RETRY;
@@ -547,7 +554,7 @@ class AudioStreamController extends BaseStreamController {
       if (this.state !== State.ERROR) {
         // if fatal error, stop processing, otherwise move to IDLE to retry loading
         this.state = data.fatal ? State.ERROR : State.IDLE;
-        logger.warn(`${data.details} while loading frag, now switching to ${this.state} state ...`);
+        this.warn(`${data.details} while loading frag, now switching to ${this.state} state ...`);
       }
       break;
     case ErrorDetails.BUFFER_FULL_ERROR:
@@ -562,14 +569,14 @@ class AudioStreamController extends BaseStreamController {
           if (config.maxMaxBufferLength >= config.maxBufferLength) {
             // reduce max buffer length as it might be too high. we do this to avoid loop flushing ...
             config.maxMaxBufferLength /= 2;
-            logger.warn(`Reduce max buffer length to ${config.maxMaxBufferLength}s`);
+            this.warn(`Reduce max buffer length to ${config.maxMaxBufferLength}s`);
           }
           this.state = State.IDLE;
         } else {
           // current position is not buffered, but browser is still complaining about buffer full error
           // this happens on IE/Edge, refer to https://github.com/video-dev/hls.js/pull/708
           // in that case flush the whole audio buffer to recover
-          logger.warn('Buffer full error also media.currentTime is not buffered, flush audio buffer');
+          this.warn('Buffer full error also media.currentTime is not buffered, flush audio buffer');
           this.fragCurrent = null;
           // flush everything
           this.state = State.BUFFER_FLUSHING;
@@ -702,6 +709,11 @@ class AudioStreamController extends BaseStreamController {
     logger.trace(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb}`);
 
     const { audioSwitch, hls, levels, media, pendingData, trackId } = this;
+    if (!levels) {
+      this.warn(`Levels object was unset while buffering fragment ${frag}. The current chunk will not be buffered.`);
+      return;
+    }
+
     const track = levels[trackId];
     LevelHelper.updateFragPTSDTS(track.details, frag, data.startPTS, data.endPTS);
     let appendOnBufferFlush = false;
