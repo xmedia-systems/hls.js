@@ -192,7 +192,7 @@ class AudioStreamController extends BaseStreamController {
         }
         if (trackDetails.initSegment && !trackDetails.initSegment.data) {
           frag = trackDetails.initSegment;
-        } else if (bufferEnd <= start) {
+        } else if (bufferEnd < start) {
           // If bufferEnd is before the start of the playlist, load the first fragment
           frag = fragments[0];
           if (this.videoTrackCC > -1 && frag.cc !== this.videoTrackCC) {
@@ -449,7 +449,7 @@ class AudioStreamController extends BaseStreamController {
     // If not we need to wait for it
     const initPTS = this.initPTS[cc];
     const initSegmentData = details.initSegment ? details.initSegment.data : [];
-    logger.trace(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
+    // this.log(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
     // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
     let accurateTimeOffset = false; // details.PTSKnown || !details.live;
     const transmuxIdentifier = { level: frag.level, sn: frag.sn };
@@ -706,7 +706,7 @@ class AudioStreamController extends BaseStreamController {
       data.endPTS = data.startPTS + frag.duration;
       data.endDTS = data.startDTS + frag.duration;
     }
-    logger.trace(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb}`);
+    // this.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb}`);
 
     const { audioSwitch, hls, levels, media, pendingData, trackId } = this;
     if (!levels) {

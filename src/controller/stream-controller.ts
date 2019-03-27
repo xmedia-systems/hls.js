@@ -217,9 +217,7 @@ export default class StreamController extends BaseStreamController {
       return;
     }
 
-    // if buffer length is less than maxBufLen try to load a new fragment ...
-    logger.trace(`Buffer length of ${bufferLen.toFixed(3)} is below max of ${maxBufLen.toFixed(3)}. Checking for more payload.`);
-
+    // if buffer length is less than maxBufLen try to load a new fragment
     // set next load level : this will trigger a playlist load if needed
     this.level = hls.nextLoadLevel = level;
 
@@ -866,7 +864,7 @@ export default class StreamController extends BaseStreamController {
     const audioCodec = this._getAudioCodec(currentLevel);
 
     // transmux the MPEG-TS data to ISO-BMFF segments
-    logger.trace(` ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
+    // this.log(`Transmuxing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
     const transmuxer = this.transmuxer = this.transmuxer ||
           new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
     const transmuxIdentifier = { level: frag.level, sn: frag.sn };
@@ -1373,7 +1371,7 @@ export default class StreamController extends BaseStreamController {
     if (data.hasVideo === true) {
       frag.addElementaryStream(ElementaryStreamTypes.VIDEO);
     }
-    logger.trace(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb},dropped:${data.dropped || 0}`);
+    // this.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb},dropped:${data.dropped || 0}`);
 
     const { hls, level, levels } = this;
     if (!levels) {
