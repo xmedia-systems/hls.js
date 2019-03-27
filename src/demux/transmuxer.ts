@@ -81,7 +81,7 @@ class Transmuxer {
     contiguous: boolean,
     duration: number,
     accurateTimeOffset: boolean,
-    defaultInitPTS: number,
+    defaultInitPTS: number | null,
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
     let uintData = new Uint8Array(data);

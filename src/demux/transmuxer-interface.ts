@@ -100,7 +100,7 @@ export default class TransmuxerInterface {
     }
   }
 
-  push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, defaultInitPTS: number, transmuxIdentifier: TransmuxIdentifier): void {
+  push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, defaultInitPTS: number | null, transmuxIdentifier: TransmuxIdentifier): void {
     const { currentTransmuxSession, transmuxer, worker } = this;
     const timeOffset = Number.isFinite(frag.startPTS) ? frag.startPTS : frag.start;
     const decryptdata = frag.decryptdata;
