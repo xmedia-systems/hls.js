@@ -144,12 +144,11 @@ class Transmuxer {
     }
 
     if (discontinuity || trackSwitch) {
-      demuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec, duration);
-      remuxer.resetInitSegment(uintInitSegment, audioCodec, videoCodec);
+      this.resetInitSegment(uintInitSegment, audioCodec, videoCodec, duration);
     }
+
     if (discontinuity) {
-      demuxer.resetTimeStamp(defaultInitPTS);
-      remuxer.resetTimeStamp(defaultInitPTS);
+      this.resetTimeStamp(defaultInitPTS);
     }
 
    let result;
@@ -182,6 +181,24 @@ class Transmuxer {
         remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, this.timeOffset, this.contiguous, this.accurateTimeOffset),
         transmuxIdentifier
     }
+  }
+
+  resetInitSegment (initSegment: Uint8Array, audioCodec: string, videoCodec: string, duration: number) {
+    const { demuxer, remuxer } = this;
+    if (!demuxer || !remuxer) {
+      return;
+    }
+    demuxer.resetInitSegment(initSegment, audioCodec, videoCodec, duration);
+    remuxer.resetInitSegment(initSegment, audioCodec, videoCodec);
+  }
+
+  resetTimeStamp (defaultInitPTS) {
+    const { demuxer, remuxer } = this;
+    if (!demuxer || !remuxer) {
+      return;
+    }
+    demuxer.resetTimeStamp(defaultInitPTS);
+    remuxer.resetTimeStamp(defaultInitPTS);
   }
 
   destroy (): void {
