@@ -41,7 +41,6 @@ class TSDemuxer extends NonProgressiveDemuxer {
 
   private sampleAes: any = null;
   private pmtParsed: boolean = false;
-  private contiguous: boolean = false;
   private audioCodec!: string;
   private videoCodec!: string;
   private _duration: number = 0;
@@ -572,10 +571,11 @@ class TSDemuxer extends NonProgressiveDemuxer {
       // only push AVC sample if starting with a keyframe is not mandatory OR
       //    if keyframe already found in this fragment OR
       //       keyframe found in last fragment (track.sps) AND
-      //          samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
+      //          samples already appended (we already found a keyframe in this fragment)
+      // TODO: The contiguous flag was removed; does it need replacing?
       if (!this.config.forceKeyFrameOnDiscontinuity ||
           avcSample.key === true ||
-          (avcTrack.sps && (nbSamples || this.contiguous))) {
+          (avcTrack.sps && nbSamples)) {
         avcSample.id = nbSamples;
         samples.push(avcSample);
       } else {
