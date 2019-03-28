@@ -302,12 +302,4 @@ function getEncryptionType (data: Uint8Array, decryptData: any): string | null {
   return encryptionType;
 }
 
-function startingNewTransmuxSession (currentSession: TransmuxSession | null, newIdentifier: TransmuxIdentifier) {
-  if (!currentSession) {
-    return true;
-  }
-  const currentId = currentSession.identifier;
-  return currentId.sn !== newIdentifier.sn || currentId.level !== newIdentifier.level;
-}
-
 export default Transmuxer;

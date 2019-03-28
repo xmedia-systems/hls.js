@@ -4,10 +4,11 @@
 import { logger } from '../utils/logger';
 import { Demuxer, DemuxerResult, DemuxedTrack } from '../types/demuxer';
 import { findBox, segmentValidRange, appendUint8Array } from '../utils/mp4-tools';
+import { dummyTrack } from './dummy-demuxed-track';
 
 class MP4Demuxer implements Demuxer {
   static readonly minProbeByteLength = 16384; // 16kb;
-  private remainderData?: Uint8Array = new Uint8Array(0);
+  private remainderData: Uint8Array | null = null;
 
   resetTimeStamp () {
   }
@@ -31,7 +32,8 @@ class MP4Demuxer implements Demuxer {
     // that the fetch loader gives us flush moof+mdat pairs. If we push jagged data to MSE, it will throw an exception.
     const segmentedData = segmentValidRange(avcSamples);
     this.remainderData = segmentedData.remainder;
-    const avcTrack = dummyTrack(segmentedData.valid);
+    const avcTrack = dummyTrack();
+    avcTrack.samples = segmentedData.valid;
 
     return {
       audioTrack: dummyTrack(),
@@ -43,8 +45,9 @@ class MP4Demuxer implements Demuxer {
 
   // TODO: Re-validate remainder data? Or we can assume that the segmented remainder is always valid CMAF
   flush () {
-    const avcTrack: DemuxedTrack = dummyTrack(this.remainderData);
-    this.remainderData = undefined;
+    const avcTrack: DemuxedTrack = dummyTrack();
+    avcTrack.samples = this.remainderData;
+    this.remainderData = null;
 
     return {
         audioTrack: dummyTrack(),
@@ -60,7 +63,5 @@ class MP4Demuxer implements Demuxer {
 
   destroy () {}
 }
-
-const dummyTrack = (samples = new Uint8Array(0)) => ({ type: '', id: -1, pid: -1, inputTimeScale: 90000, sequenceNumber: -1, len: 0, samples });
 
 export default MP4Demuxer;
