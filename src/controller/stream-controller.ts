@@ -1371,7 +1371,7 @@ export default class StreamController extends BaseStreamController {
     if (data.hasVideo === true) {
       frag.addElementaryStream(ElementaryStreamTypes.VIDEO);
     }
-    this.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb},dropped:${data.dropped || 0}`);
+    // this.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb},dropped:${data.dropped || 0}`);
 
     const { hls, level, levels } = this;
     if (!levels) {
