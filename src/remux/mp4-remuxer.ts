@@ -22,8 +22,8 @@ class MP4Remuxer implements Remuxer {
   private ISGenerated: boolean = false;
   private _initPTS!: number;
   private _initDTS!: number;
-  private nextAvcDts!: number;
-  private nextAudioPts!: number;
+  private nextAvcDts: number | null = null;
+  private nextAudioPts: number | null = null;
 
   constructor (observer, config, typeSupported, vendor) {
     this.observer = observer;
@@ -38,15 +38,22 @@ class MP4Remuxer implements Remuxer {
   }
 
   resetTimeStamp (defaultTimeStamp) {
+    logger.log('[mp4-remuxer]: initPTS & initDTS reset reset');
     this._initPTS = this._initDTS = defaultTimeStamp;
   }
 
+  resetNextTimestamp () {
+    logger.log('[mp4-remuxer]: nextAudioPts & nextAvcDts reset');
+    this.nextAudioPts = null;
+    this.nextAvcDts = null;
+  }
+
   resetInitSegment () {
+    logger.log('[mp4-remuxer]: ISGenerated flag reset');
     this.ISGenerated = false;
   }
 
-  remux (audioTrack: DemuxedAudioTrack, videoTrack: DemuxedAvcTrack, id3Track: DemuxedTrack, textTrack: DemuxedTrack, timeOffset, contiguous, accurateTimeOffset) : RemuxerResult {
-    // generate Init Segment if needed
+  remux (audioTrack: DemuxedAudioTrack, videoTrack: DemuxedAvcTrack, id3Track: DemuxedTrack, textTrack: DemuxedTrack, timeOffset, accurateTimeOffset) : RemuxerResult {
     let video;
     let audio;
     let initSegment;
@@ -57,6 +64,8 @@ class MP4Remuxer implements Remuxer {
     }
 
     if (this.ISGenerated) {
+      const isAudioContiguous = Number.isFinite(this.nextAudioPts);
+      const isVideoContiguous = Number.isFinite(this.nextAvcDts);
       const nbAudioSamples = audioTrack.samples.length;
       const nbVideoSamples = videoTrack.samples.length;
       let audioTimeOffset = timeOffset;
@@ -79,7 +88,7 @@ class MP4Remuxer implements Remuxer {
           logger.warn('regenerate InitSegment as audio detected');
           initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
         }
-        audio = this.remuxAudio(audioTrack, audioTimeOffset, contiguous, accurateTimeOffset);
+        audio = this.remuxAudio(audioTrack, audioTimeOffset, isAudioContiguous, accurateTimeOffset);
         // logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (nbVideoSamples) {
           let audioTrackLength;
@@ -92,14 +101,14 @@ class MP4Remuxer implements Remuxer {
             logger.warn('regenerate InitSegment as video detected');
             initSegment = this.generateIS(audioTrack, videoTrack, timeOffset);
           }
-          video = this.remuxVideo(videoTrack, videoTimeOffset, contiguous, audioTrackLength, accurateTimeOffset);
+          video = this.remuxVideo(videoTrack, videoTimeOffset, isVideoContiguous, audioTrackLength, accurateTimeOffset);
         }
       } else {
         // logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (nbVideoSamples) {
-          video = this.remuxVideo(videoTrack, videoTimeOffset, contiguous, 0, accurateTimeOffset);
+          video = this.remuxVideo(videoTrack, videoTimeOffset, isVideoContiguous, 0, accurateTimeOffset);
           if (video && audioTrack.codec) {
-            audio = this.remuxEmptyAudio(audioTrack, audioTimeOffset, contiguous, video);
+            audio = this.remuxEmptyAudio(audioTrack, audioTimeOffset, isAudioContiguous, video);
           }
         }
       }
@@ -237,9 +246,10 @@ class MP4Remuxer implements Remuxer {
       );
     }
 
-    if (!contiguous || !Number.isFinite(nextAvcDts)) {
+    if (!contiguous) {
       // if not contiguous, let's use target timeOffset
-      nextAvcDts = timeOffset * timeScale;
+      this.nextAvcDts = nextAvcDts = timeOffset * timeScale;
+      logger.log(`[mp4-remuxer]: nextAvcDts generated as ${nextAvcDts}`);
     }
 
     // PTS is coded on 33bits, and can loop from -2^32 to 2^32
@@ -439,6 +449,7 @@ class MP4Remuxer implements Remuxer {
       nb: outputSamples.length,
       dropped: dropped
     };
+
     return data;
   }
 
@@ -452,14 +463,17 @@ class MP4Remuxer implements Remuxer {
     const initPTS = this._initPTS;
     const rawMPEG = !track.isAAC && this.typeSupported.mpeg;
 
-    let offset,
-      mp4Sample,
-      fillFrame,
-      mdat, moof,
-      firstPTS, lastPTS,
-      inputSamples = track.samples,
-      outputSamples = [] as Array<any>,
-      nextAudioPts = this.nextAudioPts;
+    let offset;
+    let mp4Sample;
+    let fillFrame;
+    let mdat;
+    let moof;
+    let firstPTS;
+    let lastPTS;
+    let inputSamples = track.samples;
+    let outputSamples = [] as Array<any>;
+    let nextAudioPts = this.nextAudioPts;
+
 
     // for audio samples, also consider consecutive fragments as being contiguous (even if a level switch occurs),
     // for sake of clarity:
@@ -472,7 +486,7 @@ class MP4Remuxer implements Remuxer {
     contiguous = contiguous || (inputSamples.length && nextAudioPts &&
                    ((accurateTimeOffset && Math.abs(timeOffset - nextAudioPts / inputTimeScale) < 0.1) ||
                     Math.abs((inputSamples[0].pts - nextAudioPts - initPTS)) < 20 * inputSampleDuration)
-    );
+    ) as boolean;
 
     // compute normalized PTS
     inputSamples.forEach(function (sample) {
@@ -491,14 +505,9 @@ class MP4Remuxer implements Remuxer {
       return;
     }
 
-    if (!contiguous || !Number.isFinite(nextAudioPts)) {
-      if (!accurateTimeOffset) {
-        // if frag are mot contiguous and if we cant trust time offset, let's use first sample PTS as next audio PTS
-        nextAudioPts = inputSamples[0].pts;
-      } else {
-        // if timeOffset is accurate, let's use it as predicted next audio PTS
-        nextAudioPts = timeOffset * inputTimeScale;
-      }
+    if (!contiguous) {
+      this.nextAudioPts = nextAudioPts = accurateTimeOffset ? timeOffset * inputTimeScale : inputSamples[0].pts;
+      logger.log(`[mp4-remuxer]: nextAudioPts generated as ${nextAudioPts}`);
     }
 
     // If the audio track is missing samples, the frames seem to get "left-shifted" within the

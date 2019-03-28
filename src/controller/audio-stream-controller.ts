@@ -248,6 +248,7 @@ class AudioStreamController extends BaseStreamController {
           const fragState = this.fragmentTracker.getState(frag);
           this.fragCurrent = frag;
           this.startFragRequested = true;
+          let prevPos = this.nextLoadPosition;
           if (Number.isFinite(frag.sn)) {
             this.nextLoadPosition = frag.start + frag.duration;
           }
@@ -259,6 +260,7 @@ class AudioStreamController extends BaseStreamController {
             } else {
               this.log(`Unknown video PTS for continuity counter ${frag.cc}, waiting for video PTS before loading audio frag ${frag.sn} of [${trackDetails.startSN} ,${trackDetails.endSN}],track ${trackId}`);
               this.state = State.WAITING_INIT_PTS;
+              this.nextLoadPosition = prevPos;
             }
           }
         }
@@ -715,7 +717,7 @@ class AudioStreamController extends BaseStreamController {
     }
 
     const track = levels[trackId];
-    LevelHelper.updateFragPTSDTS(track.details, frag, data.startPTS, data.endPTS);
+    LevelHelper.updateFragPTSDTS(track.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
     let appendOnBufferFlush = false;
     // Only flush audio from old audio tracks when PTS is known on new audio track
     if (audioSwitch) {

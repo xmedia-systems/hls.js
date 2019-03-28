@@ -20,7 +20,7 @@ class MP4Demuxer implements Demuxer {
     return findBox({ data: data, start: 0, end: Math.min(data.length, 16384) }, ['moof']).length > 0;
   }
 
-  demux (data, timeOffset, contiguous, accurateTimeOffset): DemuxerResult {
+  demux (data): DemuxerResult {
     // Load all data into the avc track. The CMAF remuxer will look for the data in the samples object; the rest of the fields do not matter
     let avcSamples = data;
     if (this.remainderData) {
@@ -54,7 +54,7 @@ class MP4Demuxer implements Demuxer {
     };
   }
 
-  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number, contiguous: boolean): Promise<DemuxerResult> {
+  demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number): Promise<DemuxerResult> {
     return Promise.reject(new Error('The MP4 demuxer does not support SAMPLE-AES decryption'));
   }
 

@@ -116,15 +116,8 @@ export default class TransmuxerInterface {
      const nextSN = !!(lastFrag && (frag.sn === (lastFrag.sn as number + 1)));
      contiguous = !trackSwitch && nextSN;
 
+     logger.log(`[transmuxer-interface, ${frag.type}]: Starting new transmux session fragment ${frag.sn}, of level ${frag.level}; discontinuity: ${discontinuity}, trackSwitch: ${trackSwitch}, contiguous: ${contiguous}`);
      this.currentTransmuxSession = transmuxIdentifier;
-    }
-
-    if (discontinuity) {
-      logger.log(`${this.id}:discontinuity detected`);
-    }
-
-    if (trackSwitch) {
-      logger.log(`${this.id}:switch detected`);
     }
 
     this.frag = frag;

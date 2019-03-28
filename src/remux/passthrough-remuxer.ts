@@ -10,14 +10,18 @@ class PassThroughRemuxer implements Remuxer {
   private initData?: any;
   private initPTS?: number;
   private initTracks?: TrackSet;
-  private lastEndDTS?: number;
+  private lastEndDTS: number | null = null;
 
   destroy () {
   }
 
   resetTimeStamp (defaultInitPTS) {
     this.initPTS = defaultInitPTS;
-    this.lastEndDTS = undefined;
+    this.lastEndDTS = null;
+  }
+
+  resetNextTimestamp () {
+    this.lastEndDTS = null;
   }
 
   resetInitSegment (initSegment, audioCodec, videoCodec) {
@@ -66,7 +70,7 @@ class PassThroughRemuxer implements Remuxer {
   }
 
   // TODO: utilize accurateTimeOffset
-  remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset): RemuxerResult {
+  remux (audioTrack, videoTrack, id3Track, textTrack, timeOffset, accurateTimeOffset): RemuxerResult {
     let { initPTS, lastEndDTS } = this;
     const result: RemuxerResult =  {
       audio: undefined,
@@ -79,7 +83,7 @@ class PassThroughRemuxer implements Remuxer {
     // If we haven't yet set a lastEndDTS, or it was reset, set it to the provided timeOffset. We want to use the
     // lastEndDTS over timeOffset whenever possible; during progressive playback, the media source will not update
     // the media duration (which is what timeOffset is provided as) before we need to process the next chunk.
-    if (!Number.isFinite(lastEndDTS) || !contiguous) {
+    if (!Number.isFinite(lastEndDTS)) {
       lastEndDTS = this.lastEndDTS = timeOffset || 0;
     }
 

@@ -46,6 +46,13 @@ muxConfig.forEach(({ demux }) => {
   minProbeByteLength = Math.max(minProbeByteLength, demux.minProbeByteLength);
 });
 
+interface TransmuxSession {
+  contiguous: boolean
+  timeOffset: number
+  accurateTimeOffset: boolean
+  identifier: TransmuxIdentifier
+}
+
 class Transmuxer {
   private observer: any;
   private typeSupported: any;
@@ -85,6 +92,7 @@ class Transmuxer {
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
     let uintData = new Uint8Array(data);
+    const uintInitSegment = new Uint8Array(initSegment);
     const cache = this.cache;
     const encryptionType = getEncryptionType(uintData, decryptdata);
 
@@ -111,7 +119,6 @@ class Transmuxer {
       return this.decryptionPromise;
     }
 
-    this.contiguous = contiguous;
     this.timeOffset = timeOffset;
     this.accurateTimeOffset = accurateTimeOffset;
 
@@ -129,7 +136,6 @@ class Transmuxer {
       uintData = appendUint8Array(cache.flush(), uintData);
     }
 
-    const uintInitSegment = new Uint8Array(initSegment);
     let { demuxer, remuxer } = this;
     if (needsProbing) {
       ({ demuxer, remuxer } = this.configureTransmuxer(uintData, uintInitSegment, audioCodec, videoCodec, duration));
@@ -148,14 +154,18 @@ class Transmuxer {
     }
 
     if (discontinuity) {
-      this.resetTimeStamp(defaultInitPTS);
+      this.resetInitialTimestamp(defaultInitPTS);
+    }
+
+    if (!contiguous) {
+      this.resetNextTimestamp();
     }
 
    let result;
    if (encryptionType === 'SAMPLE-AES') {
-      result = this.transmuxSampleAes(uintData, decryptdata, timeOffset, contiguous, accurateTimeOffset, transmuxIdentifier);
+      result = this.transmuxSampleAes(uintData, decryptdata, timeOffset, accurateTimeOffset, transmuxIdentifier);
     } else {
-      result = this.transmux(uintData, timeOffset, contiguous, accurateTimeOffset, transmuxIdentifier);
+      result = this.transmux(uintData, timeOffset, accurateTimeOffset, transmuxIdentifier);
     }
     return result;
   }
@@ -175,12 +185,29 @@ class Transmuxer {
         transmuxIdentifier
       }
     }
-    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush(this.timeOffset, this.contiguous);
+    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.flush(this.timeOffset);
     // TODO: ensure that remuxers use last DTS as the timeOffset when passed null
     return {
-        remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, this.timeOffset, this.contiguous, this.accurateTimeOffset),
+        remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, this.timeOffset, this.accurateTimeOffset),
         transmuxIdentifier
     }
+  }
+
+  resetInitialTimestamp (defaultInitPTS) {
+    const { demuxer, remuxer } = this;
+    if (!demuxer || !remuxer) {
+      return;
+    }
+    demuxer.resetTimeStamp(defaultInitPTS);
+    remuxer.resetTimeStamp(defaultInitPTS);
+  }
+
+  resetNextTimestamp () {
+    const { demuxer, remuxer } = this;
+    if (!demuxer || !remuxer) {
+      return;
+    }
+    remuxer.resetNextTimestamp();
   }
 
   resetInitSegment (initSegment: Uint8Array, audioCodec: string, videoCodec: string, duration: number) {
@@ -188,17 +215,8 @@ class Transmuxer {
     if (!demuxer || !remuxer) {
       return;
     }
-    demuxer.resetInitSegment(initSegment, audioCodec, videoCodec, duration);
+    demuxer.resetInitSegment(audioCodec, videoCodec, duration);
     remuxer.resetInitSegment(initSegment, audioCodec, videoCodec);
-  }
-
-  resetTimeStamp (defaultInitPTS) {
-    const { demuxer, remuxer } = this;
-    if (!demuxer || !remuxer) {
-      return;
-    }
-    demuxer.resetTimeStamp(defaultInitPTS);
-    remuxer.resetTimeStamp(defaultInitPTS);
   }
 
   destroy (): void {
@@ -212,19 +230,19 @@ class Transmuxer {
     }
   }
 
-  private transmux (data: Uint8Array, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier): TransmuxerResult {
-    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.demux(data, timeOffset, contiguous, false);
+  private transmux (data: Uint8Array, timeOffset: number, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier): TransmuxerResult {
+    const { audioTrack, avcTrack, id3Track, textTrack } = this.demuxer!.demux(data, timeOffset,false);
     return {
-        remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, contiguous, accurateTimeOffset),
+        remuxResult: this.remuxer!.remux(audioTrack, avcTrack, id3Track, textTrack, timeOffset, accurateTimeOffset),
         transmuxIdentifier
     }
   }
 
   // TODO: Handle flush with Sample-AES
-  private transmuxSampleAes (data: Uint8Array, decryptData: any, timeOffset: number, contiguous: boolean, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier) : Promise<TransmuxerResult> {
-    return this.demuxer!.demuxSampleAes(data, decryptData, timeOffset, contiguous)
+  private transmuxSampleAes (data: Uint8Array, decryptData: any, timeOffset: number, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier) : Promise<TransmuxerResult> {
+    return this.demuxer!.demuxSampleAes(data, decryptData, timeOffset)
       .then(demuxResult => ({
-              remuxResult: this.remuxer!.remux(demuxResult.audioTrack, demuxResult.avcTrack, demuxResult.id3Track, demuxResult.textTrack, timeOffset, contiguous, accurateTimeOffset),
+              remuxResult: this.remuxer!.remux(demuxResult.audioTrack, demuxResult.avcTrack, demuxResult.id3Track, demuxResult.textTrack, timeOffset,  accurateTimeOffset),
               transmuxIdentifier
           })
       );
@@ -282,6 +300,14 @@ function getEncryptionType (data: Uint8Array, decryptData: any): string | null {
     encryptionType = decryptData.method;
   }
   return encryptionType;
+}
+
+function startingNewTransmuxSession (currentSession: TransmuxSession | null, newIdentifier: TransmuxIdentifier) {
+  if (!currentSession) {
+    return true;
+  }
+  const currentId = currentSession.identifier;
+  return currentId.sn !== newIdentifier.sn || currentId.level !== newIdentifier.level;
 }
 
 export default Transmuxer;

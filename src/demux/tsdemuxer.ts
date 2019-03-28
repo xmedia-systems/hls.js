@@ -124,8 +124,8 @@ class TSDemuxer extends NonProgressiveDemuxer {
    * @param {string} videoCodec
    * @param {number} duration (in TS timescale = 90kHz)
    */
-  resetInitSegment (initSegment, audioCodec, videoCodec, duration) {
-    super.resetInitSegment(initSegment, audioCodec, videoCodec, duration);
+  resetInitSegment (audioCodec, videoCodec, duration) {
+    super.resetInitSegment(audioCodec, videoCodec, duration);
 
     this.pmtParsed = false;
     this._pmtId = -1;
@@ -152,11 +152,10 @@ class TSDemuxer extends NonProgressiveDemuxer {
   resetTimeStamp () {}
 
   // feed incoming data to the front of the parsing pipeline
-  demuxInternal (data, contiguous, timeOffset, isSampleAes = false): DemuxerResult {
+  demuxInternal (data, timeOffset, isSampleAes = false): DemuxerResult {
     if (!isSampleAes) {
       this.sampleAes = null;
     }
-    this.contiguous = contiguous;
     let start;
     let stt;
     let pid;
@@ -346,8 +345,8 @@ class TSDemuxer extends NonProgressiveDemuxer {
     };
   }
 
-  demuxSampleAes (data, decryptData, timeOffset, contiguous): Promise <DemuxerResult> {
-    const demuxResult = this.demux(data, contiguous, timeOffset, true);
+  demuxSampleAes (data, decryptData, timeOffset): Promise <DemuxerResult> {
+    const demuxResult = this.demux(data, timeOffset, true);
     const sampleAes = this.sampleAes = new SampleAesDecrypter(this.observer, this.config, decryptData, this.discardEPB);
     return new Promise((resolve, reject) => {
       this.decrypt(demuxResult.audioTrack, demuxResult.avcTrack, sampleAes)
