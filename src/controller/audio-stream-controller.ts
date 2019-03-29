@@ -280,10 +280,10 @@ class AudioStreamController extends BaseStreamController {
       break;
     }
     case State.FRAG_LOADING_WAITING_RETRY:
-      var now = performance.now();
-      var retryDate = this.retryDate;
+      const now = performance.now();
+      const retryDate = this.retryDate;
       media = this.media;
-      var isSeeking = media && media.seeking;
+      const isSeeking = media && media.seeking;
       // if current time is gt than retryDate, or if media seeking let's switch to IDLE state to retry loading
       if (!retryDate || (now >= retryDate) || isSeeking) {
         this.log('RetryDate reached, switch back to IDLE state');
@@ -379,16 +379,12 @@ class AudioStreamController extends BaseStreamController {
     const details = data.details;
     const trackId = data.id;
     const track = levels[trackId];
-    const duration = details.totalduration;
     let sliding = 0;
 
     this.log(`Track ${trackId} loaded [${details.startSN},${details.endSN}],duration:${duration}`);
 
     if (details.live) {
       const curDetails = track.details;
-      details.updated = (!curDetails || details.endSN !== curDetails.endSN || details.url !== curDetails.url);
-      details.availabilityDelay = curDetails && curDetails.availabilityDelay;
-
       if (curDetails && details.fragments.length > 0) {
         // we already have details for that level, merge them
         LevelHelper.mergeDetails(curDetails, details);
