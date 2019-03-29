@@ -1175,11 +1175,11 @@ export default class StreamController extends BaseStreamController {
   private _loadBitrateTestFrag (frag) {
     this._doFragLoad(frag)
       .then((data) => {
-        const { stats } = data as FragLoadSuccessResult;
         const { hls } = this;
-        if (hls.nextLoadLevel || this._fragLoadAborted(frag)) {
+        if (!data || hls.nextLoadLevel || this._fragLoadAborted(frag)) {
           return;
         }
+        const { stats } = data as FragLoadSuccessResult;
         this.bitrateTest = false;
         this.fragLoadError = 0;
         this.state = State.IDLE;

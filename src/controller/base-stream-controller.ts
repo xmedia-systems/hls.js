@@ -159,7 +159,7 @@ export default class BaseStreamController extends TaskLoop {
     this._doFragLoad(frag, progressCallback)
       .then((data: FragLoadSuccessResult) => {
         this.fragLoadError = 0;
-        if (this._fragLoadAborted(frag)) {
+        if (!data || this._fragLoadAborted(frag)) {
           return;
         }
         this.log(`Loaded fragment ${frag.sn} of level ${frag.level}`);
@@ -176,7 +176,7 @@ export default class BaseStreamController extends TaskLoop {
       .then((data: FragLoadSuccessResult) => {
         const { stats, payload } = data;
         const { fragCurrent, hls, levels } = this;
-        if (this._fragLoadAborted(frag) || !levels) {
+        if (!data || this._fragLoadAborted(frag) || !levels) {
           return;
         }
         this.state = State.IDLE;
