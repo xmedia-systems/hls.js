@@ -2,6 +2,7 @@ import TaskLoop from "../task-loop";
 import { BufferHelper } from '../utils/buffer-helper';
 import Event from '../events';
 import EWMA from '../utils/ewma';
+import { logger } from '../utils/logger';
 
 const sampleRate: number = 250;
 
@@ -11,7 +12,7 @@ export default class PlaybackRateController extends TaskLoop {
   private media: any | null = null;
   private ewma: EWMA;
   private latencyTarget: number = 3;
-  private refreshLatency = 1;
+  private refreshLatency = 2;
 
   constructor(hls) {
     super(hls,
@@ -41,21 +42,28 @@ export default class PlaybackRateController extends TaskLoop {
     }
     const pos = media.currentTime;
     const bufferInfo = BufferHelper.bufferInfo(media, pos, config.maxBufferHole);
-    const bufferLength = bufferInfo.len;
-    const distance = latencyTarget - bufferLength;
+    const { end } = bufferInfo;
+    const target = end - latencyTarget;
+    const distance = target - media.currentTime;
 
     // TODO: Factor amount of forward buffer into refreshLatency
     // TODO: Make slowdowns less drastic, but still allow it to fall back to the target
-    if (distance < 0 || distance > this.refreshLatency) {
-      media.playbackRate = sigmoid(bufferLength, latencyTarget);
+    if (distance) {
+      if (distance > latencyTarget * 2) {
+        logger.log(`[playback-rate-controller]: Current position is twice the latency target, seeking to ${target}`);
+        media.currentTime = target;
+      } else {
+        media.playbackRate = sigmoid(target, media.currentTime);
+      }
     } else {
       media.playbackRate = 1;
     }
+    logger.log(`[playback-rate-controller]: The playback rate is ${media.playbackRate}, distance: ${distance}, currentTime: ${media.currentTime}, target: ${target}, bufferEnd: ${end}`);
   }
 }
 
 const L = 2; // Change playback rate by up to 2x
-const k = 0.5;
+const k = 0.1;
 const sigmoid = (x, x0) => L / (1 + Math.exp(-k * (x - x0)));
 
 
