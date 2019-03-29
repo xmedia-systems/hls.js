@@ -149,13 +149,14 @@ export default class BaseStreamController extends TaskLoop {
   }
 
   protected _loadFragForPlayback (frag) {
-    const progressCallback: FragmentLoadProgressCallback = (stats, context, payload, networkDetails) => {
+    const progressCallback: FragmentLoadProgressCallback = ({ stats, payload }) => {
       if (this._fragLoadAborted(frag)) {
         logger.warn(`Fragment ${frag.sn} of level ${frag.level} was aborted during progressive download.`);
         return;
       }
       this._handleFragmentLoadProgress(frag, payload, stats);
     };
+
     this._doFragLoad(frag, progressCallback)
       .then((data: FragLoadSuccessResult) => {
         this.fragLoadError = 0;
@@ -209,21 +210,34 @@ export default class BaseStreamController extends TaskLoop {
   protected _doFragLoad (frag, progressCallback?: FragmentLoadProgressCallback) {
     this.state = State.FRAG_LOADING;
     this.hls.trigger(Event.FRAG_LOADING, { frag });
-    return this.fragmentLoader.load(frag, progressCallback)
-      .catch((e) => {
-        const errorData = e ? e.data : null;
-        if (errorData && errorData.details === ErrorDetails.INTERNAL_ABORTED) {
-          const fragPrev = this.fragPrevious;
-          if (fragPrev) {
-            this.nextLoadPosition = fragPrev.start + fragPrev.duration;
-          } else {
-            this.nextLoadPosition = this.lastCurrentTime;
-          }
-          this.log(`Frag load aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
-          return;
+
+    const errorHandler = (e) => {
+      const errorData = e ? e.data : null;
+      if (errorData && errorData.details === ErrorDetails.INTERNAL_ABORTED) {
+        const fragPrev = this.fragPrevious;
+        if (fragPrev) {
+          this.nextLoadPosition = fragPrev.start + fragPrev.duration;
+        } else {
+          this.nextLoadPosition = this.lastCurrentTime;
         }
-        this.hls.trigger(Event.ERROR, errorData);
-      });
+        this.log(`Frag load aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
+        return;
+      }
+      this.hls.trigger(Event.ERROR, errorData);
+    };
+
+    // TODO: Allow progressive downloading of encrypted streams after the decrypter can handle progressive decryption
+    if (frag.decryptdata && progressCallback) {
+      return this.fragmentLoader.load(frag)
+        .then((data: FragLoadSuccessResult) => {
+          progressCallback(data);
+          return data;
+        })
+        .catch(errorHandler);
+    } else {
+      return this.fragmentLoader.load(frag, progressCallback)
+        .catch(errorHandler);
+    }
   }
 
   protected log (msg) {

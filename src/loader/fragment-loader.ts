@@ -104,7 +104,11 @@ export default class FragmentLoader {
           },
           onProgress: (stats, context, data, networkDetails) => {
             if (onProgress) {
-              onProgress(stats, context, data as ArrayBuffer, networkDetails);
+              onProgress({
+                payload: data as ArrayBuffer,
+                stats,
+                networkDetails
+              });
             }
           }
       };
@@ -140,4 +144,4 @@ export interface FragLoadFailResult {
   networkDetails: XMLHttpRequest
 }
 
-export type FragmentLoadProgressCallback = (stats: LoaderStats, context: LoaderContext, data: ArrayBuffer, networkDetails?: XMLHttpRequest) => void;
+export type FragmentLoadProgressCallback = (result: FragLoadSuccessResult) => void;
