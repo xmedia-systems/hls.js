@@ -1233,13 +1233,16 @@ export default class StreamController extends BaseStreamController {
     }
 
     // Avoid buffering if backtracking this fragment
-    if (_hasDroppedFrames(frag, video ? video.dropped : 0, levels[level].details.startSN)) {
-      this._backtrack(frag, video.startPTS);
-      return;
+    if (video) {
+      if (_hasDroppedFrames(frag, video.dropped, levels[level].details.startSN)) {
+        this._backtrack(frag, video.startPTS);
+        return;
+      } else {
+        this._bufferFragmentData(video);
+      }
     }
 
     this._bufferFragmentData(audio);
-    this._bufferFragmentData(video);
 
     if (id3) {
       id3.frag = frag;
