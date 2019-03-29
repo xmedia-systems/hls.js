@@ -375,41 +375,45 @@ class AudioStreamController extends BaseStreamController {
     if (!levels) {
       return;
     }
+
+    const details = data.details;
     const trackId = data.id;
     const track = levels[trackId];
-    const newDetails = data.details;
-    const duration = newDetails.totalduration;
+    const duration = details.totalduration;
     let sliding = 0;
 
-    this.log(`Track ${trackId} loaded [${newDetails.startSN},${newDetails.endSN}],duration:${duration}`);
+    this.log(`Track ${trackId} loaded [${details.startSN},${details.endSN}],duration:${duration}`);
 
-    if (newDetails.live) {
-      let curDetails = track.details;
-      if (curDetails && newDetails.fragments.length > 0) {
+    if (details.live) {
+      const curDetails = track.details;
+      details.updated = (!curDetails || details.endSN !== curDetails.endSN || details.url !== curDetails.url);
+      details.availabilityDelay = curDetails && curDetails.availabilityDelay;
+
+      if (curDetails && details.fragments.length > 0) {
         // we already have details for that level, merge them
-        LevelHelper.mergeDetails(curDetails, newDetails);
-        sliding = newDetails.fragments[0].start;
+        LevelHelper.mergeDetails(curDetails, details);
+        sliding = details.fragments[0].start;
         // TODO : this.liveSyncPosition = this.computeLivePosition(sliding, curDetails);
-        if (newDetails.PTSKnown) {
+        if (details.PTSKnown) {
           this.log(`Live audio playlist sliding:${sliding.toFixed(3)}`);
         } else {
           this.log('Live audio playlist - outdated PTS, unknown sliding');
         }
       } else {
-        newDetails.PTSKnown = false;
+        details.PTSKnown = false;
         this.log('Live audio playlist - first load, unknown sliding');
       }
     } else {
-      newDetails.PTSKnown = false;
+      details.PTSKnown = false;
     }
-    track.details = newDetails;
+    track.details = details;
 
     // compute start position
     if (!this.startFragRequested) {
     // compute start position if set to -1. use it straight away if value is defined
       if (this.startPosition === -1) {
         // first, check if start time offset has been set in playlist, if yes, use this value
-        let startTimeOffset = newDetails.startTimeOffset;
+        let startTimeOffset = details.startTimeOffset;
         if (Number.isFinite(startTimeOffset)) {
           this.log(`Start time offset found in playlist, adjust startPosition to ${startTimeOffset}`);
           this.startPosition = startTimeOffset;

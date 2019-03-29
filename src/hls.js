@@ -137,15 +137,10 @@ export default class Hls extends Observer {
      */
     const streamController = this.streamController = new StreamController(this, fragmentTracker);
 
-    let networkControllers = [levelController, streamController];
-    // Optional audio stream controller
-    /**
-     * @var {ICoreComponent | Controller}
-     */
-    let Controller = config.audioStreamController;
-    if (Controller) {
-      networkControllers.push(new Controller(this, fragmentTracker));
-    }
+    let networkControllers = [
+      levelController,
+      streamController
+    ];
 
     /**
      * @member {INetworkController[]} networkControllers
@@ -157,7 +152,6 @@ export default class Hls extends Observer {
      */
     const coreComponents = [
       playListLoader,
-      // fragmentLoader,
       keyLoader,
       abrController,
       bufferController,
@@ -166,54 +160,43 @@ export default class Hls extends Observer {
       fragmentTracker
     ];
 
-    // optional audio track and subtitle controller
-    Controller = config.audioTrackController;
-    if (Controller) {
-      const audioTrackController = new Controller(this);
+    // audioTrackController must be defined before audioStreamController because the order of event handling is important
+    /**
+     * @member {AudioTrackController} audioTrackController
+     */
+    this.audioTrackController = this.createController(config.audioTrackController, null, networkControllers);
+    this.createController(config.audioStreamController, fragmentTracker, networkControllers);
 
-      /**
-       * @member {AudioTrackController} audioTrackController
-       */
-      this.audioTrackController = audioTrackController;
-      coreComponents.push(audioTrackController);
-    }
 
-    Controller = config.subtitleTrackController;
-    if (Controller) {
-      const subtitleTrackController = new Controller(this);
+    // subtitleTrackController must be defined before  because the order of event handling is important
+    /**
+     * @member {SubtitleTrackController} subtitleTrackController
+     */
+    this.subtitleTrackController = this.createController(config.subtitleTrackController, null, networkControllers);
+    this.createController(config.subtitleStreamController, fragmentTracker, networkControllers);
 
-      /**
-       * @member {SubtitleTrackController} subtitleTrackController
-       */
-      this.subtitleTrackController = subtitleTrackController;
-      networkControllers.push(subtitleTrackController);
-    }
+    this.createController(config.timelineController, null, coreComponents);
 
-    Controller = config.emeController;
-    if (Controller) {
-      const emeController = new Controller(this);
-
-      /**
-       * @member {EMEController} emeController
-       */
-      this.emeController = emeController;
-      coreComponents.push(emeController);
-    }
-
-    // optional subtitle controllers
-    Controller = config.subtitleStreamController;
-    if (Controller) {
-      networkControllers.push(new Controller(this, fragmentTracker));
-    }
-    Controller = config.timelineController;
-    if (Controller) {
-      coreComponents.push(new Controller(this));
-    }
+    /**
+     * @member {EMEController} emeController
+     */
+    this.emeController = this.createController(config.emeController, null, coreComponents);
 
     /**
      * @member {ICoreComponent[]}
      */
     this.coreComponents = coreComponents;
+  }
+
+  createController(ControllerClass, fragmentTracker, components) {
+    if (ControllerClass) {
+      const controllerInstance = fragmentTracker ? new ControllerClass(this, fragmentTracker) : new ControllerClass(this);
+      if (components) {
+        components.push(controllerInstance);
+      }
+      return controllerInstance;
+    }
+    return null;
   }
 
   /**

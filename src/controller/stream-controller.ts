@@ -780,6 +780,10 @@ export default class StreamController extends BaseStreamController {
 
     this.log(`Level ${newLevelId} loaded [${newDetails.startSN},${newDetails.endSN}], cc [${newDetails.startCC}, ${newDetails.endCC}] duration:${duration}`);
 
+    // Why do we re-align and fire LEVEL_UPDATED when a playlist refresh does not include any changes?
+    // if (newDetails.updated === false) {
+    //   return;
+    // }
     if (newDetails.live) {
       let curDetails = curLevel.details;
       if (curDetails && newDetails.fragments.length > 0) {
