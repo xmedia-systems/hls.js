@@ -11,6 +11,7 @@ import KeyLoader from './loader/key-loader';
 import { FragmentTracker } from './controller/fragment-tracker';
 import StreamController from './controller/stream-controller';
 import LevelController from './controller/level-controller';
+import PlaybackRateController from './controller/playback-rate-controller';
 
 import { isSupported } from './is-supported';
 import { logger, enableLogs } from './utils/logger';
@@ -111,27 +112,23 @@ export default class Hls extends Observer {
     this.config = config;
     this._autoLevelCapping = -1;
 
-    // core controllers and network loaders
-
+    // Core controllers and network loaders
     /**
      * @member {AbrController} abrController
      */
     const abrController = this.abrController = new config.abrController(this); // eslint-disable-line new-cap
-
     const bufferController = new config.bufferController(this); // eslint-disable-line new-cap
     const capLevelController = new config.capLevelController(this); // eslint-disable-line new-cap
     const fpsController = new config.fpsController(this); // eslint-disable-line new-cap
     const playListLoader = new PlaylistLoader(this);
-    // const fragmentLoader = new FragmentLoader(this);
     const keyLoader = new KeyLoader(this);
+    const playbackRateController = new PlaybackRateController(this);
 
-    // network controllers
-
+    // Network controllers
     /**
      * @member {LevelController} levelController
      */
     const levelController = this.levelController = new LevelController(this);
-
     // FIXME: FragmentTracker must be defined before StreamController because the order of event handling is important
     const fragmentTracker = new FragmentTracker(this);
 
@@ -141,8 +138,7 @@ export default class Hls extends Observer {
     const streamController = this.streamController = new StreamController(this, fragmentTracker);
 
     let networkControllers = [levelController, streamController];
-
-    // optional audio stream controller
+    // Optional audio stream controller
     /**
      * @var {ICoreComponent | Controller}
      */
