@@ -227,7 +227,7 @@ export default class BaseStreamController extends TaskLoop {
     };
 
     // TODO: Allow progressive downloading of encrypted streams after the decrypter can handle progressive decryption
-    if (frag.decryptdata && progressCallback) {
+    if (frag.decryptdata && frag.decryptdata.key && progressCallback) {
       return this.fragmentLoader.load(frag)
         .then((data: FragLoadSuccessResult) => {
           progressCallback(data);
