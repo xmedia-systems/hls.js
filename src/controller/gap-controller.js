@@ -71,11 +71,11 @@ export default class GapController {
     const currentTime = media.currentTime;
 
     const partial = fragmentTracker.getPartialFragment(currentTime);
-    if (partial) {
+    // if (partial) {
       // Try to skip over the buffer hole caused by a partial fragment
       // This method isn't limited by the size of the gap between buffered ranges
       this._trySkipBufferHole(partial);
-    }
+    // }
 
     if (bufferInfo.len > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
       // Try to nudge currentTime over a buffer hole if we've been stalling for the configured amount of seconds
@@ -118,7 +118,7 @@ export default class GapController {
     // Check if currentTime is between unbuffered regions of partial fragments
     for (let i = 0; i < media.buffered.length; i++) {
       let startTime = media.buffered.start(i);
-      if (currentTime >= lastEndTime && currentTime < startTime) {
+      if (currentTime < startTime) {
         media.currentTime = Math.max(startTime, media.currentTime + 0.1);
         logger.warn(`skipping hole, adjusting currentTime from ${currentTime} to ${media.currentTime}`);
         this.stalled = null;

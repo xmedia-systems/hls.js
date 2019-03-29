@@ -381,8 +381,6 @@ class AudioStreamController extends BaseStreamController {
     const track = levels[trackId];
     let sliding = 0;
 
-    this.log(`Track ${trackId} loaded [${details.startSN},${details.endSN}],duration:${duration}`);
-
     if (details.live) {
       const curDetails = track.details;
       if (curDetails && details.fragments.length > 0) {

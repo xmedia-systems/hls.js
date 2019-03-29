@@ -12,7 +12,6 @@ export default class PlaybackRateController extends TaskLoop {
   private media: any | null = null;
   private ewma: EWMA;
   private latencyTarget: number = 3;
-  private refreshLatency = 2;
 
   constructor(hls) {
     super(hls,
