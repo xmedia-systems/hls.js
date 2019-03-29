@@ -137,6 +137,12 @@ class AudioStreamController extends BaseStreamController {
         }
       }
 
+      const trackId = this.trackId;
+      if (!levels || !levels[trackId]) {
+        return;
+      }
+      const levelInfo = levels[trackId];
+
       let media = this.mediaBuffer ? this.mediaBuffer : this.media;
       const videoBuffer = this.videoBuffer ? this.videoBuffer : this.media;
       const bufferInfo = BufferHelper.bufferInfo(media, pos, config.maxBufferHole);
@@ -146,11 +152,10 @@ class AudioStreamController extends BaseStreamController {
       const maxConfigBuffer = Math.min(config.maxBufferLength, config.maxMaxBufferLength);
       const maxBufLen = Math.max(maxConfigBuffer, mainBufferInfo.len);
       const audioSwitch = this.audioSwitch;
-      const trackId = this.trackId;
 
       // if buffer length is less than maxBufLen try to load a new fragment
-      if ((bufferLen < maxBufLen || audioSwitch) && trackId < levels.length) {
-        trackDetails = levels[trackId].details;
+      if (bufferLen < maxBufLen || audioSwitch) {
+        trackDetails = levelInfo.details;
         // if track info not retrieved yet, switch state and wait for track retrieval
         if (typeof trackDetails === 'undefined') {
           this.state = State.WAITING_TRACK;

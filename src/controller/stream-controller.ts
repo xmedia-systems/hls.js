@@ -181,6 +181,11 @@ export default class StreamController extends BaseStreamController {
       return;
     }
 
+    if (!levels || !levels[level]) {
+      return;
+    }
+    const levelInfo = levels[level];
+
     // if we have not yet loaded any fragment, start loading from start position
     let pos = 0;
     if (this.loadedmetadata) {
@@ -189,16 +194,9 @@ export default class StreamController extends BaseStreamController {
       pos = this.nextLoadPosition;
     }
 
-    // determine next load level
-
-    if (!levels || !levels[level]) {
-      return;
-    }
-    const levelInfo = levels[level];
+    // compute max Buffer Length that we could get from this load level, based on level bitrate. don't buffer more than 60 MB and more than 30s
     const levelBitrate = levelInfo.bitrate;
     let maxBufLen;
-
-    // compute max Buffer Length that we could get from this load level, based on level bitrate. don't buffer more than 60 MB and more than 30s
     if (levelBitrate) {
       maxBufLen = Math.max(8 * config.maxBufferSize / levelBitrate, config.maxBufferLength);
     } else {
