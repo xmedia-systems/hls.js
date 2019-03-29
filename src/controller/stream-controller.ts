@@ -1410,14 +1410,14 @@ function _hasDroppedFrames (frag, dropped, startSN) {
     frag.dropped = dropped;
     if (!frag.backtracked) {
       if (frag.sn === startSN) {
-        this.warn('Missing video frame(s) on first frag, appending with gap', frag.sn);
+        logger.warn(`[stream-controller]:  Fragment ${frag.sn} of level ${frag.level} is missing ${frag.dropped} video frame(s); this is the start fragment and will be appended with a gap`);
         return false;
       } else {
-        this.warn('Missing video frame(s), backtracking fragment', frag.sn);
+        logger.warn(`[stream-controller]: Fragment ${frag.sn} of level ${frag.level} is missing ${frag.dropped} video frame(s); backtracking to find a keyframe`);
         return true;
       }
     } else {
-      this.warn('Already backtracked on this fragment, appending with the gap', frag.sn);
+      logger.warn(`[stream-controller]: Fragment ${frag.sn} of level ${frag.level} already backtracked and will be appended with a gap`);
     }
   } else {
     // Only reset the backtracked flag if we've loaded the frag without any dropped frames
