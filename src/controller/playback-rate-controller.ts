@@ -3,6 +3,7 @@ import { BufferHelper } from '../utils/buffer-helper';
 import Event from '../events';
 import EWMA from '../utils/ewma';
 import { logger } from '../utils/logger';
+import { ErrorDetails } from '../errors';
 
 const sampleRate: number = 250;
 
@@ -11,12 +12,14 @@ export default class PlaybackRateController extends TaskLoop {
   private config: any;
   private media: any | null = null;
   private ewma: EWMA;
-  private latencyTarget: number = 3;
+  private latencyTarget: number = 1;
+  private latencyCeiling: number = 5;
 
   constructor(hls) {
     super(hls,
       Event.MEDIA_ATTACHED,
-      Event.MEDIA_DETACHING
+      Event.MEDIA_DETACHING,
+      Event.ERROR
     );
     this.hls = hls;
     this.config = hls.config;
@@ -31,6 +34,14 @@ export default class PlaybackRateController extends TaskLoop {
   onMediaDetaching () {
     this.clearInterval();
     this.media = null
+  }
+
+  onError (data) {
+    if (data.details !== ErrorDetails.BUFFER_STALLED_ERROR) {
+      return;
+    }
+    this.latencyTarget = Math.min(this.latencyTarget + 1, this.latencyCeiling);
+    logger.log(`[playback-rate-controller]: Stall detected, adjusting latencyTarget to ${this.latencyTarget}`);
   }
 
 
@@ -62,7 +73,7 @@ export default class PlaybackRateController extends TaskLoop {
 }
 
 const L = 2; // Change playback rate by up to 2x
-const k = 0.1;
+const k = 0.25;
 const sigmoid = (x, x0) => L / (1 + Math.exp(-k * (x - x0)));
 
 
