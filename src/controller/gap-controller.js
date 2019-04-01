@@ -3,7 +3,7 @@ import { ErrorTypes, ErrorDetails } from '../errors';
 import Event from '../events';
 import { logger } from '../utils/logger';
 
-const stallDebounceInterval = 1000;
+let stallDebounceInterval = 1000;
 const jumpThreshold = 0.5; // tolerance needed as some browsers stalls playback before reaching buffered range end
 
 export default class GapController {
@@ -13,6 +13,12 @@ export default class GapController {
     this.fragmentTracker = fragmentTracker;
     this.hls = hls;
     this.stallReported = false;
+    this.live = false;
+  }
+
+  set liveMode (isLive) {
+    this.live = isLive;
+    stallDebounceInterval = isLive ? 250 : 1000;
   }
 
   /**
@@ -71,11 +77,11 @@ export default class GapController {
     const currentTime = media.currentTime;
 
     const partial = fragmentTracker.getPartialFragment(currentTime);
-    // if (partial) {
+    if (partial || this.live) {
       // Try to skip over the buffer hole caused by a partial fragment
       // This method isn't limited by the size of the gap between buffered ranges
       this._trySkipBufferHole(partial);
-    // }
+    }
 
     if (bufferInfo.len > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
       // Try to nudge currentTime over a buffer hole if we've been stalling for the configured amount of seconds

@@ -809,6 +809,7 @@ export default class StreamController extends BaseStreamController {
     curLevel.details = newDetails;
     this.levelLastLoaded = newLevelId;
     this.hls.trigger(Event.LEVEL_UPDATED, { details: newDetails, level: newLevelId });
+    this.gapController.liveMode = newDetails.live;
 
     if (!this.startFragRequested) {
     // compute start position if set to -1. use it straight away if value is defined
