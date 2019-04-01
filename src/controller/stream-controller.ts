@@ -1198,7 +1198,7 @@ export default class StreamController extends BaseStreamController {
 
   private _handleTransmuxComplete (transmuxResult) {
     const id = 'main';
-    const { hls, levels } = this;
+    const { hls, fragCurrent, levels } = this;
     const { remuxResult, transmuxIdentifier: { level, sn } } = transmuxResult;
 
     // Check if the current fragment has been aborted. We check this by first seeing if we're still playing the current level.
@@ -1208,10 +1208,13 @@ export default class StreamController extends BaseStreamController {
       return;
     }
 
-    const frag = LevelHelper.getFragmentWithSN(levels[level], sn);
+    let frag = LevelHelper.getFragmentWithSN(levels[level], sn);
     if (this._fragLoadAborted(frag)) {
       return;
     }
+    // Assign fragCurrent. References to fragments in the level details change between playlist refreshes.
+    // TODO: Preserve frag references between live playlist refreshes
+    frag = fragCurrent;
 
     let { audio, video, text, id3, initSegment } = remuxResult;
     // The audio-stream-controller handles audio buffering if Hls.js is playing an alternate audio track
