@@ -4,6 +4,7 @@ import Event from '../events';
 import EWMA from '../utils/ewma';
 import { logger } from '../utils/logger';
 import { ErrorDetails } from '../errors';
+import { getProgramDateTimeAtEndOfLastEncodedFragment } from './level-helper';
 
 const sampleRate: number = 250;
 
@@ -14,12 +15,15 @@ export default class PlaybackRateController extends TaskLoop {
   private ewma: EWMA;
   private latencyTarget: number = 1;
   private latencyCeiling: number = 5;
+  private lastPDT: number | null = null;
+  private timeAtLastPDT: number | null = null;
 
   constructor(hls) {
     super(hls,
       Event.MEDIA_ATTACHED,
       Event.MEDIA_DETACHING,
-      Event.ERROR
+      Event.ERROR,
+      Event.LEVEL_UPDATED
     );
     this.hls = hls;
     this.config = hls.config;
@@ -44,6 +48,13 @@ export default class PlaybackRateController extends TaskLoop {
     logger.log(`[playback-rate-controller]: Stall detected, adjusting latencyTarget to ${this.latencyTarget}`);
   }
 
+  onLevelUpdated ({ details }) {
+    if (details.hasProgramDateTime && details.updated) {
+      const latestPDT = this.lastPDT = details.fragments[details.fragments.length - 1].programDateTime;
+      const latency = Date.now() - latestPDT;
+      console.log('>>>', latency)
+    }
+  }
 
   doTick () {
     const { config, latencyTarget, media } = this;
@@ -69,6 +80,13 @@ export default class PlaybackRateController extends TaskLoop {
       media.playbackRate = 1;
     }
     logger.log(`[playback-rate-controller]: The playback rate is ${media.playbackRate}, distance: ${distance}, currentTime: ${media.currentTime}, target: ${target}, bufferEnd: ${end}`);
+  }
+
+  get latency () {
+    if (this.lastPDT === null) {
+      return null;
+    }
+    return (Date.now() - this.lastPDT) / 1000;
   }
 }
 

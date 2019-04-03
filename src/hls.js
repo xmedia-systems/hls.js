@@ -122,7 +122,7 @@ export default class Hls extends Observer {
     const fpsController = new config.fpsController(this); // eslint-disable-line new-cap
     const playListLoader = new PlaylistLoader(this);
     const keyLoader = new KeyLoader(this);
-    const playbackRateController = new PlaybackRateController(this);
+    const playbackRateController = this.playbackRateController = new PlaybackRateController(this);
 
     // Network controllers
     /**
@@ -605,5 +605,9 @@ export default class Hls extends Observer {
     if (subtitleTrackController) {
       subtitleTrackController.subtitleDisplay = value;
     }
+  }
+
+  get latency () {
+    return this.playbackRateController.latency;
   }
 }
