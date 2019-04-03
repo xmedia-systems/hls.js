@@ -963,6 +963,9 @@ export default class StreamController extends BaseStreamController {
       if (state === State.PARSING || state === State.PARSED) {
         // check if all buffers have been appended
         this.pendingBuffering = (data.pending > 0);
+        const stats = this.stats;
+        const frag = this.fragCurrent;
+        this.hls.trigger(Event.FRAG_BUFFERED, { stats, frag: frag, id: 'main' });
         this._checkAppendedParsed();
       }
     }
