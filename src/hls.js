@@ -610,4 +610,15 @@ export default class Hls extends Observer {
   get latency () {
     return this.playbackRateController.latency;
   }
+
+  set latency (target) {
+    if (!Number.isFinite(target)) {
+      return;
+    }
+    this.playbackRateController.latency = target;
+  }
+
+  get latencyTarget () {
+    return this.playbackRateController.latencyTarget;
+  }
 }

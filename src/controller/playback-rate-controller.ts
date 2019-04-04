@@ -1,25 +1,25 @@
 import { BufferHelper } from '../utils/buffer-helper';
 import Event from '../events';
-import EWMA from '../utils/ewma';
 import { logger } from '../utils/logger';
 import { ErrorDetails } from '../errors';
 import { getProgramDateTimeAtEndOfLastEncodedFragment } from './level-helper';
 import EventHandler from '../event-handler';
 
-const sampleRate: number = 250;
 export default class PlaybackRateController extends EventHandler {
   protected hls: any;
   private config: any;
   private media: any | null = null;
-  private ewma: EWMA;
-  private latencyTarget: number = 3;
+  public latencyTarget: number = 3;
   private latencyCeiling: number = 5;
   private lastUpdatePDT: number | null = null;
   private bufferEndPDT: number | null = null;
   private currentTimePDT: number | null = null;
   private lastUpdateTimestamp: number | null = null;
+  private lastCurrentTime: number | null = null;
 
   private timeupdateHandler = this.doTick.bind(this);
+
+  private _latency: number | null = null;
 
   constructor(hls) {
     super(hls,
@@ -31,7 +31,6 @@ export default class PlaybackRateController extends EventHandler {
     );
     this.hls = hls;
     this.config = hls.config;
-    this.ewma = new EWMA(hls.config.abrEwmaFastLive);
   }
 
   onMediaAttached (data) {
@@ -55,7 +54,7 @@ export default class PlaybackRateController extends EventHandler {
   onLevelUpdated ({ details }) {
     if (details.hasProgramDateTime && details.updated) {
       this.lastUpdatePDT = getProgramDateTimeAtEndOfLastEncodedFragment(details);
-      this.lastUpdateTimestamp = Date.now() - details.availabilityDelay;
+      this.lastUpdateTimestamp = Date.now();
     }
   }
 
@@ -72,11 +71,18 @@ export default class PlaybackRateController extends EventHandler {
     const bufferInfo = BufferHelper.bufferInfo(media, pos, config.maxBufferHole);
     const { end, len } = bufferInfo;
 
-    this.currentTimePDT = this.bufferEndPDT - (len * 1000);
-    const latency = this.latency;
+    if (this.currentTimePDT === null || this.lastCurrentTime === null) {
+      this.currentTimePDT = this.bufferEndPDT - (len * 1000);
+    } else {
+      this.currentTimePDT += ((pos - this.lastCurrentTime) * 1000);
+    }
+    this.lastCurrentTime = pos;
+
+    const latency = this.computeLatency();
     if (latency === null) {
       return;
     }
+    this._latency = latency;
 
     const distance = latency - latencyTarget;
     if (distance) {
@@ -90,10 +96,11 @@ export default class PlaybackRateController extends EventHandler {
     } else {
       media.playbackRate = 1;
     }
+
     // logger.log(`[playback-rate-controller]: The playback rate is ${media.playbackRate}, distance: ${distance}, currentTime: ${media.currentTime}, target: ${latencyTarget}, bufferEnd: ${end}`);
   }
 
-  get latency () {
+  private computeLatency () {
     if (this.lastUpdatePDT === null || this.bufferEndPDT === null || this.lastUpdateTimestamp === null || this.currentTimePDT === null) {
       return null;
     }
@@ -121,6 +128,14 @@ export default class PlaybackRateController extends EventHandler {
     // `);
 
     return currentTimeLatency;
+  }
+
+  get latency () {
+    return this._latency;
+  }
+
+  set latency (target: number) {
+    this.latencyTarget = target;
   }
 }
 

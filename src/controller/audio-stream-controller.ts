@@ -483,6 +483,7 @@ class AudioStreamController extends BaseStreamController {
       const state = this.state;
       if (state === State.PARSING || state === State.PARSED) {
         // check if all buffers have been appended
+        this.hls.trigger(Event.FRAG_BUFFERED, { stats: this.stats, frag: this.fragCurrent, id: 'main' });
         this.pendingBuffering = (data.pending > 0);
         this._checkAppendedParsed();
       }
