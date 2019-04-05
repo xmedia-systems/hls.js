@@ -27,7 +27,8 @@ export default class PlaybackRateController extends EventHandler {
       Event.MEDIA_DETACHING,
       Event.ERROR,
       Event.LEVEL_UPDATED,
-      Event.FRAG_BUFFERED
+      Event.FRAG_CHANGED,
+      Event.MANIFEST_LOADING
     );
     this.hls = hls;
     this.config = hls.config;
@@ -41,6 +42,12 @@ export default class PlaybackRateController extends EventHandler {
   onMediaDetaching () {
     this.media.removeEventListener('timeupdate', this.timeupdateHandler);
     this.media = null;
+  }
+
+  onManifestLoading () {
+    this.currentTimePDT = null;
+    this.lastCurrentTime = null;
+    this._latency = null;
   }
 
   onError (data) {
@@ -58,22 +65,22 @@ export default class PlaybackRateController extends EventHandler {
     }
   }
 
-  onFragBuffered({ frag }) {
-    this.bufferEndPDT = frag.programDateTime + (frag.duration * 1000);
+  onFragChanged ({ frag }) {
+    const { media } = this;
+    if (!frag.programDateTime || !media || this.currentTimePDT !== null) {
+      return;
+    }
+    this.currentTimePDT = frag.programDateTime;
+    this.lastCurrentTime = media.currentTime;
   }
 
   doTick () {
     const { config, latencyTarget, media } = this;
-    if (!media || this.bufferEndPDT === null) {
+    if (!media) {
       return;
     }
     const pos = media.currentTime;
-    const bufferInfo = BufferHelper.bufferInfo(media, pos, config.maxBufferHole);
-    const { end, len } = bufferInfo;
-
-    if (this.currentTimePDT === null || this.lastCurrentTime === null) {
-      this.currentTimePDT = this.bufferEndPDT - (len * 1000);
-    } else {
+    if (this.currentTimePDT !== null && this.lastCurrentTime !== null) {
       this.currentTimePDT += ((pos - this.lastCurrentTime) * 1000);
     }
     this.lastCurrentTime = pos;
@@ -84,50 +91,26 @@ export default class PlaybackRateController extends EventHandler {
     }
     this._latency = latency;
 
+    const bufferInfo = BufferHelper.bufferInfo(media, pos, config.maxBufferHole);
     const distance = latency - latencyTarget;
     if (distance) {
       if (distance > latencyTarget * 2) {
-        const seekPos = end - latencyTarget;
+        const seekPos = bufferInfo.end - latencyTarget;
         logger.log(`[playback-rate-controller]: Current position is twice the latency target, seeking to ${seekPos}`);
         media.currentTime = seekPos;
       } else {
-        media.playbackRate = sigmoid(latency, latencyTarget);
+        media.playbackRate = Math.max(0.1, sigmoid(latency, latencyTarget));
       }
     } else {
       media.playbackRate = 1;
     }
-
-    // logger.log(`[playback-rate-controller]: The playback rate is ${media.playbackRate}, distance: ${distance}, currentTime: ${media.currentTime}, target: ${latencyTarget}, bufferEnd: ${end}`);
   }
 
   private computeLatency () {
-    if (this.lastUpdatePDT === null || this.bufferEndPDT === null || this.lastUpdateTimestamp === null || this.currentTimePDT === null) {
+    if (this.currentTimePDT === null) {
       return null;
     }
-
-    const timeSinceLastUpdate = Date.now() - this.lastUpdateTimestamp;
-    const encoderPDT = timeSinceLastUpdate + this.lastUpdatePDT;
-    // const encoderDate = new Date(encoderPDT);
-    // const curTime = new Date();
-    // const bufEndTime = new Date(this.bufferEndPDT);
-    // const posTime = new Date(this.currentTimePDT);
-    // console.warn('>>>',
-    //   `
-    //   Encoder Time: ${encoderDate.getSeconds()}:${encoderDate.getMilliseconds()}
-    //   Pos: ${posTime.getSeconds()}:${posTime.getMilliseconds()}
-    //   Buffer End Time: ${bufEndTime.getSeconds()}:${bufEndTime.getMilliseconds()}
-    //   UTC Time: ${curTime.getSeconds()}:${curTime.getMilliseconds()}`
-    // );
-
-    const bufferEndLatency = (Date.now() - this.bufferEndPDT) / 1000;
-    const currentTimeLatency = (Date.now() - this.currentTimePDT) / 1000;
-    // console.warn('>>>', `
-    //   Buffer end latency: ${bufferEndLatency}
-    //   Pos latency: ${(currentTimeLatency)}
-    //   Target: ${this.latencyTarget}
-    // `);
-
-    return currentTimeLatency;
+    return  (Date.now() - this.currentTimePDT) / 1000;
   }
 
   get latency () {
