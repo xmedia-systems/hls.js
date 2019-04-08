@@ -1422,6 +1422,8 @@ function _hasDroppedFrames (frag, dropped, startSN) {
       }
     } else {
       logger.warn(`[stream-controller]: Fragment ${frag.sn} of level ${frag.level} already backtracked and will be appended with a gap`);
+      frag.backtracked = false;
+      return false;
     }
   } else {
     // Only reset the backtracked flag if we've loaded the frag without any dropped frames
