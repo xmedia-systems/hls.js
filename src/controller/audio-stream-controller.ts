@@ -623,9 +623,12 @@ class AudioStreamController extends BaseStreamController {
     // Check if the current fragment has been aborted. We check this by first seeing if we're still playing the current level.
     // If we are, subsequently check if the currently loading fragment (fragCurrent) has changed.
     // If nothing has changed by this point, allow the segment to be buffered.
-    if (!levels) {
+    if (!levels || !levels[level]) {
+      this.warn(`Levels object was unset while buffering fragment ${sn} of level ${level}. The current chunk will not be buffered.`);
       return;
     }
+    const currentLevel = levels[level];
+
     let frag = LevelHelper.getFragmentWithSN(levels[level], sn);
     if (this._fragLoadAborted(frag)) {
       return;
@@ -640,11 +643,11 @@ class AudioStreamController extends BaseStreamController {
 
     const { audio, text, id3, initSegment } = remuxResult;
     if (initSegment && initSegment.tracks) {
-      this._bufferInitSegment(frag, initSegment.tracks);
+      this._bufferInitSegment(initSegment.tracks);
       hls.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { frag, id, tracks: initSegment.tracks });
     }
     if (audio) {
-      this._bufferFragmentData(frag, audio);
+      this._bufferFragmentData(frag, currentLevel, audio);
     }
     if (id3) {
       id3.frag = frag;
@@ -658,7 +661,7 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  _handleTransmuxerFlush ({ level, sn }) {
+  _handleTransmuxerFlush () {
     this._endParsing();
   }
 
@@ -671,7 +674,7 @@ class AudioStreamController extends BaseStreamController {
     this._checkAppendedParsed();
   }
 
-  _bufferInitSegment (frag, tracks) {
+  _bufferInitSegment (tracks) {
     if (this.state !== State.PARSING) {
       return;
     }
@@ -706,7 +709,7 @@ class AudioStreamController extends BaseStreamController {
     this.tick();
   }
 
-  _bufferFragmentData (frag, data) {
+  _bufferFragmentData (frag, currentLevel, data) {
     if (this.state !== State.PARSING) {
       return;
     }
@@ -718,14 +721,9 @@ class AudioStreamController extends BaseStreamController {
     }
     // this.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb}`);
 
-    const { audioSwitch, hls, levels, media, pendingData, trackId } = this;
-    if (!levels) {
-      this.warn(`Levels object was unset while buffering fragment ${frag}. The current chunk will not be buffered.`);
-      return;
-    }
+    const { audioSwitch, hls, media, pendingData, trackId } = this;
+    LevelHelper.updateFragPTSDTS(currentLevel.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
 
-    const track = levels[trackId];
-    LevelHelper.updateFragPTSDTS(track.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
     let appendOnBufferFlush = false;
     // Only flush audio from old audio tracks when PTS is known on new audio track
     if (audioSwitch) {

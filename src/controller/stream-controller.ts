@@ -1199,11 +1199,13 @@ export default class StreamController extends BaseStreamController {
     // Check if the current fragment has been aborted. We check this by first seeing if we're still playing the current level.
     // If we are, subsequently check if the currently loading fragment (fragCurrent) has changed.
     // If nothing has changed by this point, allow the segment to be buffered.
-    if (!levels) {
+    if (!levels || !levels[level]) {
+      this.warn(`Levels object was unset while buffering fragment ${sn} of level ${level}. The current chunk will not be buffered.`);
       return;
     }
+    const currentLevel = levels[level];
 
-    let frag = LevelHelper.getFragmentWithSN(levels[level], sn);
+    let frag = LevelHelper.getFragmentWithSN(currentLevel, sn);
     if (this._fragLoadAborted(frag)) {
       return;
     }
@@ -1218,8 +1220,8 @@ export default class StreamController extends BaseStreamController {
     }
 
     // Update timing before a potential backtrack
-    this._updateTiming(frag, audio);
-    this._updateTiming(frag, video);
+    this._updateTiming(frag, currentLevel, audio);
+    this._updateTiming(frag, currentLevel, video);
 
     this.state = State.PARSING;
     this.pendingBuffering = true;
@@ -1227,7 +1229,7 @@ export default class StreamController extends BaseStreamController {
 
     if (initSegment) {
       if (initSegment.tracks) {
-        this._bufferInitSegment(frag, initSegment.tracks);
+        this._bufferInitSegment(currentLevel,initSegment.tracks);
         hls.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { frag, id, tracks: initSegment.tracks });
       }
       if (Number.isFinite(initSegment.initPTS)) {
@@ -1237,7 +1239,7 @@ export default class StreamController extends BaseStreamController {
 
     // Avoid buffering if backtracking this fragment
     if (video) {
-      if (_hasDroppedFrames(frag, video.dropped, levels[level].details.startSN)) {
+      if (_hasDroppedFrames(frag, video.dropped, currentLevel.details.startSN)) {
         this._backtrack(frag, video.startPTS);
         return;
       } else {
@@ -1276,13 +1278,8 @@ export default class StreamController extends BaseStreamController {
     this._checkAppendedParsed();
   }
 
-  private _bufferInitSegment (frag, tracks) {
+  private _bufferInitSegment (currentLevel, tracks) {
     if (this.state !== State.PARSING) {
-      return;
-    }
-    const { levels, level } = this;
-    if (!levels) {
-      this.warn(`Levels object was unset while buffering the init segment for fragment ${frag}. The init segment will not be buffered.`);
       return;
     }
     // if audio track is expected to come from audio stream controller, discard any coming from main
@@ -1291,7 +1288,6 @@ export default class StreamController extends BaseStreamController {
     }
     // include levelCodec in audio and video tracks
     const { audio, video } = tracks;
-    const currentLevel = levels[level];
     if (audio) {
       let audioCodec = currentLevel.audioCodec;
       const ua = navigator.userAgent.toLowerCase();
@@ -1359,10 +1355,11 @@ export default class StreamController extends BaseStreamController {
     this.tick();
   }
 
-  private _updateTiming (frag, data) {
+  private _updateTiming (frag, currentLevel, data) {
     if (!data) {
       return;
     }
+
     if (!Number.isFinite(data.endPTS)) {
       data.endPTS = data.startPTS + frag.duration;
       data.endDTS = data.startDTS + frag.duration;
@@ -1377,14 +1374,9 @@ export default class StreamController extends BaseStreamController {
     }
     // this.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb},dropped:${data.dropped || 0}`);
 
-    const { hls, level, levels } = this;
-    if (!levels) {
-      this.warn(`Levels object was unset while buffering fragment ${frag}. The current chunk will not be buffered.`);
-      return;
-    }
-    const currentLevel = levels[level];
-    const drift = LevelHelper.updateFragPTSDTS(currentLevel.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
-    hls.trigger(Event.LEVEL_PTS_UPDATED, { details: currentLevel.details, level, drift, type: data.type, start: data.startPTS, end: data.endPTS });
+    const { details } = currentLevel;
+    const drift = LevelHelper.updateFragPTSDTS(details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
+    this.hls.trigger(Event.LEVEL_PTS_UPDATED, { details, level: currentLevel, drift, type: data.type, start: data.startPTS, end: data.endPTS });
   }
 
   private _backtrack (frag, nextLoadPosition) {
