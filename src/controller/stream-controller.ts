@@ -453,7 +453,7 @@ export default class StreamController extends BaseStreamController {
     this.fragCurrent = frag;
     this.startFragRequested = true;
     // Don't update nextLoadPosition for fragments which are not buffered
-    if (Number.isFinite(frag.sn) && !frag.bitrateTest) {
+    if (Number.isFinite(frag.sn) && !this.bitrateTest) {
       this.nextLoadPosition = frag.start + frag.duration;
     }
 
@@ -465,6 +465,7 @@ export default class StreamController extends BaseStreamController {
         this._loadInitSegment(frag);
       } else if (this.bitrateTest) {
         frag.bitrateTest = true;
+        this.log(`Fragment ${frag.sn} of level ${frag.level} is being downloaded to test bitrate and will not be buffered`);
         this._loadBitrateTestFrag(frag);
       } else {
         this._loadFragForPlayback(frag);
@@ -1180,10 +1181,10 @@ export default class StreamController extends BaseStreamController {
           return;
         }
         const { stats } = data as FragLoadSuccessResult;
-        this.bitrateTest = false;
         this.fragLoadError = 0;
         this.state = State.IDLE;
         this.startFragRequested = false;
+        this.bitrateTest = false;
         frag.bitrateTest = false;
         stats.tparsed = stats.tbuffered = window.performance.now();
         hls.trigger(Event.FRAG_BUFFERED, { stats: stats, frag, id: 'main' });
