@@ -275,7 +275,7 @@ class Transmuxer {
         demuxer = this.demuxer = new mux.demux(observer, config, typeSupported);
 
         // Ensure that muxers are always initialized with an initSegment
-        demuxer.resetInitSegment(initSegmentData, audioCodec, videoCodec, duration);
+        demuxer.resetInitSegment(audioCodec, videoCodec, duration);
         remuxer.resetInitSegment(initSegmentData, audioCodec, videoCodec);
         logger.log(`[transmuxer.ts]: Probe succeeded with a data length of ${data.length}.`);
         this.probe = probe;
