@@ -143,20 +143,6 @@ export default class Hls extends Observer {
 
     let networkControllers = [levelController, streamController];
 
-    // optional audio stream controller
-    /**
-     * @var {ICoreComponent | Controller}
-     */
-    let Controller = config.audioStreamController;
-    if (Controller) {
-      networkControllers.push(new Controller(this, fragmentTracker));
-    }
-
-    /**
-     * @member {INetworkController[]} networkControllers
-     */
-    this.networkControllers = networkControllers;
-
     /**
      * @var {ICoreComponent[]}
      */
@@ -171,6 +157,10 @@ export default class Hls extends Observer {
       fragmentTracker
     ];
 
+    let Controller;
+
+    // audioTrackController must be defined before audioStreamController because the order of event handling is important
+
     // optional audio track and subtitle controller
     Controller = config.audioTrackController;
     if (Controller) {
@@ -180,9 +170,19 @@ export default class Hls extends Observer {
        * @member {AudioTrackController} audioTrackController
        */
       this.audioTrackController = audioTrackController;
-      coreComponents.push(audioTrackController);
+      networkControllers.push(audioTrackController);
     }
 
+    // optional audio stream controller
+    /**
+     * @var {ICoreComponent | Controller}
+     */
+    Controller = config.audioStreamController;
+    if (Controller) {
+      networkControllers.push(new Controller(this, fragmentTracker));
+    }
+
+    // subtitleTrackController must be defined before  because the order of event handling is important
     Controller = config.subtitleTrackController;
     if (Controller) {
       const subtitleTrackController = new Controller(this);
@@ -192,6 +192,12 @@ export default class Hls extends Observer {
        */
       this.subtitleTrackController = subtitleTrackController;
       networkControllers.push(subtitleTrackController);
+    }
+
+    // optional subtitle controllers
+    Controller = config.subtitleStreamController;
+    if (Controller) {
+      networkControllers.push(new Controller(this, fragmentTracker));
     }
 
     Controller = config.emeController;
@@ -205,15 +211,15 @@ export default class Hls extends Observer {
       coreComponents.push(emeController);
     }
 
-    // optional subtitle controllers
-    Controller = config.subtitleStreamController;
-    if (Controller) {
-      networkControllers.push(new Controller(this, fragmentTracker));
-    }
     Controller = config.timelineController;
     if (Controller) {
       coreComponents.push(new Controller(this));
     }
+
+    /**
+     * @member {INetworkController[]} networkControllers
+     */
+    this.networkControllers = networkControllers;
 
     /**
      * @member {ICoreComponent[]}

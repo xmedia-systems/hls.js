@@ -65,6 +65,7 @@ export default class LevelController extends EventHandler {
 
   stopLoad () {
     this.canload = false;
+    this.clearTimer();
   }
 
   onManifestLoaded (data) {

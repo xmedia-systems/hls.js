@@ -1286,8 +1286,16 @@ class StreamController extends BaseStreamController {
     */
     const media = this.mediaBuffer ? this.mediaBuffer : this.media;
     if (media) {
+      // Handle DOMException caused by SourceBuffer beeing removed
+      let buffered;
+      try {
+        buffered = media.buffered;
+      } catch (e) {
+        // DOMException: Failed to read the 'buffered' property from 'SourceBuffer': This SourceBuffer has been removed from the parent media source.
+        buffered = [];
+      }
       // filter fragments potentially evicted from buffer. this is to avoid memleak on live streams
-      this.fragmentTracker.detectEvictedFragments(Fragment.ElementaryStreamTypes.VIDEO, media.buffered);
+      this.fragmentTracker.detectEvictedFragments(Fragment.ElementaryStreamTypes.VIDEO, buffered);
     }
     // move to IDLE once flush complete. this should trigger new fragment loading
     this.state = State.IDLE;
