@@ -46,13 +46,6 @@ muxConfig.forEach(({ demux }) => {
   minProbeByteLength = Math.max(minProbeByteLength, demux.minProbeByteLength);
 });
 
-interface TransmuxSession {
-  contiguous: boolean
-  timeOffset: number
-  accurateTimeOffset: boolean
-  identifier: TransmuxIdentifier
-}
-
 class Transmuxer {
   private observer: any;
   private typeSupported: any;
@@ -64,7 +57,6 @@ class Transmuxer {
   private probe!: Function;
   private decryptionPromise: Promise<TransmuxerResult> | null = null;
 
-  private contiguous: boolean = false;
   private timeOffset: number = 0;
   private accurateTimeOffset: boolean = false;
 

@@ -765,22 +765,24 @@ export default class StreamController extends BaseStreamController {
 
   onLevelLoaded (data) {
     const { levels, levelLastLoaded } = this;
-    const newDetails = data.details;
     const newLevelId = data.level;
-
+    const newDetails = data.details;
     const duration = newDetails.totalduration;
-    let sliding = 0;
-    let lastLevel;
-    let curLevel;
-    if (levels) {
-      if (levelLastLoaded) {
-        lastLevel = levels[levelLastLoaded];
-      }
-      curLevel = levels[newLevelId];
-    }
 
+    if (!levels) {
+      this.warn(`Levels were reset while loading level ${newLevelId}`);
+      return;
+    }
     this.log(`Level ${newLevelId} loaded [${newDetails.startSN},${newDetails.endSN}], cc [${newDetails.startCC}, ${newDetails.endCC}] duration:${duration}`);
 
+
+    let lastLevel;
+    let curLevel = levels[newLevelId];
+    if (levelLastLoaded) {
+      lastLevel = levels[levelLastLoaded];
+    }
+
+    let sliding = 0;
     if (newDetails.live) {
       let curDetails = curLevel.details;
       if (curDetails && newDetails.fragments.length > 0) {
@@ -851,6 +853,7 @@ export default class StreamController extends BaseStreamController {
   _handleFragmentLoadProgress (frag, payload, stats) {
     const { levels, media } = this;
     if (!levels) {
+      this.warn(`Levels were reset while fragment load was in progress. Fragment ${frag.sn} of level ${frag.level} will not be buffered`);
       return;
     }
     const currentLevel = levels[frag.level];
@@ -1008,7 +1011,7 @@ export default class StreamController extends BaseStreamController {
         if ((this.fragLoadError + 1) <= this.config.fragLoadingMaxRetry) {
           // exponential backoff capped to config.fragLoadingMaxRetryTimeout
           let delay = Math.min(Math.pow(2, this.fragLoadError) * this.config.fragLoadingRetryDelay, this.config.fragLoadingMaxRetryTimeout);
-          this.warn(`mediaController: frag loading failed, retry in ${delay} ms`);
+          this.warn(`Fragment ${frag.sn} of level ${frag.level} failed to load, retrying in ${delay}ms`);
           this.retryDate = window.performance.now() + delay;
           // retry loading state
           // if loadedmetadata is not set, it means that we are emergency switch down on first frag
@@ -1032,8 +1035,8 @@ export default class StreamController extends BaseStreamController {
       if (this.state !== State.ERROR) {
         if (data.fatal) {
           // if fatal error, stop processing
+          this.warn(`${data.details}`);
           this.state = State.ERROR;
-          this.warn(`streamController: ${data.details},switch to ${this.state} state ...`);
         } else {
           // in case of non fatal error while loading level, if level controller is not retrying to load level , switch back to IDLE
           if (!data.levelRetry && this.state === State.WAITING_LEVEL) {

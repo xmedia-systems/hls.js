@@ -248,26 +248,7 @@ class AudioStreamController extends BaseStreamController {
           hls.trigger(Event.KEY_LOADING, { frag: frag });
         } else {
           this.log(`Loading ${frag.sn}, cc: ${frag.cc} of [${trackDetails.startSN} ,${trackDetails.endSN}],track ${trackId}, currentTime:${pos},bufferEnd:${bufferEnd.toFixed(3)}`);
-          // only load if fragment is not loaded or if in audio switch
-          // we force a frag loading in audio switch as fragment tracker might not have evicted previous frags in case of quick audio switch
-          const fragState = this.fragmentTracker.getState(frag);
-          this.fragCurrent = frag;
-          this.startFragRequested = true;
-          let prevPos = this.nextLoadPosition;
-          if (Number.isFinite(frag.sn)) {
-            this.nextLoadPosition = frag.start + frag.duration;
-          }
-          if (audioSwitch || fragState === FragmentState.NOT_LOADED) {
-            if (frag.sn === 'initSegment') {
-              this._loadInitSegment(frag);
-            } else if (trackDetails.initSegment || Number.isFinite(this.initPTS[frag.cc])) {
-              this._loadFragForPlayback(frag);
-            } else {
-              this.log(`Unknown video PTS for continuity counter ${frag.cc}, waiting for video PTS before loading audio frag ${frag.sn} of [${trackDetails.startSN} ,${trackDetails.endSN}],track ${trackId}`);
-              this.state = State.WAITING_INIT_PTS;
-              this.nextLoadPosition = prevPos;
-            }
-          }
+          this.loadFragment(frag);
         }
       }
       break;
@@ -372,17 +353,15 @@ class AudioStreamController extends BaseStreamController {
 
   onAudioTrackLoaded (data) {
     const { levels } = this;
+    const { details: newDetails, totalduration: duration, id: trackId, } =  data;
     if (!levels) {
+      this.warn(`Audio tracks were reset while loading level ${trackId}`);
       return;
     }
-    const trackId = data.id;
-    const track = levels[trackId];
-    const newDetails = data.details;
-    const duration = newDetails.totalduration;
-    let sliding = 0;
-
     this.log(`Track ${trackId} loaded [${newDetails.startSN},${newDetails.endSN}],duration:${duration}`);
 
+    const track = levels[trackId];
+    let sliding = 0;
     if (newDetails.live) {
       let curDetails = track.details;
       if (curDetails && newDetails.fragments.length > 0) {
@@ -438,9 +417,10 @@ class AudioStreamController extends BaseStreamController {
   _handleFragmentLoadProgress (frag, payload, stats) {
     const { config, trackId, levels } = this;
     if (!levels) {
+      this.warn(`Audio tracks were reset while fragment load was in progress. Fragment ${frag.sn} of level ${frag.level} will not be buffered`);
       return;
     }
-    const { cc, sn } = frag;
+
     const track = levels[trackId];
     const details = track.details;
     const audioCodec = config.defaultAudioCodec || track.audioCodec || 'mp4a.40.2';
@@ -452,9 +432,11 @@ class AudioStreamController extends BaseStreamController {
           new TransmuxerInterface(this.hls, 'audio', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
     }
 
-    // Check if we have video initPTS
-    // If not we need to wait for it
-    const initPTS = this.initPTS[cc];
+    // initPTS from the video track is required for transmuxing. It should exist before loading a fragment.
+    const initPTS = this.initPTS[frag.cc];
+    // TODO: Compile out asserts for production builds so that we can uncomment them
+    // console.assert(Number.isFinite(initPTS), 'initPTS must exist, and must stay set, before and during fragment load');
+
     const initSegmentData = details.initSegment ? details.initSegment.data : [];
     // this.log(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
     // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
@@ -615,7 +597,7 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  _handleTransmuxComplete (transmuxResult) {
+  private _handleTransmuxComplete (transmuxResult) {
     const id = 'audio';
     const { hls, fragCurrent, levels } = this;
     const { remuxResult, transmuxIdentifier: { level, sn } } = transmuxResult;
@@ -661,11 +643,11 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  _handleTransmuxerFlush () {
+  private _handleTransmuxerFlush () {
     this._endParsing();
   }
 
-  _endParsing () {
+  private _endParsing () {
     if (this.state !== State.PARSING) {
       return;
     }
@@ -674,7 +656,7 @@ class AudioStreamController extends BaseStreamController {
     this._checkAppendedParsed();
   }
 
-  _bufferInitSegment (tracks) {
+  private _bufferInitSegment (tracks) {
     if (this.state !== State.PARSING) {
       return;
     }
@@ -709,7 +691,7 @@ class AudioStreamController extends BaseStreamController {
     this.tick();
   }
 
-  _bufferFragmentData (frag, currentLevel, data) {
+  private _bufferFragmentData (frag, currentLevel, data) {
     if (this.state !== State.PARSING) {
       return;
     }
@@ -770,6 +752,30 @@ class AudioStreamController extends BaseStreamController {
     }
     // trigger handler right now
     this.tick();
+  }
+
+  private loadFragment (frag) {
+    // only load if fragment is not loaded or if in audio switch
+    // we force a frag loading in audio switch as fragment tracker might not have evicted previous frags in case of quick audio switch
+    const fragState = this.fragmentTracker.getState(frag);
+    this.fragCurrent = frag;
+    this.startFragRequested = true;
+    let prevPos = this.nextLoadPosition;
+
+    if (!this.audioSwitch && fragState !== FragmentState.NOT_LOADED) {
+      return;
+    }
+
+    if (frag.sn === 'initSegment') {
+      this._loadInitSegment(frag);
+    } else if (Number.isFinite(this.initPTS[frag.cc])) {
+      this.nextLoadPosition = frag.start + frag.duration;
+      this._loadFragForPlayback(frag);
+    } else {
+      this.log(`Unknown video PTS for continuity counter ${frag.cc}, waiting for video PTS before loading audio fragment ${frag.sn} of level ${this.trackId}`);
+      this.state = State.WAITING_INIT_PTS;
+      this.nextLoadPosition = prevPos;
+    }
   }
 }
 export default AudioStreamController;
