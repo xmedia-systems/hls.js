@@ -46,6 +46,8 @@ class BufferController extends EventHandler {
   // signals that mediaSource should have endOfStream called
   private _needsEos: boolean = false;
 
+  private timestampOffset: number | null = null;
+
   // this is optional because this property is removed from the class sometimes
   public audioTimestampOffset?: number;
 
@@ -87,8 +89,14 @@ class BufferController extends EventHandler {
       Events.BUFFER_EOS,
       Events.BUFFER_FLUSHING,
       Events.LEVEL_PTS_UPDATED,
-      Events.LEVEL_UPDATED);
+      Events.LEVEL_UPDATED,
+      Events.INIT_PTS_FOUND
+    );
     this.hls = hls;
+  }
+
+  onInitPtsFound ({ initPTS }) {
+    this.timestampOffset = -initPTS;
   }
 
   onLevelPtsUpdated (data: { type: SourceBufferName, start: number }) {
@@ -267,12 +275,17 @@ class BufferController extends EventHandler {
     // this.sourceBuffer is better to use than media.buffered as it is closer to the PTS data from the fragments
     const timeRanges: Partial<Record<SourceBufferName, TimeRanges>> = {};
     const sbSet = this.sourceBuffer;
+    const offset = this.timestampOffset;
     for (let streamType in sbSet) {
       const sb = sbSet[streamType as SourceBufferName];
       if (!sb) {
         throw Error(`handling source buffer update end error: source buffer for ${streamType} uninitilized and unable to update buffered TimeRanges.`);
       }
       timeRanges[streamType as SourceBufferName] = sb.buffered;
+      if (offset !== null) {
+        sb.timestampOffset = offset;
+        this.timestampOffset = null;
+      }
     }
 
     this.hls.trigger(Events.BUFFER_APPENDED, { parent, pending, timeRanges });
@@ -489,6 +502,7 @@ class BufferController extends EventHandler {
    * More details: https://github.com/video-dev/hls.js/issues/355
    */
   updateMediaElementDuration () {
+    return;
     let { config } = this.hls;
     let duration: number;
 
