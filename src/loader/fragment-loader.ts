@@ -27,7 +27,7 @@ export default class FragmentLoader {
 
     let loader = this.loader;
     if (loader) {
-      logger.warn(`Aborting loader for previous ${frag.type} fragment`);
+      logger.warn(`[fragment-loader, ${frag.type}]: Aborting fragment ${frag.sn} of level ${frag.level}`);
       loader.abort();
     }
 

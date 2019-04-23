@@ -45,6 +45,8 @@ export default class BaseStreamController extends TaskLoop {
   protected fragLoadError: number = 0;
   protected levels: Array<any> | null = null;
   protected fragmentLoader!: FragmentLoader;
+  protected stats!: LoaderStats;
+
   protected readonly logPrefix: string = '';
 
   protected doTick () {}
@@ -154,7 +156,8 @@ export default class BaseStreamController extends TaskLoop {
   protected _loadFragForPlayback (frag) {
     const progressCallback: FragmentLoadProgressCallback = ({ payload }) => {
       if (this._fragLoadAborted(frag)) {
-        logger.warn(`Fragment ${frag.sn} of level ${frag.level} was aborted during progressive download.`);
+        this.warn(`Fragment ${frag.sn} of level ${frag.level} was aborted during progressive download.`);
+        this.fragmentTracker.removeFragment(frag);
         return;
       }
       this._handleFragmentLoadProgress(frag, payload);
@@ -179,18 +182,18 @@ export default class BaseStreamController extends TaskLoop {
   protected _loadInitSegment (frag) {
     this._doFragLoad(frag)
       .then((data: FragLoadSuccessResult) => {
-        const { payload } = data;
         const { fragCurrent, hls, levels } = this;
         if (!data || this._fragLoadAborted(frag) || !levels) {
           return;
         }
+        const { payload } = data;
+        const stats = frag.stats;
         this.state = State.IDLE;
         this.fragLoadError = 0;
-        const stats = frag.stats;
         levels[frag.level].details.initSegment.data = payload;
         stats.tparsed = stats.tbuffered = window.performance.now();
         // TODO: set id from calling class
-        hls.trigger(Event.FRAG_BUFFERED, { stats: stats, frag: fragCurrent, id: 'main' });
+        hls.trigger(Event.FRAG_BUFFERED, { stats: stats, frag: fragCurrent, id: frag.type });
         this.tick();
       });
   }
@@ -217,6 +220,7 @@ export default class BaseStreamController extends TaskLoop {
     this.state = State.FRAG_LOADING;
     this.hls.trigger(Event.FRAG_LOADING, { frag });
 
+    // TODO: nextLoadPos should only be set on successful frag load
     const errorHandler = (e) => {
       const errorData = e ? e.data : null;
       if (errorData && errorData.details === ErrorDetails.INTERNAL_ABORTED) {
@@ -224,7 +228,7 @@ export default class BaseStreamController extends TaskLoop {
         if (fragPrev) {
           this.nextLoadPosition = fragPrev.start + fragPrev.duration;
         } else {
-          this.nextLoadPosition = this.lastCurrentTime;
+          this.nextLoadPosition = this.media.currentTime;
         }
         this.log(`Frag load aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
         return;
@@ -290,6 +294,29 @@ export default class BaseStreamController extends TaskLoop {
 
   protected warn (msg) {
     logger.warn(`${this.logPrefix}: ${msg}`);
+  }
+
+  protected _handleTransmuxerFlush ({ sn, level }) {
+    if (this.state !== State.PARSING) {
+      this.warn(`State is expected to be PARSING on transmuxer flush, but is ${this.state}.`);
+      return;
+    }
+    this.state = State.PARSED;
+
+    const { levels } = this;
+    if (!levels) {
+      return;
+    }
+    const currentLevel = levels[level];
+
+    if (this.stats) {
+      this.stats.tparsed = window.performance.now();
+    } else {
+      this.warn(`Stats object was unset after fragment finished parsing. tparsed will not be recorded for ${this.fragCurrent}`);
+    }
+
+    const frag = LevelHelper.getFragmentWithSN(currentLevel, sn);
+    this.hls.trigger(Event.FRAG_PARSED, { frag });
   }
 
   set state (nextState) {

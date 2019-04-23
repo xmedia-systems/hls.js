@@ -17,7 +17,8 @@ import { alignStream } from '../utils/discontinuities';
 import { findFragmentByPDT, findFragmentByPTS } from './fragment-finders';
 import GapController from './gap-controller';
 import BaseStreamController, { State } from './base-stream-controller';
-import FragmentLoader from '../loader/fragment-loader';
+import FragmentLoader, { FragLoadSuccessResult } from '../loader/fragment-loader';
+import { appendUint8Array } from '../utils/mp4-tools';
 
 const TICK_INTERVAL = 100; // how often to tick in ms
 
@@ -63,7 +64,8 @@ export default class StreamController extends BaseStreamController {
       Event.BUFFER_CREATED,
       Event.BUFFER_APPENDED,
       Event.BUFFER_FLUSHED,
-      Event.LEVELS_UPDATED
+      Event.LEVELS_UPDATED,
+      Event.FRAG_BUFFERED
     );
 
     this.audioCodecSwap = false;
@@ -964,6 +966,15 @@ export default class StreamController extends BaseStreamController {
     }
   }
 
+  onFragBuffered (data) {
+    const { frag } = data;
+    if (frag && frag.type !== 'main') {
+      return;
+    }
+    this.state = State.IDLE;
+    this.tick();
+  }
+
   _checkAppendedParsed () {
     // trigger handler right now
     if (this.state === State.PARSED && (!this.appended || !this.pendingBuffering)) {
@@ -1312,18 +1323,19 @@ export default class StreamController extends BaseStreamController {
     if (!data || this.state !== State.PARSING) {
       return;
     }
-    // has remuxer dropped video frames located before first keyframe ?
-    [data.data1, data.data2].forEach(buffer => {
-      // only append in PARSING state (rationale is that an appending error could happen synchronously on first segment appending)
-      // in that case it is useless to append following segments
-      if (buffer && buffer.length && this.state === State.PARSING) {
-        this.appended = true;
-        // arm pending Buffering flag before appending a segment
-        this.pendingBuffering = true;
-        this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
-      }
-    });
-    // trigger handler right now
+    const { data1, data2  } = data;
+    let buffer = data1;
+    if (data1 && data2) {
+      buffer = appendUint8Array(data1, data2);
+    }
+
+    if (!buffer.length) {
+      return;
+    }
+    this.appended = true;
+    // arm pending Buffering flag before appending a segment
+    this.pendingBuffering = true;
+    this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
     this.tick();
   }
 
@@ -1361,6 +1373,17 @@ export default class StreamController extends BaseStreamController {
     this.state = State.IDLE;
     this.fragPrevious = frag;
     this.tick();
+  }
+
+  private getFragmentFromTransmuxIdentifier ({ sn, level }) : Fragment | null {
+    const { levels } = this;
+    if (!levels || !levels[level]) {
+      this.warn(`Levels object was unset while buffering fragment ${sn} of level ${level}. The current chunk will not be buffered.`);
+      return null;
+    }
+    const currentLevel = levels[level];
+
+    return LevelHelper.getFragmentWithSN(currentLevel, sn);
   }
 
   get liveSyncPosition () {
