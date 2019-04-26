@@ -29,7 +29,6 @@ class AudioStreamController extends BaseStreamController {
   private onvended: Function | null = null;
   private videoBuffer: any | null = null;
   private initPTS: any = [];
-  private waitingFragment: Fragment | null = null;
   private videoTrackCC: number = -1;
   private audioSwitch: boolean = false;
   private trackId: number = -1;
@@ -281,6 +280,13 @@ class AudioStreamController extends BaseStreamController {
     default:
       break;
     }
+
+    const media = this.media;
+    if (media) {
+      if (media.currentTime > this.lastCurrentTime) {
+        this.lastCurrentTime = media.currentTime;
+      }
+    }
   }
 
   onMediaAttached (data) {
@@ -325,7 +331,6 @@ class AudioStreamController extends BaseStreamController {
 
     this.fragCurrent = null;
     this.state = State.PAUSED;
-    this.waitingFragment = null;
     // destroy useless transmuxer when switching audio to main
     if (!altAudio) {
       if (this.transmuxer) {
@@ -457,16 +462,16 @@ class AudioStreamController extends BaseStreamController {
   }
 
   onFragBuffered (data) {
-    const { frag, hls } = data;
+    const { frag } = data;
     if (frag && frag.type !== 'audio') {
       return;
     }
     this.fragPrevious = frag;
     const media = this.mediaBuffer ? this.mediaBuffer : this.media;
     this.log(`Buffered fragment ${frag.sn} of level ${frag.level}. PTS:[${frag.startPTS},${frag.endPTS}],DTS:[${frag.startDTS}/${frag.endDTS}], Buffered: ${TimeRanges.toString(media)}`);
-    if (this.audioSwitch) {
+    if (this.audioSwitch && frag.sn !== 'initSegment') {
       this.audioSwitch = false;
-      hls.trigger(Event.AUDIO_TRACK_SWITCHED, { id: this.trackId });
+      this.hls.trigger(Event.AUDIO_TRACK_SWITCHED, { id: this.trackId });
     }
     this.state = State.IDLE;
     this.tick();
@@ -586,9 +591,15 @@ class AudioStreamController extends BaseStreamController {
     this.state = State.PARSING;
 
     const { audio, text, id3, initSegment } = remuxResult;
+
+    if (this.audioSwitch && audio) {
+      this.completeAudioSwitch(audio.startPTS);
+    }
+
     if (initSegment && initSegment.tracks) {
       this._bufferInitSegment(initSegment.tracks);
       hls.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { frag, id, tracks: initSegment.tracks });
+      // Only flush audio from old audio tracks when PTS is known on new audio track
     }
     if (audio) {
       this._bufferFragmentData(frag, level, audio);
@@ -646,11 +657,6 @@ class AudioStreamController extends BaseStreamController {
     // this.log(`Parsed ${data.type},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],DTS:[${data.startDTS.toFixed(3)}/${data.endDTS.toFixed(3)}],nb:${data.nb}`);
 
     LevelHelper.updateFragPTSDTS(currentLevel.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
-
-    // Only flush audio from old audio tracks when PTS is known on new audio track
-    if (this.audioSwitch) {
-      this.completeAudioSwitch(data.startPTS);
-    }
 
     const { data1, data2 } = data;
     let buffer = data1;

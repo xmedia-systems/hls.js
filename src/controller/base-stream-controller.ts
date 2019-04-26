@@ -228,7 +228,7 @@ export default class BaseStreamController extends TaskLoop {
         if (fragPrev) {
           this.nextLoadPosition = fragPrev.start + fragPrev.duration;
         } else {
-          this.nextLoadPosition = this.media.currentTime;
+          this.nextLoadPosition = this.lastCurrentTime;
         }
         this.log(`Frag load aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
         return;
