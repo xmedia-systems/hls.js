@@ -42,8 +42,6 @@ export default class StreamController extends BaseStreamController {
   private fragLastKbps: number = 0;
   private stalled: boolean = false;
   private audioCodecSwitch: boolean = false;
-  private pendingBuffering: boolean = false;
-  private appended: boolean = false;
   private videoBuffer: any | null = null;
   private _liveSyncPosition: number | null = null;
 
@@ -62,7 +60,6 @@ export default class StreamController extends BaseStreamController {
       Event.AUDIO_TRACK_SWITCHING,
       Event.AUDIO_TRACK_SWITCHED,
       Event.BUFFER_CREATED,
-      Event.BUFFER_APPENDED,
       Event.BUFFER_FLUSHED,
       Event.LEVELS_UPDATED,
       Event.FRAG_BUFFERED
@@ -955,46 +952,23 @@ export default class StreamController extends BaseStreamController {
     }
   }
 
-  onBufferAppended (data) {
-    if (data.parent === 'main') {
-      const state = this.state;
-      if (state === State.PARSING || state === State.PARSED) {
-        // check if all buffers have been appended
-        this.pendingBuffering = (data.pending > 0);
-        this._checkAppendedParsed();
-      }
-    }
-  }
-
   onFragBuffered (data) {
-    const { frag } = data;
+    const { frag, stats } = data;
     if (frag && frag.type !== 'main') {
       return;
     }
+    this.fragPrevious = frag;
+    const media = this.mediaBuffer ? this.mediaBuffer : this.media;
+    this.log(`Buffered fragment ${frag.sn} of level ${frag.level}. PTS:[${frag.startPTS},${frag.endPTS}],DTS:[${frag.startDTS}/${frag.endDTS}], Buffered: ${TimeRanges.toString(media)}`);
+    if (!stats) {
+      this.warn(`Stats object was unset after fragment was buffered. tbuffered will not be recorded for ${this.fragCurrent}`);
+    } else {
+      stats.tbuffered = window.performance.now();
+      // we should get rid of this.fragLastKbps
+      this.fragLastKbps = Math.round(8 * stats.total / (stats.tbuffered - stats.tfirst));
+    }
     this.state = State.IDLE;
     this.tick();
-  }
-
-  _checkAppendedParsed () {
-    // trigger handler right now
-    if (this.state === State.PARSED && (!this.appended || !this.pendingBuffering)) {
-      const frag = this.fragCurrent;
-      if (frag) {
-        const media = this.mediaBuffer ? this.mediaBuffer : this.media;
-        this.fragPrevious = frag;
-
-        this.log(`Parsed fragment ${frag.sn} of level ${frag.level}, PTS:[${frag.startPTS},${frag.endPTS}],DTS:[${frag.startDTS}/${frag.endDTS}]`);
-        this.log(`Buffered : ${TimeRanges.toString(media.buffered)}`);
-
-        const stats = frag.stats;
-        stats.tbuffered = window.performance.now();
-        // TODO: Remove fragLastKbps
-        this.fragLastKbps = Math.round(8 * stats.total / (stats.tbuffered - stats.tfirst));
-        this.hls.trigger(Event.FRAG_BUFFERED, { stats, frag: frag, id: 'main' });
-        this.state = State.IDLE;
-      }
-      this.tick();
-    }
   }
 
   onError (data) {
@@ -1224,8 +1198,6 @@ export default class StreamController extends BaseStreamController {
     this._updateTiming(frag, level, video);
 
     this.state = State.PARSING;
-    this.pendingBuffering = true;
-    this.appended = false;
 
     if (initSegment) {
       if (initSegment.tracks) {
@@ -1309,9 +1281,6 @@ export default class StreamController extends BaseStreamController {
       const initSegment = track.initSegment;
       this.log(`Main track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]`);
       if (initSegment) {
-        this.appended = true;
-        // arm pending Buffering flag before appending a segment
-        this.pendingBuffering = true;
         this.hls.trigger(Event.BUFFER_APPENDING, { type: trackName, data: initSegment, parent: 'main', content: 'initSegment' });
       }
     });
@@ -1332,9 +1301,6 @@ export default class StreamController extends BaseStreamController {
     if (!buffer.length) {
       return;
     }
-    this.appended = true;
-    // arm pending Buffering flag before appending a segment
-    this.pendingBuffering = true;
     this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
     this.tick();
   }
