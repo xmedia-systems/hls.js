@@ -17,7 +17,7 @@ import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { isCodecSupportedInMp4 } from '../utils/codecs';
 import { addGroupId, computeReloadInterval } from './level-helper';
-import Fragment from "../loader/fragment";
+import Fragment from '../loader/fragment';
 
 let chromeOrFirefox: boolean;
 
@@ -314,14 +314,9 @@ export default class LevelController extends EventHandler {
   /**
    * Switch to a redundant stream if any available.
    * If redundant stream is not available, emergency switch down if ABR mode is enabled.
-   *
-   * @param {Object} errorEvent
-   * @param {Number} levelIndex current level index
-   * @param {Boolean} levelError
-   * @param {Boolean} fragmentError
    */
   // FIXME Find a better abstraction where fragment/level retry management is well decoupled
-  private recoverLevel (errorEvent, levelIndex, levelError, fragmentError): void {
+  private recoverLevel (errorEvent: ErrorData, levelIndex: number, levelError: boolean, fragmentError: boolean): void {
     if (!this._levels) {
       throw new Error('No levels');
     }
@@ -453,7 +448,7 @@ export default class LevelController extends EventHandler {
   }
 
   private loadLevel () {
-    logger.debug(`call to loadLevel (canLoad ${this.canLoad})`);
+    logger.log(`call to loadLevel (canLoad ${this.canLoad})`);
 
     if (this.currentLevelIndex !== null && this.canLoad) {
       if (!this._levels) {

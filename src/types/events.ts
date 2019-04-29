@@ -73,6 +73,7 @@ export interface ErrorData {
   event?: any
   frag?: Fragment
   level?: number
+  levelRetry?: boolean
   networkDetails?: any
   reason?: string
   response?: any
