@@ -12,12 +12,11 @@
 import Event from '../events';
 import EventHandler from '../event-handler';
 import { ErrorTypes, ErrorDetails } from '../errors';
-
 import { logger } from '../utils/logger';
-
 import { parseSegmentIndex } from '../utils/mp4-tools';
 import M3U8Parser from './m3u8-parser';
 import { getProgramDateTimeAtEndOfLastEncodedFragment } from '../controller/level-helper';
+import { LevelParsed } from '../types/level';
 import { Loader, LoaderContext, LoaderResponse, LoaderStats } from '../types/loader';
 import { ManifestLoadingData, LevelLoadingData, TrackLoadingData } from '../types/events';
 import LevelDetails from './level-details';
@@ -212,17 +211,17 @@ class PlaylistLoader extends EventHandler {
   private load (context: ManifestLoaderContext): void {
     const config = this.hls.config;
 
-    logger.debug(`Loading playlist of type ${context.type}, level: ${context.level}, id: ${context.id}`);
+    logger.debug(`[playlist-loader]: Loading playlist of type ${context.type}, level: ${context.level}, id: ${context.id}`);
 
     // Check if a loader for this context already exists
     let loader = this.getInternalLoader(context);
     if (loader) {
       const loaderContext = loader.context;
       if (loaderContext && loaderContext.url === context.url) { // same URL can't overlap
-        logger.trace('playlist request ongoing');
+        logger.trace('[playlist-loader]: playlist request ongoing');
         return;
       }
-      logger.warn(`aborting previous loader for type: ${context.type}`);
+      logger.warn(`[playlist-loader]: aborting previous loader for type: ${context.type}`);
       loader.abort();
     }
 
@@ -269,7 +268,7 @@ class PlaylistLoader extends EventHandler {
       onTimeout: this.loadtimeout.bind(this)
     };
 
-    logger.debug(`Calling internal loader delegate for URL: ${context.url}`);
+    logger.debug(`[playlist-loader]: Calling internal loader delegate for URL: ${context.url}`);
 
     loader.load(context, loaderConfig, loaderCallbacks);
   }
@@ -313,7 +312,7 @@ class PlaylistLoader extends EventHandler {
 
     const url = getResponseUrl(response, context);
 
-    const levels = M3U8Parser.parseMasterPlaylist(string, url);
+    const levels: LevelParsed[] = M3U8Parser.parseMasterPlaylist(string, url);
     if (!levels.length) {
       this._handleManifestParsingError(response, context, 'no level found in manifest', networkDetails);
       return;
@@ -321,7 +320,7 @@ class PlaylistLoader extends EventHandler {
 
     // multi level playlist, parse level info
 
-    const audioGroups = levels.map(level => ({
+    const audioGroups = levels.map((level: LevelParsed) => ({
       id: level.attrs.AUDIO,
       codec: level.audioCodec
     }));
@@ -332,19 +331,14 @@ class PlaylistLoader extends EventHandler {
 
     if (audioTracks.length) {
       // check if we have found an audio track embedded in main playlist (audio track without URI attribute)
-      let embeddedAudioFound = false;
-      audioTracks.forEach(audioTrack => {
-        if (!audioTrack.url) {
-          embeddedAudioFound = true;
-        }
-      });
+      const embeddedAudioFound: boolean = audioTracks.some(audioTrack => !audioTrack.url);
 
       // if no embedded audio track defined, but audio codec signaled in quality level,
       // we need to signal this main audio track this could happen with playlists with
       // alt audio rendition in which quality levels (main)
       // contains both audio+video. but with mixed audio track not signaled
-      if (embeddedAudioFound === false && levels[0].audioCodec && !levels[0].attrs.AUDIO) {
-        logger.log('audio codec signaled in quality level, but no embedded audio track signaled, create one');
+      if (!embeddedAudioFound && levels[0].audioCodec && !levels[0].attrs.AUDIO) {
+        logger.log('[playlist-loader]: audio codec signaled in quality level, but no embedded audio track signaled, create one');
         audioTracks.unshift({
           type: 'main',
           name: 'main'
@@ -403,9 +397,11 @@ class PlaylistLoader extends EventHandler {
     // We fire the manifest-loaded event anyway with the parsed level-details
     // by creating a single-level structure for it.
     if (type === ContextType.MANIFEST) {
-      const singleLevel = {
-        url,
-        details: levelDetails
+      const singleLevel: LevelParsed = {
+        attrs: {},
+        bitrate: 0,
+        details: levelDetails,
+        url
       };
 
       hls.trigger(Event.MANIFEST_LOADED, {
@@ -478,7 +474,7 @@ class PlaylistLoader extends EventHandler {
   }
 
   private _handleNetworkError (context, networkDetails, timeout = false, response: LoaderResponse | null = null): void {
-    logger.info(`A network error occurred while loading a ${context.type}-type playlist`);
+    logger.info(`[playlist-loader]: A network error occurred while loading a ${context.type}-type playlist`);
     let details;
     let fatal;
 

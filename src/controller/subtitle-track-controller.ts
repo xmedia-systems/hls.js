@@ -94,14 +94,14 @@ class SubtitleTrackController extends EventHandler {
       return;
     }
 
-    logger.log(`subtitle track ${id} loaded [${details.startSN},${details.endSN}]`);
+    logger.log(`[subtitle-track-controller]: subtitle track ${id} loaded [${details.startSN},${details.endSN}]`);
 
     if (details.live) {
       const curDetails = currentTrack.details;
       details.updated = (!curDetails || details.endSN !== curDetails.endSN || details.url !== curDetails.url);
       details.availabilityDelay = curDetails && curDetails.availabilityDelay;
       const reloadInterval = computeReloadInterval(details, data.stats);
-      logger.log(`live subtitle track ${details.updated ? 'REFRESHED' : 'MISSED'}, reload in ${Math.round(reloadInterval)} ms`);
+      logger.log(`[subtitle-track-controller]: live subtitle track ${details.updated ? 'REFRESHED' : 'MISSED'}, reload in ${Math.round(reloadInterval)} ms`);
       this.timer = window.setTimeout(() => {
         this._loadCurrentTrack();
       }, reloadInterval);
@@ -151,7 +151,7 @@ class SubtitleTrackController extends EventHandler {
     if (trackId < 0 || !currentTrack || (currentTrack.details && !currentTrack.details.live)) {
       return;
     }
-    logger.log(`Loading subtitle track ${trackId}`);
+    logger.log(`[subtitle-track-controller]: Loading subtitle track ${trackId}`);
     hls.trigger(Event.SUBTITLE_TRACK_LOADING, { url: currentTrack.url, id: trackId });
   }
 
@@ -195,7 +195,7 @@ class SubtitleTrackController extends EventHandler {
     }
 
     this.trackId = newId;
-    logger.log(`Switching to subtitle track ${newId}`);
+    logger.log(`[subtitle-track-controller]: Switching to subtitle track ${newId}`);
     hls.trigger(Event.SUBTITLE_TRACK_SWITCH, { id: newId });
     this._loadCurrentTrack();
   }

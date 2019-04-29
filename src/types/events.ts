@@ -1,6 +1,6 @@
 import Fragment from '../loader/fragment';
 import LevelDetails from '../loader/level-details';
-import { Level, LevelParsed, PlaylistMedia, SingleLevel } from './level';
+import { Level, LevelParsed, PlaylistMedia } from './level';
 import { LoaderStats } from './loader';
 
 export interface ManifestLoadingData {
@@ -10,7 +10,7 @@ export interface ManifestLoadingData {
 export interface ManifestLoadedData {
   audioTracks: PlaylistMedia[]
   captions?: PlaylistMedia[]
-  levels: LevelParsed[] | [SingleLevel]
+  levels: LevelParsed[]
   networkDetails: any,
   stats: LoaderStats
   subtitles?: PlaylistMedia[]
