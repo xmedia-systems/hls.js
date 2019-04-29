@@ -20,8 +20,8 @@ import M3U8Parser from './m3u8-parser';
 import { getProgramDateTimeAtEndOfLastEncodedFragment } from '../controller/level-helper';
 import { Loader, LoaderContext, LoaderResponse, LoaderStats } from '../types/loader';
 import { ManifestLoadingData, LevelLoadingData, TrackLoadingData } from '../types/events';
-import LevelDetails from './level';
-import Fragment from "./fragment";
+import LevelDetails from './level-details';
+import Fragment from './fragment';
 
 const { performance } = window;
 

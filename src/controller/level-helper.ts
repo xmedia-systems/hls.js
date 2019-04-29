@@ -5,7 +5,7 @@
 
 import { logger } from '../utils/logger';
 import Fragment from '../loader/fragment';
-import LevelDetails from '../loader/level';
+import LevelDetails from '../loader/level-details';
 import { Level } from '../types/level';
 import { LoaderStats } from '../types/loader';
 

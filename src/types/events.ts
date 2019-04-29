@@ -1,7 +1,7 @@
-import {LoaderStats} from './loader';
 import Fragment from '../loader/fragment';
-import LevelDetails from '../loader/level';
-import {Level, LevelParsed, PlaylistMedia, SingleLevel} from './level';
+import LevelDetails from '../loader/level-details';
+import { Level, LevelParsed, PlaylistMedia, SingleLevel } from './level';
+import { LoaderStats } from './loader';
 
 export interface ManifestLoadingData {
   url: string

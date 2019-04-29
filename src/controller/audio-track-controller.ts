@@ -3,8 +3,8 @@ import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { computeReloadInterval } from './level-helper';
 import EventHandler from '../event-handler';
-import {PlaylistMedia} from '../types/level';
-import {AudioTrackSwitchedData, TrackLoadedData, ManifestParsedData, LevelLoadedData, ErrorData} from '../types/events';
+import { PlaylistMedia } from '../types/level';
+import { AudioTrackSwitchedData, TrackLoadedData, ManifestParsedData, LevelLoadedData, ErrorData } from '../types/events';
 
 /**
  * @class AudioTrackController

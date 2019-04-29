@@ -2,8 +2,8 @@ import Event from '../events';
 import EventHandler from '../event-handler';
 import { logger } from '../utils/logger';
 import { computeReloadInterval } from './level-helper';
-import {PlaylistMedia} from '../types/level';
-import {TrackLoadedData, ManifestLoadedData, MediaAttachedData} from '../types/events';
+import { PlaylistMedia } from '../types/level';
+import { TrackLoadedData, ManifestLoadedData, MediaAttachedData } from '../types/events';
 
 class SubtitleTrackController extends EventHandler {
   private tracks: PlaylistMedia[];

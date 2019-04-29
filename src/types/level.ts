@@ -1,4 +1,4 @@
-import LevelDetails from '../loader/level';
+import LevelDetails from '../loader/level-details';
 
 export interface SingleLevel {
   details: LevelDetails
