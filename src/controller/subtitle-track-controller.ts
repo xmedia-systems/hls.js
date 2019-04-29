@@ -27,7 +27,7 @@ class SubtitleTrackController extends EventHandler {
   }
 
   // Listen for subtitle track change, then extract the current track ID.
-  onMediaAttached (data: MediaAttachedData): void {
+  protected onMediaAttached (data: MediaAttachedData): void {
     this.media = data.media;
     if (!this.media) {
       return;
@@ -48,7 +48,7 @@ class SubtitleTrackController extends EventHandler {
     }
   }
 
-  onMediaDetaching (): void {
+  protected onMediaDetaching (): void {
     if (!this.media) {
       return;
     }
@@ -63,7 +63,7 @@ class SubtitleTrackController extends EventHandler {
   }
 
   // Fired whenever a new manifest is loaded.
-  onManifestLoaded (data: ManifestLoadedData): void {
+  protected onManifestLoaded (data: ManifestLoadedData): void {
     let tracks = data.subtitles || [];
     this.tracks = tracks;
     this.hls.trigger(Event.SUBTITLE_TRACKS_UPDATED, { subtitleTracks: tracks });
@@ -85,7 +85,7 @@ class SubtitleTrackController extends EventHandler {
     });
   }
 
-  onSubtitleTrackLoaded (data: TrackLoadedData): void {
+  protected onSubtitleTrackLoaded (data: TrackLoadedData): void {
     const { id, details } = data;
     const { trackId, tracks } = this;
     const currentTrack = tracks[trackId];
@@ -110,12 +110,12 @@ class SubtitleTrackController extends EventHandler {
     }
   }
 
-  startLoad (): void {
+  public startLoad (): void {
     this.stopped = false;
     this._loadCurrentTrack();
   }
 
-  stopLoad (): void {
+  public stopLoad (): void {
     this.stopped = true;
     this._clearReloadTimer();
   }
@@ -138,14 +138,14 @@ class SubtitleTrackController extends EventHandler {
     }
   }
 
-  _clearReloadTimer (): void {
+  private _clearReloadTimer (): void {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
   }
 
-  _loadCurrentTrack (): void {
+  private _loadCurrentTrack (): void {
     const { trackId, tracks, hls } = this;
     const currentTrack = tracks[trackId];
     if (trackId < 0 || !currentTrack || (currentTrack.details && !currentTrack.details.live)) {
@@ -159,10 +159,8 @@ class SubtitleTrackController extends EventHandler {
    * Disables the old subtitleTrack and sets current mode on the next subtitleTrack.
    * This operates on the DOM textTracks.
    * A value of -1 will disable all subtitle tracks.
-   * @param newId - The id of the next track to enable
-   * @private
    */
-  _toggleTrackModes (newId: number): void {
+  private _toggleTrackModes (newId: number): void {
     const { media, subtitleDisplay, trackId } = this;
     if (!media) {
       return;
@@ -189,9 +187,8 @@ class SubtitleTrackController extends EventHandler {
   /**
      * This method is responsible for validating the subtitle index and periodically reloading if live.
      * Dispatches the SUBTITLE_TRACK_SWITCH event, which instructs the subtitle-stream-controller to load the selected track.
-     * @param newId - The id of the subtitle track to activate.
      */
-  _setSubtitleTrackInternal (newId: number): void {
+  private _setSubtitleTrackInternal (newId: number): void {
     const { hls, tracks } = this;
     if (!Number.isFinite(newId) || newId < -1 || newId >= tracks.length) {
       return;
@@ -203,7 +200,7 @@ class SubtitleTrackController extends EventHandler {
     this._loadCurrentTrack();
   }
 
-  _onTextTracksChanged (): void {
+  private _onTextTracksChanged (): void {
     // Media is undefined when switching streams via loadSource()
     if (!this.media || !this.hls.config.renderNatively) {
       return;

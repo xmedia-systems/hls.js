@@ -42,19 +42,19 @@ export default class LevelController extends EventHandler {
     chromeOrFirefox = /chrome|firefox/.test(navigator.userAgent.toLowerCase());
   }
 
-  onHandlerDestroying (): void {
+  protected onHandlerDestroying (): void {
     this.clearTimer();
     this.manualLevelIndex = -1;
   }
 
-  clearTimer (): void {
+  private clearTimer (): void {
     if (this.timer !== null) {
       clearTimeout(this.timer);
       this.timer = null;
     }
   }
 
-  startLoad (): void {
+  public startLoad (): void {
     let levels = this._levels;
 
     this.canLoad = true;
@@ -76,12 +76,12 @@ export default class LevelController extends EventHandler {
     }
   }
 
-  stopLoad (): void {
+  public stopLoad (): void {
     this.canLoad = false;
     this.clearTimer();
   }
 
-  onManifestLoaded (data: ManifestLoadedData): void {
+  protected onManifestLoaded (data: ManifestLoadedData): void {
     let levels: Level[] = [];
     let audioTracks: PlaylistMedia[] = [];
     let bitrateStart: number | undefined;
@@ -196,7 +196,7 @@ export default class LevelController extends EventHandler {
     }
   }
 
-  setLevelInternal (newLevel: number): void {
+  private setLevelInternal (newLevel: number): void {
     const levels = this._levels as Level[];
     const hls = this.hls;
     // check if level idx is valid
@@ -273,7 +273,7 @@ export default class LevelController extends EventHandler {
     this._startLevel = newLevel;
   }
 
-  onError (data: ErrorData) {
+  protected onError (data: ErrorData) {
     if (data.fatal) {
       if (data.type === ErrorTypes.NETWORK_ERROR) {
         this.clearTimer();
@@ -321,7 +321,7 @@ export default class LevelController extends EventHandler {
    * @param {Boolean} fragmentError
    */
   // FIXME Find a better abstraction where fragment/level retry management is well decoupled
-  recoverLevel (errorEvent, levelIndex, levelError, fragmentError): void {
+  private recoverLevel (errorEvent, levelIndex, levelError, fragmentError): void {
     if (!this._levels) {
       throw new Error('No levels');
     }
@@ -385,7 +385,7 @@ export default class LevelController extends EventHandler {
   }
 
   // reset errors on the successful load of a fragment
-  onFragLoaded ({ frag }: FragLoadedData) {
+  protected onFragLoaded ({ frag }: FragLoadedData) {
     if (frag !== undefined && frag.type === 'main') {
       if (!this._levels) {
         throw new Error('No levels');
@@ -399,7 +399,7 @@ export default class LevelController extends EventHandler {
     }
   }
 
-  onLevelLoaded (data: LevelLoadedData) {
+  protected onLevelLoaded (data: LevelLoadedData) {
     const { level, details } = data;
     // only process level loaded events matching with expected level
     if (level !== this.currentLevelIndex) {
@@ -427,7 +427,7 @@ export default class LevelController extends EventHandler {
     }
   }
 
-  onAudioTrackSwitched (data: AudioTrackSwitchedData) {
+  protected onAudioTrackSwitched (data: AudioTrackSwitchedData) {
     const audioGroupId = this.hls.audioTracks[data.id].groupId;
 
     const currentLevel = this.hls.levels[this.currentLevelIndex as number];
@@ -452,7 +452,7 @@ export default class LevelController extends EventHandler {
     }
   }
 
-  loadLevel () {
+  private loadLevel () {
     logger.debug(`call to loadLevel (canLoad ${this.canLoad})`);
 
     if (this.currentLevelIndex !== null && this.canLoad) {

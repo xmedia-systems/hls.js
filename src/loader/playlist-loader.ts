@@ -120,11 +120,8 @@ class PlaylistLoader extends EventHandler {
 
   /**
    * Returns defaults or configured loader-type overloads (pLoader and loader config params)
-   * Default loader is XHRLoader (see utils)
-   * @param {object} context
-   * @returns {XHRLoader} or other compatible configured overload
    */
-  createInternalLoader (context: ManifestLoaderContext): Loader<LoaderContext> {
+  private createInternalLoader (context: ManifestLoaderContext): Loader<LoaderContext> {
     const config = this.hls.config;
     const PLoader = config.pLoader;
     const Loader = config.loader;
@@ -138,11 +135,11 @@ class PlaylistLoader extends EventHandler {
     return loader;
   }
 
-  getInternalLoader (context: ManifestLoaderContext): Loader<LoaderContext> {
+  private getInternalLoader (context: ManifestLoaderContext): Loader<LoaderContext> {
     return this.loaders[context.type];
   }
 
-  resetInternalLoader (contextType): void {
+  private resetInternalLoader (contextType): void {
     if (this.loaders[contextType]) {
       delete this.loaders[contextType];
     }
@@ -151,7 +148,7 @@ class PlaylistLoader extends EventHandler {
   /**
    * Call `destroy` on all internal loader instances mapped (one per context type)
    */
-  destroyInternalLoaders (): void {
+  private destroyInternalLoaders (): void {
     for (let contextType in this.loaders) {
       let loader = this.loaders[contextType];
       if (loader) {
@@ -162,13 +159,13 @@ class PlaylistLoader extends EventHandler {
     }
   }
 
-  destroy (): void {
+  public destroy (): void {
     this.destroyInternalLoaders();
 
     super.destroy();
   }
 
-  onManifestLoading (data: ManifestLoadingData): void {
+  protected onManifestLoading (data: ManifestLoadingData): void {
     const { url } = data;
     this.load({
       id: null,
@@ -179,7 +176,7 @@ class PlaylistLoader extends EventHandler {
     });
   }
 
-  onLevelLoading (data: LevelLoadingData): void {
+  protected onLevelLoading (data: LevelLoadingData): void {
     const { id, level, url } = data;
     this.load({
       id,
@@ -190,7 +187,7 @@ class PlaylistLoader extends EventHandler {
     });
   }
 
-  onAudioTrackLoading (data: TrackLoadingData): void {
+  protected onAudioTrackLoading (data: TrackLoadingData): void {
     const { id, url } = data;
     this.load({
       id,
@@ -201,7 +198,7 @@ class PlaylistLoader extends EventHandler {
     });
   }
 
-  onSubtitleTrackLoading (data: TrackLoadingData): void {
+  protected onSubtitleTrackLoading (data: TrackLoadingData): void {
     const { id, url } = data;
     this.load({
       id,
@@ -277,7 +274,7 @@ class PlaylistLoader extends EventHandler {
     loader.load(context, loaderConfig, loaderCallbacks);
   }
 
-  loadsuccess (response: LoaderResponse, stats: LoaderStats, context: ManifestLoaderContext, networkDetails: any = null): void {
+  private loadsuccess (response: LoaderResponse, stats: LoaderStats, context: ManifestLoaderContext, networkDetails: any = null): void {
     if (context.isSidxRequest) {
       this._handleSidxRequest(response, context);
       this._handlePlaylistLoaded(response, stats, context, networkDetails);
@@ -302,15 +299,15 @@ class PlaylistLoader extends EventHandler {
     }
   }
 
-  loaderror (response: LoaderResponse, context: ManifestLoaderContext, networkDetails: any = null): void {
+  private loaderror (response: LoaderResponse, context: ManifestLoaderContext, networkDetails: any = null): void {
     this._handleNetworkError(context, networkDetails, false, response);
   }
 
-  loadtimeout (stats: LoaderStats, context: ManifestLoaderContext, networkDetails: any = null): void {
+  private loadtimeout (stats: LoaderStats, context: ManifestLoaderContext, networkDetails: any = null): void {
     this._handleNetworkError(context, networkDetails, true, null);
   }
 
-  _handleMasterPlaylist (response: LoaderResponse, stats: LoaderStats, context: ManifestLoaderContext, networkDetails: any): void {
+  private _handleMasterPlaylist (response: LoaderResponse, stats: LoaderStats, context: ManifestLoaderContext, networkDetails: any): void {
     const hls = this.hls;
     const string = response.data;
 
@@ -366,7 +363,7 @@ class PlaylistLoader extends EventHandler {
     });
   }
 
-  _handleTrackOrLevelPlaylist (response: LoaderResponse, stats: LoaderStats, context: ManifestLoaderContext, networkDetails: any): void {
+  private _handleTrackOrLevelPlaylist (response: LoaderResponse, stats: LoaderStats, context: ManifestLoaderContext, networkDetails: any): void {
     const hls = this.hls;
 
     const { id, level, type, loader } = context;
@@ -448,7 +445,7 @@ class PlaylistLoader extends EventHandler {
     this._handlePlaylistLoaded(response, stats, context, networkDetails);
   }
 
-  _handleSidxRequest (response: LoaderResponse, context: ManifestLoaderContext): void {
+  private _handleSidxRequest (response: LoaderResponse, context: ManifestLoaderContext): void {
     const sidxInfo = parseSegmentIndex(new Uint8Array(response.data as SharedArrayBuffer));
     // if provided fragment does not contain sidx, early return
     if (!sidxInfo) {
@@ -467,7 +464,7 @@ class PlaylistLoader extends EventHandler {
     (levelDetails.initSegment as Fragment).setByteRange(String(sidxInfo.moovEndOffset) + '@0');
   }
 
-  _handleManifestParsingError (response: LoaderResponse, context, reason, networkDetails): void {
+  private _handleManifestParsingError (response: LoaderResponse, context, reason, networkDetails): void {
     this.hls.trigger(Event.ERROR, {
       type: ErrorTypes.NETWORK_ERROR,
       details: ErrorDetails.MANIFEST_PARSING_ERROR,
@@ -480,7 +477,7 @@ class PlaylistLoader extends EventHandler {
     });
   }
 
-  _handleNetworkError (context, networkDetails, timeout = false, response: LoaderResponse | null = null): void {
+  private _handleNetworkError (context, networkDetails, timeout = false, response: LoaderResponse | null = null): void {
     logger.info(`A network error occurred while loading a ${context.type}-type playlist`);
     let details;
     let fatal;
@@ -527,7 +524,7 @@ class PlaylistLoader extends EventHandler {
     this.hls.trigger(Event.ERROR, errorData);
   }
 
-  _handlePlaylistLoaded (response: LoaderResponse, stats: LoaderStats, context, networkDetails): void {
+  private _handlePlaylistLoaded (response: LoaderResponse, stats: LoaderStats, context, networkDetails): void {
     const { type, level, id, levelDetails } = context;
 
     if (!levelDetails.targetduration) {
