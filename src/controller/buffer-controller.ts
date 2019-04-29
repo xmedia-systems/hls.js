@@ -9,27 +9,11 @@ import { ErrorDetails, ErrorTypes } from '../errors';
 import { getMediaSource } from '../utils/mediasource-helper';
 
 import { TrackSet } from '../types/track';
-import { Segment, SourceBufferName } from '../types/segment';
+import { Segment } from '../types/segment';
 import { ElementaryStreamTypes } from '../loader/fragment';
+import BufferOperationQueue from './buffer-operation-queue';
 
-// Add extension properties to SourceBuffers from the DOM API.
-type ExtendedSourceBuffer = SourceBuffer & {
-  ended?: boolean
-};
-
-type SourceBuffers = Partial<Record<SourceBufferName, ExtendedSourceBuffer>>;
-
-interface SourceBufferFlushRange {
-  start: number;
-  end: number;
-  type: SourceBufferName
-}
-
-interface BufferOperation {
-  execute: Function
-  onComplete: Function
-  onError: Function
-}
+import { BufferOperation, SourceBuffers, SourceBufferFlushRange, SourceBufferName } from '../types/buffer';
 
 const MediaSource = getMediaSource();
 
@@ -46,10 +30,7 @@ class BufferController extends EventHandler {
   // cache the self generated object url to detect hijack of video tag
   private _objectUrl: string | null = null;
 
-  private queues = {
-    audio: [] as Array<BufferOperation>,
-    video: [] as Array<BufferOperation>
-  };
+  private operationQueue: BufferOperationQueue;
 
   // this is optional because this property is removed from the class sometimes
   public audioTimestampOffset?: number;
@@ -88,6 +69,7 @@ class BufferController extends EventHandler {
       Events.FRAG_PARSED
     );
     this.hls = hls;
+    this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
   }
 
   onManifestParsed (data: { altAudio: boolean }) {
@@ -157,10 +139,7 @@ class BufferController extends EventHandler {
       this.pendingTracks = {};
       this.tracks = {};
       this.sourceBuffer = {};
-      this.queues = {
-        audio: [],
-        video: []
-      };
+      this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
     }
 
     this.hls.trigger(Events.MEDIA_DETACHED);
@@ -183,10 +162,7 @@ class BufferController extends EventHandler {
       }
     }
     this.sourceBuffer = {};
-    this.queues = {
-      audio: [],
-      video: []
-    };
+    this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
   }
 
   onBufferCodecs (tracks: TrackSet) {
@@ -207,7 +183,7 @@ class BufferController extends EventHandler {
   }
 
   onBufferAppending (data: Segment) {
-    const { hls } = this;
+    const { hls, operationQueue } = this;
     const type = data.type;
 
     const operation: BufferOperation = {
@@ -244,10 +220,11 @@ class BufferController extends EventHandler {
         hls.trigger(Events.ERROR, event);
       }
     };
-    this.enqueueOperation(operation, type);
+    operationQueue.append(operation, type);
   }
 
   onBufferFlushing (data: { startOffset: number, endOffset: number, type?: SourceBufferName }) {
+    const { operationQueue } = this;
     const flushOperation = (type): BufferOperation => ({
       execute: this.removeExecuteor.bind(this, type, data.startOffset, data.endOffset),
       onComplete: () => {
@@ -257,10 +234,10 @@ class BufferController extends EventHandler {
     });
 
     if (data.type) {
-      this.enqueueOperation(flushOperation(data.type), data.type);
+      operationQueue.append(flushOperation(data.type), data.type);
     } else {
-      this.enqueueOperation(flushOperation('audio'), 'audio');
-      this.enqueueOperation(flushOperation('video'), 'video');
+      operationQueue.append(flushOperation('audio'), 'audio');
+      operationQueue.append(flushOperation('video'), 'video');
     }
   }
 
@@ -321,7 +298,7 @@ class BufferController extends EventHandler {
   }
 
   flushLiveBackBuffer () {
-    const { hls, _levelTargetDuration, _live, media, sourceBuffer } = this;
+    const { hls, operationQueue, _levelTargetDuration, _live, media, sourceBuffer } = this;
     if (!media) {
       return;
     }
@@ -338,8 +315,8 @@ class BufferController extends EventHandler {
 
     const currentTime = media.currentTime;
     const targetBackBufferPosition = currentTime - Math.max(liveBackBufferLength, _levelTargetDuration);
-    Object.keys(sourceBuffer).forEach(type => {
-      const sb = sourceBuffer[type];
+    Object.keys(sourceBuffer).forEach((type: SourceBufferName) => {
+      const sb = sourceBuffer[type]!;
       const buffered = sb.buffered;
       // when target buffer start exceeds actual buffer start
       if (buffered.length > 0 && targetBackBufferPosition > buffered.start(0)) {
@@ -352,7 +329,7 @@ class BufferController extends EventHandler {
           onError: (e) => { logger.warn(`[buffer-controller]: Failed to remove from ${type} SourceBuffer`, e); }
         };
         logger.log(`[buffer-controller]: Enqueueing operation to flush ${type} back buffer`);
-        this.enqueueOperation(operation, type);
+        operationQueue.append(operation, type);
       }
     });
   }
@@ -434,7 +411,7 @@ class BufferController extends EventHandler {
   }
 
   private checkPendingTracks () {
-    let { bufferCodecEventsExpected, pendingTracks } = this;
+    let { bufferCodecEventsExpected, operationQueue, pendingTracks } = this;
 
     // Check if we've received all of the expected bufferCodec events. When none remain, create all the sourceBuffers at once.
     // This is important because the MSE spec allows implementations to throw QuotaExceededErrors if creating new sourceBuffers after
@@ -446,8 +423,8 @@ class BufferController extends EventHandler {
       this.createSourceBuffers(pendingTracks);
       this.pendingTracks = {};
       // append any pending segments now !
-      Object.keys(this.sourceBuffer).forEach(type => {
-        this.executeNext(type);
+      Object.keys(this.sourceBuffer).forEach((type: SourceBufferName) => {
+        operationQueue.executeNext(type);
       });
     }
   }
@@ -507,13 +484,13 @@ class BufferController extends EventHandler {
   };
 
   private _onSBUpdateEnd (type: SourceBufferName) {
-    const queue = this.queues[type];
+    const { operationQueue } = this;
+    const queue = operationQueue.queues[type];
     const operation = queue[0];
     console.assert(operation, 'Operation should exist on update end');
 
     operation.onComplete();
-    queue.shift();
-    this.executeNext(type);
+    operationQueue.shiftAndExecuteNext(type);
   }
 
   private _onSBUpdateError (type: SourceBufferName, event: Event) {
@@ -522,7 +499,7 @@ class BufferController extends EventHandler {
     // SourceBuffer errors are not necessarily fatal; if so, the HTMLMediaElement will fire an error event
     this.hls.trigger(Events.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_APPENDING_ERROR, fatal: false });
     // updateend is always fired after error, so we'll allow that to shift the current operation off of the queue
-    const queue = this.queues[type];
+    const queue = this.operationQueue.queues[type];
     const operation = queue[0];
     if (operation) {
       operation.onError();
@@ -590,62 +567,22 @@ class BufferController extends EventHandler {
       logger.log(`[buffer-controller]: Blocking operation requested, but no SourceBuffers exist`);
       return;
     }
+    const { operationQueue } = this;
 
     logger.log(`[buffer-controller]: Blocking ${buffers} SourceBuffer`);
-    const blockingOperations = buffers.map(type  => this.enqueueBlockingOperation(type as SourceBufferName));
+    const blockingOperations = buffers.map(type => operationQueue.appendBlocker(type as SourceBufferName));
     Promise.all(blockingOperations).then(() => {
       logger.log(`[buffer-controller]: Blocking operation resolved`);
       onUnblocked();
       buffers.forEach(type => {
-        this.queues[type].shift();
-        this.executeNext(type);
+        operationQueue.shiftAndExecuteNext(type);
       })
     });
   }
 
-  private enqueueBlockingOperation (type: SourceBufferName) : Promise<{}> {
-    let execute;
-    const promise = new Promise((resolve, reject) => { execute = resolve; });
-    const operation = {
-      execute,
-      onComplete: () => {},
-      onError: () => {}
-    };
-
-    this.enqueueOperation(operation, type);
-    return promise;
-  }
-
-  // TODO: Handle media errors, (!this.media || this.media.error)
-  private enqueueOperation (operation: BufferOperation, type: SourceBufferName) {
-    const { sourceBuffer } = this;
-    const queue = this.queues[type];
-    queue.push(operation);
-    if (queue.length === 1 && sourceBuffer[type]) {
-      this.executeNext(type);
-    }
-  }
-
-  private executeNext (type) {
-    this.assertNotUpdating(type);
-    const queue = this.queues[type];
-    if (queue.length) {
-      const operation: BufferOperation = queue[0];
-      try {
-        // Operations are expected to result in an 'updateend' event being fired. If not, the queue will lock. Operations
-        // which do not end with this event must call _onSBUpdateEnd manually
-        operation.execute();
-      } catch (e) {
-        logger.warn(`[buffer-controller]: Unhandled exception executing the current operation`);
-        operation.onError(e);
-        queue.shift();
-      }
-    }
-  }
-
   private assertNotUpdating (type: SourceBufferName) {
     const sb = this.sourceBuffer[type];
-    console.assert(!sb || !this.sourceBuffer[type].updating, `${type} sourceBuffer should not be updating`);
+    console.assert(!sb || !sb.updating, `${type} sourceBuffer must exist, and must not be updating`);
   }
 
   private getSourceBufferTypes () : Array<SourceBufferName> {

@@ -1,4 +1,4 @@
-export type SourceBufferName = 'video' | 'audio';
+import { SourceBufferName } from './buffer';
 
 export interface Segment {
   type: SourceBufferName;
