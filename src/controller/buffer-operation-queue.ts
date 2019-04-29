@@ -22,7 +22,6 @@ export default class BufferOperationQueue {
     }
   }
 
-
   public appendBlocker (type: SourceBufferName) : Promise<{}> {
     let execute;
     const promise = new Promise((resolve, reject) => { execute = resolve; });
