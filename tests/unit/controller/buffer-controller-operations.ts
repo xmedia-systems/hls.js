@@ -96,7 +96,6 @@ describe.only('BufferController SourceBuffer operation queueing', function () {
     });
   });
 
-  // TODO: Assert HLS throws error
   it('does not cycle the queue on error', function () {
     const onError = sandbox.spy();
     const operation: BufferOperation = {
@@ -155,11 +154,10 @@ describe.only('BufferController SourceBuffer operation queueing', function () {
           content: 'data'
         });
 
-        // TODO: Don't call BUFFER_APPENDED if the SB does not exist
-        // expect(triggerSpy).to.have.not.been.called;
         expect(queueAppendSpy, `The append operation should have been enqueued`).to.have.callCount(i + 1);
         expect(shiftAndExecuteNextSpy, `The queue should have been cycled`).to.have.callCount(i + 1);
       });
+      expect(triggerSpy, `No event should have been triggered`).to.have.not.been.called;
     });
   });
 
@@ -250,6 +248,7 @@ describe.only('BufferController SourceBuffer operation queueing', function () {
         const buffer = bufferController.sourceBuffer[name];
         expect(buffer.remove, `Remove should not have been called on the ${name} buffer`).to.have.not.been.called;
       });
+      expect(triggerSpy, `No event should have been triggered`).to.have.not.been.called;
     });
   });
 });

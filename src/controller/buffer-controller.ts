@@ -508,10 +508,11 @@ class BufferController extends EventHandler {
 
   // This method must result in an updateend event; if remove is not called, _onSBUpdateEnd must be called manually
   private removeExecuteor (type: SourceBufferName, startOffset: number, endOffset: number) {
-    const sb = this.sourceBuffer[type];
+    const { operationQueue, sourceBuffer } = this;
+    const sb = sourceBuffer[type];
     if (!sb) {
       logger.warn(`[buffer-controller]: Attempting to remove from the ${type} SourceBuffer, but it does not exist`);
-      this._onSBUpdateEnd(type);
+      operationQueue.shiftAndExecuteNext(type);
       return;
     }
 
@@ -540,17 +541,17 @@ class BufferController extends EventHandler {
     }
     // Simulate a buffer end event so that the queue continues executing
     if (!removed) {
-      this._onSBUpdateEnd(type);
+      operationQueue.shiftAndExecuteNext(type);
     }
   }
 
   // This method must result in an updateend event; if append is not called, _onSBUpdateEnd must be called manually
   private appendExecuteor (segment: Segment, type: SourceBufferName) {
-    const { sourceBuffer } = this;
+    const { operationQueue, sourceBuffer } = this;
     const sb = sourceBuffer[type];
     if (!sb) {
       logger.warn(`[buffer-controller]: Attempting to append to the ${type} SourceBuffer, but it does not exist`);
-      this._onSBUpdateEnd(type);
+      operationQueue.shiftAndExecuteNext(type);
       return;
     }
 
