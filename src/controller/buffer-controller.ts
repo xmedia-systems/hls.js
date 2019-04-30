@@ -195,7 +195,7 @@ class BufferController extends EventHandler {
           timeRanges[type] = sourceBuffer[type].buffered;
         }
         this.appendError = 0;
-        this.hls.trigger(Events.BUFFER_APPENDED, { parent, timeRanges });
+        this.hls.trigger(Events.BUFFER_APPENDED, { parent: data.parent, timeRanges });
       },
       onError: (err) => {
         // in case any error occured while appending, put back segment in segments table
@@ -252,7 +252,7 @@ class BufferController extends EventHandler {
     console.assert(buffersAppendedTo.length, 'Fragments must have at least one ElementaryStreamType set', frag);
 
     logger.log(`[buffer-controller]: All fragment chunks received, enqueueing operation to signal fragment buffered`);
-    const onUnblocked = () => { this.hls.trigger(Events.FRAG_BUFFERED, {frag, stats: {}, id: frag.type}); };
+    const onUnblocked = () => { this.hls.trigger(Events.FRAG_BUFFERED, { frag, stats: {}, id: frag.type }); };
     this.blockBuffers(onUnblocked, buffersAppendedTo);
     this.flushLiveBackBuffer();
   }
@@ -502,7 +502,7 @@ class BufferController extends EventHandler {
     const queue = this.operationQueue.queues[type];
     const operation = queue[0];
     if (operation) {
-      operation.onError();
+      operation.onError(event);
     }
   }
 

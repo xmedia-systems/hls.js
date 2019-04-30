@@ -11,7 +11,7 @@ const expect = chai.expect;
 const queueNames = ['audio', 'video'];
 
 describe('BufferOperationQueue tests', function () {
-  const sandbox = sinon.sandbox.create();
+  const sandbox = sinon.createSandbox();
   let operationQueue;
   let sbMock = {
     audio: {
@@ -99,8 +99,7 @@ describe('BufferOperationQueue tests', function () {
         execute: () => {
           throw error;
         },
-        onComplete: () => {
-        },
+        onComplete: () => {},
         onError
       };
       queueNames.forEach((name, i) => {
@@ -119,7 +118,7 @@ describe('BufferOperationQueue tests', function () {
       onComplete: () => {},
       onError: () => {}
     };
-    it('should shift and execute next', function () {
+    it('should dequeue the current operation and execute the next', function () {
       queueNames.forEach((name) => {
         operationQueue.queues[name].push({}, operation);
       });
