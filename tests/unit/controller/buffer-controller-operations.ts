@@ -10,6 +10,7 @@ import { Segment } from '../../../src/types/segment';
 import Events from '../../../src/events';
 import { ErrorDetails, ErrorTypes } from '../../../src/errors';
 import Fragment, { ElementaryStreamTypes } from '../../../src/loader/fragment';
+import queue from '../../../../media-lighthouse/src/queue';
 
 chai.use(sinonChai);
 const expect = chai.expect;
@@ -39,23 +40,31 @@ class MockSourceBuffer extends EventTarget {
     _end: 0
   };
 
-  setBuffered(start, end) {
+  setBuffered (start, end) {
     this.buffered._start = start;
     this.buffered._end = end;
+    this.buffered.length = (start === end) ? 0 : 1;
   }
 }
+
+class MockMediaElement {
+  public currentTime: number = 0;
+}
+
 const queueNames: Array<SourceBufferName> = ['audio', 'video'];
 
-describe.only('BufferController SourceBuffer operation queueing', function () {
+describe('BufferController SourceBuffer operation queueing', function () {
   let hls;
   let bufferController;
   let operationQueue;
   let triggerSpy;
   let shiftAndExecuteNextSpy;
+  let mockMedia;
   beforeEach(function () {
     hls = new Hls({});
 
     bufferController = new BufferController(hls);
+    bufferController.media = mockMedia = new MockMediaElement();
     bufferController.mediaSource = new MockMediaSource();
     bufferController.createSourceBuffers({
       audio: {},
@@ -163,6 +172,7 @@ describe.only('BufferController SourceBuffer operation queueing', function () {
 
   describe('onFragParsed', function () {
     it('should trigger FRAG_BUFFERED when all audio/video data has been buffered', function () {
+      const flushLiveBackBufferSpy = sandbox.spy(bufferController, 'flushLiveBackBuffer');
       const queueAppendBlockerSpy = sandbox.spy(operationQueue, 'appendBlocker');
       const frag = new Fragment();
       frag.addElementaryStream(ElementaryStreamTypes.AUDIO);
@@ -170,6 +180,7 @@ describe.only('BufferController SourceBuffer operation queueing', function () {
 
       bufferController.onFragParsed({ frag });
       expect(queueAppendBlockerSpy).to.have.been.calledTwice;
+      expect(flushLiveBackBufferSpy).to.have.been.calledOnce;
       return new Promise((resolve, reject) => {
         hls.on(Events.FRAG_BUFFERED, (event, data) => {
           try {
@@ -249,6 +260,85 @@ describe.only('BufferController SourceBuffer operation queueing', function () {
         expect(buffer.remove, `Remove should not have been called on the ${name} buffer`).to.have.not.been.called;
       });
       expect(triggerSpy, `No event should have been triggered`).to.have.not.been.called;
+    });
+  });
+
+  describe('flushLiveBackBuffer', function () {
+    let bufferFlushingSpy;
+    beforeEach(function () {
+      bufferController._live = true;
+      hls.config.liveBackBufferLength = 10;
+      bufferController._levelTargetDuration = 10;
+      queueNames.forEach(name => {
+        const sb = bufferController.sourceBuffer[name];
+        sb.setBuffered(0, 30);
+      });
+      mockMedia.currentTime = 30;
+      bufferFlushingSpy = sandbox.spy(bufferController, 'onBufferFlushing');
+    });
+
+    it('exits early if no media is defined', function () {
+      delete bufferController.media;
+      bufferController.flushLiveBackBuffer();
+      expect(bufferFlushingSpy, `onBufferFlushing should not have been called`).to.have.not.been.called;
+    });
+
+    it('exits early if the stream is not live', function () {
+      bufferController._live = false;
+      bufferController.flushLiveBackBuffer();
+      expect(bufferFlushingSpy, `onBufferFlushing should not have been called`).to.have.not.been.called;
+    });
+
+    it('exits early if the liveBackBufferLength config is not a finite number, or less than 0', function () {
+      hls.config.liveBackBufferLength = null;
+      bufferController.flushLiveBackBuffer();
+      hls.config.liveBackBufferLength = -1;
+      bufferController.flushLiveBackBuffer();
+      hls.config.liveBackBufferLength = Infinity;
+      bufferController.flushLiveBackBuffer();
+
+      expect(bufferFlushingSpy, `onBufferFlushing should not have been called`).to.have.not.been.called;
+    });
+
+    it('should execute a remove operation if flushing a valid backBuffer range', function () {
+      bufferController.flushLiveBackBuffer();
+      expect(bufferFlushingSpy).to.have.been.calledTwice;
+      queueNames.forEach(name => {
+        expect(bufferFlushingSpy, `onBufferFlushing should have been called for the ${name} SourceBuffer`).to.have.been.calledWith({ startOffset: 0, endOffset: 20, type: name });
+      });
+    });
+
+    it('removes a maximum of one targetDuration from currentTime', function () {
+      mockMedia.currentTime = 25;
+      hls.config.liveBackBufferLength = 5;
+      bufferController.flushLiveBackBuffer();
+      queueNames.forEach(name => {
+        expect(bufferFlushingSpy, `onBufferFlushing should have been called for the ${name} SourceBuffer`).to.have.been.calledWith({ startOffset: 0, endOffset: 15, type: name });
+      });
+    });
+
+    it('removes nothing if no buffered range intersects with back buffer limit', function () {
+      mockMedia.currentTime = 15;
+      queueNames.forEach(name => {
+        const buffer = bufferController.sourceBuffer[name];
+        buffer.setBuffered(10, 30);
+      });
+      bufferController.flushLiveBackBuffer();
+      expect(bufferFlushingSpy, `onBufferFlushing should not have been called`).to.have.not.been.called;
+    });
+
+
+    it('does not remove if the buffer does not exist', function () {
+      queueNames.forEach(name => {
+        const buffer = bufferController.sourceBuffer[name];
+        buffer.setBuffered(0, 0);
+      });
+      bufferController.flushLiveBackBuffer();
+
+      bufferController.sourceBuffer = {};
+      bufferController.flushLiveBackBuffer();
+
+      expect(bufferFlushingSpy, `onBufferFlushing should not have been called`).to.have.not.been.called;
     });
   });
 });

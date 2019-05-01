@@ -45,9 +45,7 @@ class BufferController extends EventHandler {
   public mediaSource: MediaSource | null = null;
 
   // counters
-  public appended: number = 0;
   public appendError: number = 0;
-  public flushBufferCounter: number = 0;
 
   public tracks: TrackSet = {};
   public pendingTracks: TrackSet = {};
@@ -220,7 +218,7 @@ class BufferController extends EventHandler {
         hls.trigger(Events.ERROR, event);
       }
     };
-    operationQueue.append(operation, type);
+    operationQueue.append(operation, type as SourceBufferName);
   }
 
   onBufferFlushing (data: { startOffset: number, endOffset: number, type?: SourceBufferName }) {
@@ -298,38 +296,30 @@ class BufferController extends EventHandler {
   }
 
   flushLiveBackBuffer () {
-    const { hls, operationQueue, _levelTargetDuration, _live, media, sourceBuffer } = this;
-    if (!media) {
-      return;
-    }
-
-    // clear back buffer for live only
-    if (!_live) {
+    const { hls,  _levelTargetDuration, _live, media, sourceBuffer } = this;
+    if (!media || !_live) {
       return;
     }
 
     const liveBackBufferLength = hls.config.liveBackBufferLength;
-    if (!isFinite(liveBackBufferLength) || liveBackBufferLength < 0) {
+    if (!Number.isFinite(liveBackBufferLength) || liveBackBufferLength < 0) {
       return;
     }
 
-    const currentTime = media.currentTime;
-    const targetBackBufferPosition = currentTime - Math.max(liveBackBufferLength, _levelTargetDuration);
-    Object.keys(sourceBuffer).forEach((type: SourceBufferName) => {
-      const sb = sourceBuffer[type]!;
-      const buffered = sb.buffered;
+    const targetBackBufferPosition = media.currentTime - Math.max(liveBackBufferLength, _levelTargetDuration);
+    this.getSourceBufferTypes().forEach((type: SourceBufferName) => {
+      const buffered = sourceBuffer[type]!.buffered;
       // when target buffer start exceeds actual buffer start
       if (buffered.length > 0 && targetBackBufferPosition > buffered.start(0)) {
         // remove buffer up until current time minus minimum back buffer length (removing buffer too close to current
         // time will lead to playback freezing)
         // credits for level target duration - https://github.com/videojs/http-streaming/blob/3132933b6aa99ddefab29c10447624efd6fd6e52/src/segment-loader.js#L91
-        const operation: BufferOperation = {
-          execute: this.removeExecuteor.bind(this, type, 0, targetBackBufferPosition),
-          onComplete: () => {},
-          onError: (e) => { logger.warn(`[buffer-controller]: Failed to remove from ${type} SourceBuffer`, e); }
-        };
         logger.log(`[buffer-controller]: Enqueueing operation to flush ${type} back buffer`);
-        operationQueue.append(operation, type);
+        this.onBufferFlushing({
+          startOffset: 0,
+          endOffset: targetBackBufferPosition,
+          type
+        });
       }
     });
   }
