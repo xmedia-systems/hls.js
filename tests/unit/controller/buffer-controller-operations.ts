@@ -49,6 +49,7 @@ class MockSourceBuffer extends EventTarget {
 
 class MockMediaElement {
   public currentTime: number = 0;
+  public duration: number = Infinity;
 }
 
 const queueNames: Array<SourceBufferName> = ['audio', 'video'];
@@ -213,7 +214,7 @@ describe('BufferController SourceBuffer operation queueing', function () {
     it('flushes audio and video buffers if no type arg is specified', function () {
       bufferController.onBufferFlushing({
         startOffset: 0,
-        endOffset: Infinity
+        endOffset: 10
       });
 
       expect(queueAppendSpy, `A remove operation should have been appended to each queue`).to.have.been.calledTwice;
@@ -241,20 +242,14 @@ describe('BufferController SourceBuffer operation queueing', function () {
     });
 
     it('dequeues the remove operation if the requested remove range is not valid', function () {
-      // Does not flush if out of buffered range
+      // Does not flush if start greater than end
       bufferController.onBufferFlushing({
-        startOffset: 9000,
-        endOffset: 9001
+        startOffset: 9001,
+        endOffset: 9000
       });
 
-      // Does not flush if the range length is less than 0.5s
-      bufferController.onBufferFlushing({
-        startOffset: 9,
-        endOffset: 9.1
-      });
-
-      expect(queueAppendSpy, `Four remove operations should have been appended`).to.have.callCount(4);
-      expect(shiftAndExecuteNextSpy, `The queues should have been cycled`).to.have.callCount(4);
+      expect(queueAppendSpy, `Four remove operations should have been appended`).to.have.callCount(2);
+      expect(shiftAndExecuteNextSpy, `The queues should have been cycled`).to.have.callCount(2);
       queueNames.forEach(name => {
         const buffer = bufferController.sourceBuffer[name];
         expect(buffer.remove, `Remove should not have been called on the ${name} buffer`).to.have.not.been.called;

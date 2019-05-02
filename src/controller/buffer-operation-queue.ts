@@ -50,7 +50,11 @@ export default class BufferOperationQueue {
       } catch (e) {
         logger.warn(`[buffer-operation-queue]: Unhandled exception executing the current operation`);
         operation.onError(e);
-        queue.shift();
+
+        // Only shift the current operation off, otherwise the updateend handler will do this for us
+        if (!sb || !sb.updating) {
+          queue.shift();
+        }
       }
     }
   }

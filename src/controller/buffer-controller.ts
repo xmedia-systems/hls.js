@@ -13,11 +13,17 @@ import { Segment } from '../types/segment';
 import { ElementaryStreamTypes } from '../loader/fragment';
 import BufferOperationQueue from './buffer-operation-queue';
 
-import { BufferOperation, SourceBuffers, SourceBufferFlushRange, SourceBufferName } from '../types/buffer';
+import {
+  BufferOperation,
+  SourceBuffers,
+  SourceBufferFlushRange,
+  SourceBufferName,
+  ExtendedSourceBuffer
+} from '../types/buffer';
 
 const MediaSource = getMediaSource();
 
-class BufferController extends EventHandler {
+export default class BufferController extends EventHandler {
   // the value that we have set mediasource.duration to
   // (the actual duration may be tweaked slighly by the browser)
   private _msDuration: number | null = null;
@@ -498,39 +504,21 @@ class BufferController extends EventHandler {
 
   // This method must result in an updateend event; if remove is not called, _onSBUpdateEnd must be called manually
   private removeExecuteor (type: SourceBufferName, startOffset: number, endOffset: number) {
-    const { operationQueue, sourceBuffer } = this;
+    const { media, operationQueue, sourceBuffer } = this;
     const sb = sourceBuffer[type];
-    if (!sb) {
+    if (!media || !sb) {
       logger.warn(`[buffer-controller]: Attempting to remove from the ${type} SourceBuffer, but it does not exist`);
       operationQueue.shiftAndExecuteNext(type);
       return;
     }
 
-    let removed = false;
-    for (let i = 0; i < sb.buffered.length; i++) {
-      let bufStart = sb.buffered.start(i);
-      let bufEnd = sb.buffered.end(i);
-      let removeStart = Math.max(bufStart, startOffset);
-      let removeEnd = Math.min(bufEnd, endOffset);
-
-      /* sometimes sourcebuffer.remove() does not flush
-        the exact expected time range.
-        to avoid rounding issues/infinite loop,
-        only flush buffer range of length greater than 500ms.
-      */
-      if (Math.min(removeEnd, bufEnd) - removeStart > 0.5) {
-        let currentTime: string = 'null';
-        if (this.media) {
-          currentTime = this.media.currentTime.toString();
-        }
-
-        logger.log(`[buffer-controller]: Removing from the ${type} SourceBuffer; [${removeStart},${removeEnd}], of [${bufStart},${bufEnd}], pos:${currentTime}`);
-        sb.remove(removeStart, removeEnd);
-        removed = true;
-      }
-    }
-    // Simulate a buffer end event so that the queue continues executing
-    if (!removed) {
+    const removeStart = Math.max(0, startOffset);
+    const removeEnd = Math.min(media.duration, endOffset);
+    if (removeEnd > removeStart) {
+      logger.log(`[buffer-controller]: Removing [${removeStart},${removeEnd}] from the ${type} SourceBuffer`);
+      sb.remove(removeStart, removeEnd);
+    } else {
+      // Cycle the queue
       operationQueue.shiftAndExecuteNext(type);
     }
   }
@@ -580,5 +568,3 @@ class BufferController extends EventHandler {
     return Object.keys(this.sourceBuffer) as Array<SourceBufferName>;
   }
 }
-
-export default BufferController;
