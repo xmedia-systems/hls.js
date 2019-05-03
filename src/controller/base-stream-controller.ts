@@ -22,7 +22,6 @@ export const State = {
   WAITING_TRACK: 'WAITING_TRACK',
   PARSING: 'PARSING',
   PARSED: 'PARSED',
-  BUFFER_FLUSHING: 'BUFFER_FLUSHING',
   ENDED: 'ENDED',
   ERROR: 'ERROR',
   WAITING_INIT_PTS: 'WAITING_INIT_PTS',
@@ -230,7 +229,7 @@ export default class BaseStreamController extends TaskLoop {
         } else {
           this.nextLoadPosition = this.lastCurrentTime;
         }
-        this.log(`Frag load aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
+        this.log(`Fragment ${frag.sn} of level ${frag.level} was aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
         return;
       }
       this.hls.trigger(Event.ERROR, errorData);

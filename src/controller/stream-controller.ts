@@ -122,10 +122,6 @@ export default class StreamController extends BaseStreamController {
 
   doTick () {
     switch (this.state) {
-    case State.BUFFER_FLUSHING:
-      // in buffer flushing state, reset fragLoadError counter
-      this.fragLoadError = 0;
-      break;
     case State.IDLE:
       this._doTickIdle();
       break;
@@ -654,13 +650,11 @@ export default class StreamController extends BaseStreamController {
   }
 
   flushMainBuffer (startOffset, endOffset) {
-    this.state = State.BUFFER_FLUSHING;
-    let flushScope: any = { startOffset: startOffset, endOffset: endOffset };
-    // if alternate audio tracks are used, only flush video, otherwise flush everything
-    if (this.altAudio) {
-      flushScope.type = 'video';
-    }
-
+    // When alternate audio is playing, the audio-stream-controller is responsible for the audio buffer. Otherwise,
+    // passing a null type flushes both buffers
+    const flushScope: any = { startOffset: startOffset, endOffset: endOffset, type: this.altAudio ? 'video' : null };
+    // Reset load errors on flush
+    this.fragLoadError = 0;
     this.hls.trigger(Event.BUFFER_FLUSHING, flushScope);
   }
 
@@ -1336,17 +1330,6 @@ export default class StreamController extends BaseStreamController {
     this.state = State.IDLE;
     this.fragPrevious = frag;
     this.tick();
-  }
-
-  private getFragmentFromTransmuxIdentifier ({ sn, level }) : Fragment | null {
-    const { levels } = this;
-    if (!levels || !levels[level]) {
-      this.warn(`Levels object was unset while buffering fragment ${sn} of level ${level}. The current chunk will not be buffered.`);
-      return null;
-    }
-    const currentLevel = levels[level];
-
-    return LevelHelper.getFragmentWithSN(currentLevel, sn);
   }
 
   get liveSyncPosition () {

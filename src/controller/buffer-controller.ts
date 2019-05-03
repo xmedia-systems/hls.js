@@ -544,6 +544,7 @@ export default class BufferController extends EventHandler {
   private blockBuffers (onUnblocked: Function, buffers: Array<SourceBufferName> = this.getSourceBufferTypes()) {
     if (!buffers.length) {
       logger.log(`[buffer-controller]: Blocking operation requested, but no SourceBuffers exist`);
+      onUnblocked();
       return;
     }
     const { operationQueue } = this;

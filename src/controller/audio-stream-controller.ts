@@ -96,10 +96,10 @@ class AudioStreamController extends BaseStreamController {
     switch (this.state) {
     case State.ERROR:
       // don't do anything in error state to avoid breaking further ...
+        break;
     case State.PAUSED:
       // don't do anything in paused state either ...
-    case State.BUFFER_FLUSHING:
-      break;
+        break;
     case State.STARTING:
       this.state = State.WAITING_TRACK;
       this.loadedmetadata = false;
@@ -551,7 +551,6 @@ class AudioStreamController extends BaseStreamController {
           this.warn('Buffer full error also media.currentTime is not buffered, flush audio buffer');
           this.fragCurrent = null;
           // flush everything
-          this.state = State.BUFFER_FLUSHING;
           this.hls.trigger(Event.BUFFER_FLUSHING, { startOffset: 0, endOffset: Number.POSITIVE_INFINITY, type: 'audio' });
         }
       }
@@ -593,7 +592,7 @@ class AudioStreamController extends BaseStreamController {
     const { audio, text, id3, initSegment } = remuxResult;
 
     if (this.audioSwitch && audio) {
-      this.completeAudioSwitch(audio.startPTS);
+      this.completeAudioSwitch();
     }
 
     if (initSegment && initSegment.tracks) {
@@ -695,21 +694,15 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  private completeAudioSwitch (startPTS: number) {
+  private completeAudioSwitch () {
     const { hls, media, trackId } = this;
-    if (media && media.readyState) {
-      if (media.currentTime >= startPTS) {
-        this.log('Switching audio track : flushing all audio');
-        // this.state = State.BUFFER_FLUSHING;
-        hls.trigger(Event.BUFFER_FLUSHING, {
-          startOffset: 0,
-          endOffset: Number.POSITIVE_INFINITY,
-          type: 'audio'
-        });
-      } else {
-        // TODO: Figure out root cause of why track switching sometimes ends up here
-        this.warn(`Switching track, but didnt flush buffer, time: ${media.currentTime}, pts: ${startPTS}`)
-      }
+    if (media) {
+      this.warn('Switching audio track : flushing all audio');
+      hls.trigger(Event.BUFFER_FLUSHING, {
+        startOffset: 0,
+        endOffset: Number.POSITIVE_INFINITY,
+        type: 'audio'
+      });
     }
     this.audioSwitch = false;
     hls.trigger(Event.AUDIO_TRACK_SWITCHED, { id: trackId });
