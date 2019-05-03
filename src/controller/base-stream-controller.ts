@@ -223,13 +223,7 @@ export default class BaseStreamController extends TaskLoop {
     const errorHandler = (e) => {
       const errorData = e ? e.data : null;
       if (errorData && errorData.details === ErrorDetails.INTERNAL_ABORTED) {
-        const fragPrev = this.fragPrevious;
-        if (fragPrev) {
-          this.nextLoadPosition = fragPrev.start + fragPrev.duration;
-        } else {
-          this.nextLoadPosition = this.lastCurrentTime;
-        }
-        this.log(`Fragment ${frag.sn} of level ${frag.level} was aborted, resetting nextLoadPosition to ${this.nextLoadPosition}`);
+        this.handleFragLoadAborted(frag);
         return;
       }
       this.hls.trigger(Event.ERROR, errorData);
@@ -316,6 +310,19 @@ export default class BaseStreamController extends TaskLoop {
 
     const frag = LevelHelper.getFragmentWithSN(currentLevel, sn);
     this.hls.trigger(Event.FRAG_PARSED, { frag });
+  }
+
+  private handleFragLoadAborted (frag: Fragment) {
+    const { fragPrevious, transmuxer } = this;
+    if (fragPrevious) {
+      this.nextLoadPosition = fragPrevious.start + fragPrevious.duration;
+    } else {
+      this.nextLoadPosition = this.lastCurrentTime;
+    }
+    if (transmuxer && frag.sn !== 'initSegment') {
+      transmuxer.flush({ sn: frag.sn, level: frag.level });
+    }
+    this.log(`Fragment ${frag.sn} of level ${frag.level} was aborted, flushing transmuxer & resetting nextLoadPosition to ${this.nextLoadPosition}`);
   }
 
   set state (nextState) {
