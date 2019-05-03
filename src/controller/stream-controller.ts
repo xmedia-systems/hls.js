@@ -956,7 +956,7 @@ export default class StreamController extends BaseStreamController {
     }
     this.fragPrevious = frag;
     const media = this.mediaBuffer ? this.mediaBuffer : this.media;
-    this.log(`Buffered fragment ${frag.sn} of level ${frag.level}. PTS:[${frag.startPTS},${frag.endPTS}],DTS:[${frag.startDTS}/${frag.endDTS}], Buffered: ${TimeRanges.toString(media)}`);
+    this.log(`Buffered fragment ${frag.sn} of level ${frag.level}. PTS:[${frag.startPTS},${frag.endPTS}],DTS:[${frag.startDTS}/${frag.endDTS}], Buffered: ${TimeRanges.toString(media.buffered)}`);
     if (!stats) {
       this.warn(`Stats object was unset after fragment was buffered. tbuffered will not be recorded for ${this.fragCurrent}`);
     } else {
