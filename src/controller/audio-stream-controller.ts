@@ -15,7 +15,7 @@ import { ElementaryStreamTypes } from '../loader/fragment';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
 import { findFragmentByPTS } from './fragment-finders';
-import Fragment from '../loader/fragment';
+import { appendUint8Array } from '../utils/mp4-tools';
 
 const { performance } = window;
 
@@ -97,7 +97,8 @@ class AudioStreamController extends BaseStreamController {
     case State.ERROR:
       // don't do anything in error state to avoid breaking further ...
         break;
-    case State.PAUSED:
+      case State.PAUSED:
+      // TODO: Remove useless PAUSED state
       // don't do anything in paused state either ...
         break;
     case State.STARTING:
@@ -328,13 +329,16 @@ class AudioStreamController extends BaseStreamController {
     // if any URL found on new audio track, it is an alternate audio track
     let altAudio = !!data.url;
     this.trackId = data.id;
+    const { fragCurrent, transmuxer } = this;
 
+    if (fragCurrent && fragCurrent.loader) {
+     fragCurrent.loader.abort();
+    }
     this.fragCurrent = null;
-    this.state = State.PAUSED;
     // destroy useless transmuxer when switching audio to main
     if (!altAudio) {
-      if (this.transmuxer) {
-        this.transmuxer.destroy();
+      if (transmuxer) {
+        transmuxer.destroy();
         this.transmuxer = null;
       }
     } else {
@@ -347,6 +351,8 @@ class AudioStreamController extends BaseStreamController {
       this.audioSwitch = true;
       // main audio track are handled by stream-controller, just do something if switching to alt audio track
       this.state = State.IDLE;
+    } else {
+      this.state = State.PAUSED;
     }
     this.tick();
   }
@@ -464,6 +470,12 @@ class AudioStreamController extends BaseStreamController {
   onFragBuffered (data) {
     const { frag } = data;
     if (frag && frag.type !== 'audio') {
+      return;
+    }
+    if (this._fragLoadAborted(frag)) {
+      // If a level switch was requested while a fragment was buffering, it will emit the FRAG_BUFFERED event upon completion
+      // Avoid setting state back to IDLE or concluding the audio switch; otherwise, the switched-to track will not buffer
+      this.warn(`Fragment ${frag.sn} of level ${frag.level} finished buffering, but was aborted. state: ${this.state}, audioSwitch: ${this.audioSwitch}`);
       return;
     }
     this.fragPrevious = frag;

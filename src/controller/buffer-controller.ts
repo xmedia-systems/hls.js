@@ -18,8 +18,7 @@ import {
   SourceBuffers,
   SourceBufferFlushRange,
   SourceBufferName,
-  SourceBufferListener,
-  ExtendedSourceBuffer
+  SourceBufferListener
 } from '../types/buffer';
 
 const MediaSource = getMediaSource();
@@ -94,9 +93,8 @@ export default class BufferController extends EventHandler {
   onMediaAttaching (data: { media: HTMLMediaElement }) {
     let media = this.media = data.media;
     if (media) {
-      // setup the media source
       let ms = this.mediaSource = new MediaSource();
-      // Media Source listeners
+      // MediaSource listeners are arrow functions with a lexical scope, and do not need to be bound
       ms.addEventListener('sourceopen', this._onMediaSourceOpen);
       ms.addEventListener('sourceended', this._onMediaSourceEnded);
       ms.addEventListener('sourceclose', this._onMediaSourceClose);
@@ -466,10 +464,11 @@ export default class BufferController extends EventHandler {
     this.hls.trigger(Events.BUFFER_CREATED, { tracks: this.tracks });
   }
 
+  // Keep as arrow functions so that we can directly reference these functions directly as event listeners
   private _onMediaSourceOpen = () => {
+    const { hls, media, mediaSource } = this;
     logger.log('media source opened');
-    this.hls.trigger(Events.MEDIA_ATTACHED, { media: this.media });
-    let mediaSource = this.mediaSource;
+    hls.trigger(Events.MEDIA_ATTACHED, { media });
     if (mediaSource) {
       // once received, don't listen anymore to sourceopen event
       mediaSource.removeEventListener('sourceopen', this._onMediaSourceOpen);

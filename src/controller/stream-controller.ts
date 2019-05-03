@@ -948,6 +948,12 @@ export default class StreamController extends BaseStreamController {
     if (frag && frag.type !== 'main') {
       return;
     }
+    if (this._fragLoadAborted(frag)) {
+      // If a level switch was requested while a fragment was buffering, it will emit the FRAG_BUFFERED event upon completion
+      // Avoid setting state back to IDLE, since that will interfere with a level switch
+      this.warn(`Fragment ${frag.sn} of level ${frag.level} finished buffering, but was aborted. state: ${this.state}`);
+      return;
+    }
     this.fragPrevious = frag;
     const media = this.mediaBuffer ? this.mediaBuffer : this.media;
     this.log(`Buffered fragment ${frag.sn} of level ${frag.level}. PTS:[${frag.startPTS},${frag.endPTS}],DTS:[${frag.startDTS}/${frag.endDTS}], Buffered: ${TimeRanges.toString(media)}`);
