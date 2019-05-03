@@ -385,27 +385,28 @@ export default class BufferController extends EventHandler {
       this.mediaSource.readyState !== 'open') {
       return;
     }
-    let { config } = this.hls;
-    const duration = this.media.duration;
+    const { hls, _levelDuration, _live, media, mediaSource, _msDuration } = this;
+    const duration = media.duration;
 
     this.getSourceBufferTypes().map(type => this.assertNotUpdating(type));
 
     // initialise to the value that the media source is reporting
-    if (this._msDuration === null) {
-      this._msDuration = this.mediaSource.duration;
+    let msDuration = _msDuration;
+    if (msDuration === null) {
+      this._msDuration = msDuration = mediaSource.duration;
     }
 
-    if (this._live === true && config.liveDurationInfinity === true) {
+    if (_live && hls.config.liveDurationInfinity) {
       // Override duration to Infinity
       logger.log('[buffer-controller]: Media Source duration is set to Infinity');
-      this._msDuration = this.mediaSource.duration = Infinity;
-    } else if ((this._levelDuration > this._msDuration && this._levelDuration > duration) || !Number.isFinite(duration)) {
+      this._msDuration = mediaSource.duration = Infinity;
+    } else if ((_levelDuration > msDuration && _levelDuration > duration) || !Number.isFinite(duration)) {
       // levelDuration was the last value we set.
       // not using mediaSource.duration as the browser may tweak this value
       // only update Media Source duration if its value increase, this is to avoid
       // flushing already buffered portion when switching between quality level
-      logger.log(`[buffer-controller]: Updating Media Source duration to ${this._levelDuration.toFixed(3)}`);
-      this._msDuration = this.mediaSource.duration = this._levelDuration;
+      logger.log(`[buffer-controller]: Updating Media Source duration to ${_levelDuration.toFixed(3)}`);
+      this._msDuration = mediaSource.duration = _levelDuration;
     }
   }
 
@@ -557,10 +558,16 @@ export default class BufferController extends EventHandler {
     logger.log(`[buffer-controller]: Blocking ${buffers} SourceBuffer`);
     const blockingOperations = buffers.map(type => operationQueue.appendBlocker(type as SourceBufferName));
     Promise.all(blockingOperations).then(() => {
-      logger.log(`[buffer-controller]: Blocking operation resolved`);
+      logger.log(`[buffer-controller]: Blocking operation resolved; unblocking ${buffers} SourceBuffer`);
       onUnblocked();
       buffers.forEach(type => {
-        operationQueue.shiftAndExecuteNext(type);
+        const sb = this.sourceBuffer[type];
+        // Only cycle the queue if the SB is not updating. There's a bug in Chrome which sets the SB updating flag to
+        // true when changing the MediaSource duration (https://bugs.chromium.org/p/chromium/issues/detail?id=959359&can=2&q=mediasource%20duration)
+        // While this is a workaround, it's probably useful to have around
+        if (!sb || !sb.updating) {
+          operationQueue.shiftAndExecuteNext(type);
+        }
       })
     });
   }
