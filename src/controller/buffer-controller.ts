@@ -18,6 +18,7 @@ import {
   SourceBuffers,
   SourceBufferFlushRange,
   SourceBufferName,
+  SourceBufferListener,
   ExtendedSourceBuffer
 } from '../types/buffer';
 
@@ -35,8 +36,13 @@ export default class BufferController extends EventHandler {
   private _live: boolean | null = null;
   // cache the self generated object url to detect hijack of video tag
   private _objectUrl: string | null = null;
-
+  // A queue of buffer operations which require the SourceBuffer to not be updating upon execution
   private operationQueue: BufferOperationQueue;
+  // References to event listeners for each SourceBuffer, so that they can be reference for event removal
+  private listeners: { [key in SourceBufferName]: Array<SourceBufferListener> } = {
+    audio: [],
+    video: [],
+  };
 
   // this is optional because this property is removed from the class sometimes
   public audioTimestampOffset?: number;
@@ -103,35 +109,37 @@ export default class BufferController extends EventHandler {
 
   onMediaDetaching () {
     logger.log('media source detaching');
-    let ms = this.mediaSource;
-    if (ms) {
-      if (ms.readyState === 'open') {
+    const { media, mediaSource, _objectUrl } = this;
+    if (mediaSource) {
+      if (mediaSource.readyState === 'open') {
         try {
           // endOfStream could trigger exception if any sourcebuffer is in updating state
           // we don't really care about checking sourcebuffer state here,
           // as we are anyway detaching the MediaSource
           // let's just avoid this exception to propagate
-          ms.endOfStream();
+          mediaSource.endOfStream();
         } catch (err) {
           logger.warn(`onMediaDetaching:${err.message} while calling endOfStream`);
         }
       }
-      ms.removeEventListener('sourceopen', this._onMediaSourceOpen);
-      ms.removeEventListener('sourceended', this._onMediaSourceEnded);
-      ms.removeEventListener('sourceclose', this._onMediaSourceClose);
+      // Clean up the SourceBuffers by invoking onBufferReset
+      this.onBufferReset();
+      mediaSource.removeEventListener('sourceopen', this._onMediaSourceOpen);
+      mediaSource.removeEventListener('sourceended', this._onMediaSourceEnded);
+      mediaSource.removeEventListener('sourceclose', this._onMediaSourceClose);
 
       // Detach properly the MediaSource from the HTMLMediaElement as
       // suggested in https://github.com/w3c/media-source/issues/53.
-      if (this.media) {
-        if (this._objectUrl) {
-          window.URL.revokeObjectURL(this._objectUrl);
+      if (media) {
+        if (_objectUrl) {
+          window.URL.revokeObjectURL(_objectUrl);
         }
 
         // clean up video tag src only if it's our own url. some external libraries might
         // hijack the video tag and change its 'src' without destroying the Hls instance first
-        if (this.media.src === this._objectUrl) {
-          this.media.removeAttribute('src');
-          this.media.load();
+        if (media.src === _objectUrl) {
+          media.removeAttribute('src');
+          media.load();
         } else {
           logger.warn('media.src was changed by a third party - skip cleanup');
         }
@@ -142,8 +150,6 @@ export default class BufferController extends EventHandler {
       this._objectUrl = null;
       this.pendingTracks = {};
       this.tracks = {};
-      this.sourceBuffer = {};
-      this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
     }
 
     this.hls.trigger(Events.MEDIA_DETACHED);
@@ -151,20 +157,19 @@ export default class BufferController extends EventHandler {
 
   onBufferReset () {
     const sourceBuffer = this.sourceBuffer;
-    for (let type in sourceBuffer) {
+    this.getSourceBufferTypes().forEach(type => {
       const sb = sourceBuffer[type];
       try {
         if (sb) {
+          this.removeBufferListeners(type);
           if (this.mediaSource) {
             this.mediaSource.removeSourceBuffer(sb);
           }
-          // TODO: Remove bound event listeners
-          sb.removeEventListener('updateend', this._onSBUpdateEnd);
-          sb.removeEventListener('error', this._onSBUpdateError);
         }
       } catch (err) {
+        logger.warn(`Failed to reset the ${type} buffer`, err);
       }
-    }
+    });
     this.sourceBuffer = {};
     this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
   }
@@ -302,7 +307,7 @@ export default class BufferController extends EventHandler {
   }
 
   flushLiveBackBuffer () {
-    const { hls,  _levelTargetDuration, _live, media, sourceBuffer } = this;
+    const { hls, _levelTargetDuration, _live, media, sourceBuffer } = this;
     if (!media || !_live) {
       return;
     }
@@ -443,8 +448,9 @@ export default class BufferController extends EventHandler {
         logger.log(`creating sourceBuffer(${mimeType})`);
         try {
           const sb = sourceBuffer[trackName] = mediaSource.addSourceBuffer(mimeType);
-          sb.addEventListener('updateend', this._onSBUpdateEnd.bind(this, trackName));
-          sb.addEventListener('error', this._onSBUpdateError.bind(this, trackName));
+          const sbName = trackName as SourceBufferName;
+          this.addBufferListener(sbName, 'updateend', this._onSBUpdateEnd);
+          this.addBufferListener(sbName, 'error', this._onSBUpdateError);
           this.tracks[trackName] = {
             buffer: sb,
             codec: codec,
@@ -487,7 +493,7 @@ export default class BufferController extends EventHandler {
 
     operation.onComplete();
     operationQueue.shiftAndExecuteNext(type);
-  }
+  };
 
   private _onSBUpdateError (type: SourceBufferName, event: Event) {
     logger.error(`[buffer-controller]: ${type} SourceBuffer error`, event);
@@ -567,5 +573,25 @@ export default class BufferController extends EventHandler {
 
   private getSourceBufferTypes () : Array<SourceBufferName> {
     return Object.keys(this.sourceBuffer) as Array<SourceBufferName>;
+  }
+
+  private addBufferListener (type: SourceBufferName, event: string, fn: Function) {
+    const buffer = this.sourceBuffer[type];
+    if (!buffer) {
+      return;
+    }
+    const listener = fn.bind(this, type);
+    this.listeners[type].push({ event, listener });
+    buffer.addEventListener(event, listener);
+  }
+
+  private removeBufferListeners (type: SourceBufferName) {
+    const buffer = this.sourceBuffer[type];
+    if (!buffer) {
+      return;
+    }
+    this.listeners[type].forEach(l => {
+     buffer.removeEventListener(l.event, l.listener);
+    });
   }
 }

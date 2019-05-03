@@ -17,3 +17,8 @@ export interface BufferOperation {
   onComplete: Function
   onError: Function
 }
+
+export interface SourceBufferListener {
+  event: string,
+  listener: EventListener
+}
