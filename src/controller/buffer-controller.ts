@@ -79,7 +79,6 @@ export default class BufferController extends EventHandler {
     );
     this.hls = hls;
     this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
-    window.queue = this.operationQueue;
   }
 
   onManifestParsed (data: { altAudio: boolean }) {
@@ -305,7 +304,11 @@ export default class BufferController extends EventHandler {
     this._live = details.live;
 
     logger.log(`[buffer-controller]: Duration update required; enqueueing duration change operation`);
-    this.blockBuffers(this.updateMediaElementDuration.bind(this));
+    if (this.getSourceBufferTypes().length) {
+      this.blockBuffers(this.updateMediaElementDuration.bind(this));
+    } else {
+      this.updateMediaElementDuration();
+    }
   }
 
   // Adjusting `SourceBuffer.timestampOffset` (desired point in the timeline where the next frames should be appended)
@@ -384,7 +387,6 @@ export default class BufferController extends EventHandler {
     if (this._levelDuration === null ||
       !this.media ||
       !this.mediaSource ||
-      this.media.readyState === 0 ||
       this.mediaSource.readyState !== 'open') {
       return;
     }
