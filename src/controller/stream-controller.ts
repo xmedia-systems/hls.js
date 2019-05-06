@@ -944,7 +944,7 @@ export default class StreamController extends BaseStreamController {
   }
 
   onFragBuffered (data) {
-    const { frag, stats } = data;
+    const { frag } = data;
     if (frag && frag.type !== 'main') {
       return;
     }
@@ -954,16 +954,12 @@ export default class StreamController extends BaseStreamController {
       this.warn(`Fragment ${frag.sn} of level ${frag.level} finished buffering, but was aborted. state: ${this.state}`);
       return;
     }
-    this.fragPrevious = frag;
     const media = this.mediaBuffer ? this.mediaBuffer : this.media;
+    const stats = frag.stats;
+    this.fragPrevious = frag;
+    this.fragLastKbps = Math.round(8 * stats.total / (stats.tbuffered - stats.tfirst));
+
     this.log(`Buffered fragment ${frag.sn} of level ${frag.level}. PTS:[${frag.startPTS},${frag.endPTS}],DTS:[${frag.startDTS}/${frag.endDTS}], Buffered: ${TimeRanges.toString(media.buffered)}`);
-    if (!stats) {
-      this.warn(`Stats object was unset after fragment was buffered. tbuffered will not be recorded for ${this.fragCurrent}`);
-    } else {
-      stats.tbuffered = window.performance.now();
-      // we should get rid of this.fragLastKbps
-      this.fragLastKbps = Math.round(8 * stats.total / (stats.tbuffered - stats.tfirst));
-    }
     this.state = State.IDLE;
     this.tick();
   }
@@ -1167,7 +1163,7 @@ export default class StreamController extends BaseStreamController {
         frag.bitrateTest = false;
         const stats = frag.stats;
         stats.tparsed = stats.tbuffered = window.performance.now();
-        hls.trigger(Event.FRAG_BUFFERED, { stats: stats, frag, id: 'main' });
+        hls.trigger(Event.FRAG_BUFFERED, { stats, frag, id: 'main' });
         this.tick();
       });
   }

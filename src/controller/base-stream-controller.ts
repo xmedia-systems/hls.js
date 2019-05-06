@@ -192,7 +192,7 @@ export default class BaseStreamController extends TaskLoop {
         levels[frag.level].details.initSegment.data = payload;
         stats.tparsed = stats.tbuffered = window.performance.now();
         // TODO: set id from calling class
-        hls.trigger(Event.FRAG_BUFFERED, { stats: stats, frag: fragCurrent, id: frag.type });
+        hls.trigger(Event.FRAG_BUFFERED, { stats, frag: fragCurrent, id: frag.type });
         this.tick();
       });
   }
@@ -287,29 +287,6 @@ export default class BaseStreamController extends TaskLoop {
 
   protected warn (msg) {
     logger.warn(`${this.logPrefix}: ${msg}`);
-  }
-
-  protected _handleTransmuxerFlush ({ sn, level }) {
-    if (this.state !== State.PARSING) {
-      this.warn(`State is expected to be PARSING on transmuxer flush, but is ${this.state}.`);
-      return;
-    }
-    this.state = State.PARSED;
-
-    const { levels } = this;
-    if (!levels) {
-      return;
-    }
-    const currentLevel = levels[level];
-
-    if (this.stats) {
-      this.stats.tparsed = window.performance.now();
-    } else {
-      this.warn(`Stats object was unset after fragment finished parsing. tparsed will not be recorded for ${this.fragCurrent}`);
-    }
-
-    const frag = LevelHelper.getFragmentWithSN(currentLevel, sn);
-    this.hls.trigger(Event.FRAG_PARSED, { frag });
   }
 
   private handleFragLoadAborted (frag: Fragment) {

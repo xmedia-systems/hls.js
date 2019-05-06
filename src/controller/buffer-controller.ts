@@ -259,7 +259,10 @@ export default class BufferController extends EventHandler {
     console.assert(buffersAppendedTo.length, 'Fragments must have at least one ElementaryStreamType set', frag);
 
     logger.log(`[buffer-controller]: All fragment chunks received, enqueueing operation to signal fragment buffered`);
-    const onUnblocked = () => { this.hls.trigger(Events.FRAG_BUFFERED, { frag, stats: {}, id: frag.type }); };
+    const onUnblocked = () => {
+      frag.stats.tbuffered = window.performance.now();
+      this.hls.trigger(Events.FRAG_BUFFERED, { frag, stats: frag.stats, id: frag.type });
+    };
     this.blockBuffers(onUnblocked, buffersAppendedTo);
     this.flushLiveBackBuffer();
   }
