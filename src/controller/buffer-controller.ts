@@ -79,6 +79,7 @@ export default class BufferController extends EventHandler {
     );
     this.hls = hls;
     this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
+    window.queue = this.operationQueue;
   }
 
   onManifestParsed (data: { altAudio: boolean }) {
@@ -307,6 +308,44 @@ export default class BufferController extends EventHandler {
     this.blockBuffers(this.updateMediaElementDuration.bind(this));
   }
 
+  // Adjusting `SourceBuffer.timestampOffset` (desired point in the timeline where the next frames should be appended)
+  // in Chrome browser when we detect MPEG audio container and time delta between level PTS and `SourceBuffer.timestampOffset`
+  // is greater than 100ms (this is enough to handle seek for VOD or level change for LIVE videos). At the time of change we issue
+  // `SourceBuffer.abort()` and adjusting `SourceBuffer.timestampOffset` if `SourceBuffer.updating` is false or awaiting `updateend`
+  // event if SB is in updating state.
+  // More info here: https://github.com/video-dev/hls.js/issues/332#issuecomment-257986486
+  onLevelPtsUpdated (data: { type: SourceBufferName, start: number }) {
+    const { operationQueue, sourceBuffer, tracks } = this;
+    const type = data.type;
+    const audioTrack = tracks.audio;
+
+    if (type !== 'audio' || (audioTrack && audioTrack.container !== 'audio/mpeg')) {
+      return;
+    }
+    const audioBuffer = sourceBuffer[type];
+    if (!audioBuffer) {
+      return;
+    }
+    const delta = Math.abs(audioBuffer.timestampOffset - data.start);
+    if (delta < 0.1) {
+      return;
+    }
+
+    const operation = {
+      execute: this.abortExecuteor.bind(this, type),
+      onComplete () {
+        if (audioBuffer) {
+          logger.log(`[buffer-controller]: Updating audio SourceBuffer timestampOffset to ${data.start}`);
+          audioBuffer.timestampOffset = data.start;
+        }
+      },
+      onError (e) {
+        logger.warn('[buffer-controller]: Failed to abort the audio SourceBuffer', e);
+      }
+    };
+    operationQueue.append(operation, type);
+  }
+
   flushLiveBackBuffer () {
     const { hls, _levelTargetDuration, _live, media, sourceBuffer } = this;
     if (!media || !_live) {
@@ -334,45 +373,6 @@ export default class BufferController extends EventHandler {
         });
       }
     });
-  }
-
-  onLevelPtsUpdated (data: { type: SourceBufferName, start: number }) {
-    let type = data.type;
-    let audioTrack = this.tracks.audio;
-
-    // Adjusting `SourceBuffer.timestampOffset` (desired point in the timeline where the next frames should be appended)
-    // in Chrome browser when we detect MPEG audio container and time delta between level PTS and `SourceBuffer.timestampOffset`
-    // is greater than 100ms (this is enough to handle seek for VOD or level change for LIVE videos). At the time of change we issue
-    // `SourceBuffer.abort()` and adjusting `SourceBuffer.timestampOffset` if `SourceBuffer.updating` is false or awaiting `updateend`
-    // event if SB is in updating state.
-    // More info here: https://github.com/video-dev/hls.js/issues/332#issuecomment-257986486
-
-    if (type === 'audio' && audioTrack && audioTrack.container === 'audio/mpeg') { // Chrome audio mp3 track
-      let audioBuffer = this.sourceBuffer.audio;
-      if (!audioBuffer) {
-        throw Error('Level PTS Updated and source buffer for audio uninitalized');
-      }
-
-      let delta = Math.abs(audioBuffer.timestampOffset - data.start);
-
-      // adjust timestamp offset if time delta is greater than 100ms
-      if (delta > 0.1) {
-        let updating = audioBuffer.updating;
-
-        try {
-          audioBuffer.abort();
-        } catch (err) {
-          logger.warn('can not abort audio buffer: ' + err);
-        }
-
-        if (!updating) {
-          logger.warn('change mpeg audio timestamp offset from ' + audioBuffer.timestampOffset + ' to ' + data.start);
-          audioBuffer.timestampOffset = data.start;
-        } else {
-          this.audioTimestampOffset = data.start;
-        }
-      }
-    }
   }
 
   /**
@@ -545,6 +545,24 @@ export default class BufferController extends EventHandler {
     sb.ended = false;
     this.assertNotUpdating(type);
     sb.appendBuffer(segment.data);
+  }
+
+  // SourceBuffers can be aborted while the updating flag is true, but only if it is because of an append operation -
+  // aborting during a remove will throw an InvalidStateError. It's safer to enqueue aborts and execute them only if
+  // updating is false
+  private abortExecuteor (type: SourceBufferName) {
+    const { operationQueue, sourceBuffer } = this;
+    const sb = sourceBuffer[type];
+    if (!sb) {
+      logger.warn(`[buffer-controller]: Attempting to abort to the ${type} SourceBuffer, but it does not exist`);
+      operationQueue.shiftAndExecuteNext(type);
+      return;
+    }
+    logger.log(`[buffer-controller]: Aborting the ${type} SourceBuffer`);
+    sb.abort();
+    // updateend is only triggered if aborting while updating is true; because we're queuing aborts, it should always be false
+    this.assertNotUpdating(type);
+    this._onSBUpdateEnd(type);
   }
 
   // Enqueues an operation to each SourceBuffer queue which, upon execution, resolves a promise. When all promises
