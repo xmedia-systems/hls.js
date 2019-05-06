@@ -27,12 +27,10 @@ export default class BufferController extends EventHandler {
   // the value that we have set mediasource.duration to
   // (the actual duration may be tweaked slighly by the browser)
   private _msDuration: number | null = null;
-  // the value that we want to set mediaSource.duration to
-  private _levelDuration: number | null = null;
   // the target duration of the current media playlist
-  private _levelTargetDuration: number = 10;
+  private _levelTargetDuration: number | null = null;
   // current stream state: true - for live broadcast, false - for VoD content
-  private _live: boolean | null = null;
+  private _live: boolean =  false;
   // cache the self generated object url to detect hijack of video tag
   private _objectUrl: string | null = null;
   // A queue of buffer operations which require the SourceBuffer to not be updating upon execution
@@ -299,15 +297,15 @@ export default class BufferController extends EventHandler {
     if (!details.fragments.length) {
       return;
     }
-    this._levelDuration = details.totalduration + details.fragments[0].start;
     this._levelTargetDuration = details.averagetargetduration || details.targetduration || 10;
     this._live = details.live;
 
+    const levelDuration = details.totalduration + details.fragments[0].start;
     logger.log(`[buffer-controller]: Duration update required; enqueueing duration change operation`);
     if (this.getSourceBufferTypes().length) {
-      this.blockBuffers(this.updateMediaElementDuration.bind(this));
+      this.blockBuffers(this.updateMediaElementDuration.bind(this, levelDuration));
     } else {
-      this.updateMediaElementDuration();
+      this.updateMediaElementDuration(levelDuration);
     }
   }
 
@@ -351,7 +349,7 @@ export default class BufferController extends EventHandler {
 
   flushLiveBackBuffer () {
     const { hls, _levelTargetDuration, _live, media, sourceBuffer } = this;
-    if (!media || !_live) {
+    if (!media || !_live || !_levelTargetDuration) {
       return;
     }
 
@@ -383,15 +381,12 @@ export default class BufferController extends EventHandler {
    * 'liveDurationInfinity` is set to `true`
    * More details: https://github.com/video-dev/hls.js/issues/355
    */
-  updateMediaElementDuration () {
-    if (this._levelDuration === null ||
-      !this.media ||
-      !this.mediaSource ||
-      this.mediaSource.readyState !== 'open') {
+  updateMediaElementDuration (levelDuration: number) {
+    if (!this.media || !this.mediaSource || this.mediaSource.readyState !== 'open') {
       return;
     }
-    const { hls, _levelDuration, _live, media, mediaSource, _msDuration } = this;
-    const duration = media.duration;
+    const { hls, _live, media, mediaSource, _msDuration } = this;
+    const mediaDuration = media.duration;
 
     this.getSourceBufferTypes().map(type => this.assertNotUpdating(type));
 
@@ -405,13 +400,13 @@ export default class BufferController extends EventHandler {
       // Override duration to Infinity
       logger.log('[buffer-controller]: Media Source duration is set to Infinity');
       this._msDuration = mediaSource.duration = Infinity;
-    } else if ((_levelDuration > msDuration && _levelDuration > duration) || !Number.isFinite(duration)) {
+    } else if ((levelDuration > msDuration && levelDuration > mediaDuration) || !Number.isFinite(mediaDuration)) {
       // levelDuration was the last value we set.
       // not using mediaSource.duration as the browser may tweak this value
       // only update Media Source duration if its value increase, this is to avoid
       // flushing already buffered portion when switching between quality level
-      logger.log(`[buffer-controller]: Updating Media Source duration to ${_levelDuration.toFixed(3)}`);
-      this._msDuration = mediaSource.duration = _levelDuration;
+      logger.log(`[buffer-controller]: Updating Media Source duration to ${levelDuration.toFixed(3)}`);
+      this._msDuration = mediaSource.duration = levelDuration;
     }
   }
 

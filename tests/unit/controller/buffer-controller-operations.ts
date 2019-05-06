@@ -17,6 +17,8 @@ const expect = chai.expect;
 const sandbox = sinon.createSandbox();
 
 class MockMediaSource {
+  public readyState: string = 'open';
+  public duration: number = 0;
   addSourceBuffer () : MockSourceBuffer {
     return new MockSourceBuffer();
   }
@@ -61,12 +63,13 @@ describe('BufferController SourceBuffer operation queueing', function () {
   let triggerSpy;
   let shiftAndExecuteNextSpy;
   let mockMedia;
+  let mockMediaSource;
   beforeEach(function () {
     hls = new Hls({});
 
     bufferController = new BufferController(hls);
     bufferController.media = mockMedia = new MockMediaElement();
-    bufferController.mediaSource = new MockMediaSource();
+    bufferController.mediaSource = mockMediaSource = new MockMediaSource();
     bufferController.createSourceBuffers({
       audio: {},
       video: {}
@@ -334,6 +337,63 @@ describe('BufferController SourceBuffer operation queueing', function () {
       bufferController.flushLiveBackBuffer();
 
       expect(bufferFlushingSpy, `onBufferFlushing should not have been called`).to.have.not.been.called;
+    });
+  });
+
+  describe('onLevelUpdated', function () {
+    let queueAppendBlockerSpy;
+    let data;
+    beforeEach(function () {
+      mockMediaSource.duration = 0;
+      queueAppendBlockerSpy = sandbox.spy(operationQueue, 'appendBlocker');
+      data = {
+        details: {
+          averagetargetduration: 6,
+          live: true,
+          totalduration: 5,
+          fragments: [{ start: 5 }]
+        }
+      };
+    });
+
+    it('exits early if the fragments array is empty', function () {
+      data.details.fragments = [];
+      bufferController.onLevelUpdated(data);
+      expect(bufferController._levelTargetDuration, '_levelTargetDuration').to.be.null;
+      expect(bufferController._live, '_live').to.be.false;
+    });
+
+    it('updates class properties based on level data', function () {
+      bufferController.onLevelUpdated(data);
+      expect(bufferController._levelTargetDuration, '_levelTargetDuration').to.equal(6);
+      expect(bufferController._live, `_live`).to.be.true;
+
+      // It prefers averagetargetduration, but falls back to targetduration
+      delete data.details.averagetargetduration;
+      data.details.targetduration = 7;
+      data.details.live = false;
+      bufferController.onLevelUpdated(data);
+      expect(bufferController._levelTargetDuration, '_levelTargetDuration').to.equal(7);
+      expect(bufferController._live, '_live').to.be.false;
+
+      // Defaults to 10 if no duration is provided
+      delete data.details.targetduration;
+      bufferController.onLevelUpdated(data);
+      expect(bufferController._levelTargetDuration, '_levelTargetDuration').to.equal(10);
+    });
+
+    it('enqueues a blocking operation which updates the MediaSource duration', function () {
+      bufferController.onLevelUpdated(data);
+      expect(queueAppendBlockerSpy).to.have.been.calledTwice;
+      // Updating the duration is aync and has no event to signal completion, so we are unable to test for it directly
+    });
+
+    it('synchronously updates the duration if no SourceBuffers exist', function () {
+      bufferController.sourceBuffer = {};
+      bufferController.onLevelUpdated(data);
+      expect(queueAppendBlockerSpy).to.have.not.been.called;
+      expect(mockMediaSource.duration, 'mediaSource.duration').to.equal(10);
+      expect(bufferController._msDuration, '_msDuration').to.equal(10);
     });
   });
 });
