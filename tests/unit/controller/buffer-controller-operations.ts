@@ -62,6 +62,7 @@ describe('BufferController SourceBuffer operation queueing', function () {
   let operationQueue;
   let triggerSpy;
   let shiftAndExecuteNextSpy;
+  let queueAppendBlockerSpy;
   let mockMedia;
   let mockMediaSource;
   beforeEach(function () {
@@ -79,6 +80,7 @@ describe('BufferController SourceBuffer operation queueing', function () {
     bufferController.operationQueue = operationQueue;
     triggerSpy = sandbox.spy(hls, 'trigger');
     shiftAndExecuteNextSpy = sandbox.spy(operationQueue, 'shiftAndExecuteNext');
+    queueAppendBlockerSpy = sandbox.spy(operationQueue, 'appendBlocker');
   });
 
   afterEach(function () {
@@ -177,7 +179,6 @@ describe('BufferController SourceBuffer operation queueing', function () {
   describe('onFragParsed', function () {
     it('should trigger FRAG_BUFFERED when all audio/video data has been buffered', function () {
       const flushLiveBackBufferSpy = sandbox.spy(bufferController, 'flushLiveBackBuffer');
-      const queueAppendBlockerSpy = sandbox.spy(operationQueue, 'appendBlocker');
       const frag = new Fragment();
       frag.addElementaryStream(ElementaryStreamTypes.AUDIO);
       frag.addElementaryStream(ElementaryStreamTypes.VIDEO);
@@ -341,11 +342,9 @@ describe('BufferController SourceBuffer operation queueing', function () {
   });
 
   describe('onLevelUpdated', function () {
-    let queueAppendBlockerSpy;
     let data;
     beforeEach(function () {
       mockMediaSource.duration = 0;
-      queueAppendBlockerSpy = sandbox.spy(operationQueue, 'appendBlocker');
       data = {
         details: {
           averagetargetduration: 6,
@@ -394,6 +393,18 @@ describe('BufferController SourceBuffer operation queueing', function () {
       expect(queueAppendBlockerSpy).to.have.not.been.called;
       expect(mockMediaSource.duration, 'mediaSource.duration').to.equal(10);
       expect(bufferController._msDuration, '_msDuration').to.equal(10);
+    });
+  });
+
+  describe('onBufferEos', function () {
+    it('marks the ExtendedSourceBuffer as ended', function () {
+      // No type arg ends both SourceBuffers
+      bufferController.onBufferEos({ });
+      expect(queueAppendBlockerSpy).to.have.been.calledTwice;
+      queueNames.forEach(type => {
+        const buffer = bufferController.sourceBuffer[type];
+        expect(buffer.ended, 'ExtendedSourceBuffer.ended').to.be.true;
+      });
     });
   });
 });

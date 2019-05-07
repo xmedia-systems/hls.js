@@ -273,13 +273,12 @@ export default class BufferController extends EventHandler {
         const sb = this.sourceBuffer[type as SourceBufferName];
         if (sb && !sb.ended) {
           sb.ended = true;
-          logger.log(`${type} sourceBuffer now EOS`);
+          logger.log(`[buffer-controller]: ${type} sourceBuffer now EOS`);
         }
       }
     }
 
     const endStream = () => {
-      this.getSourceBufferTypes().map(name => this.assertNotUpdating(name));
       const { mediaSource } = this;
       if (!mediaSource || mediaSource.readyState !== 'open') {
         return;
