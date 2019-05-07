@@ -14,12 +14,12 @@ const mergeConfig = merge(webpackConfig, {
         exclude: path.resolve(__dirname, 'node_modules'),
         enforce: 'post',
         use: [
-          // {
-          //   loader: 'istanbul-instrumenter-loader',
-          //   options: {
-          //     esModules: true
-          //   }
-          // }
+          {
+            loader: 'istanbul-instrumenter-loader',
+            options: {
+              esModules: true
+            }
+          }
         ]
       }
     ]
