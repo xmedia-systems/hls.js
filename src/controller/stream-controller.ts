@@ -1,7 +1,3 @@
-/*
- * Stream Controller
-*/
-
 import BinarySearch from '../utils/binary-search';
 import { BufferHelper } from '../utils/buffer-helper';
 import TransmuxerInterface from '../demux/transmuxer-interface';
@@ -17,8 +13,7 @@ import { alignStream } from '../utils/discontinuities';
 import { findFragmentByPDT, findFragmentByPTS } from './fragment-finders';
 import GapController from './gap-controller';
 import BaseStreamController, { State } from './base-stream-controller';
-import FragmentLoader, { FragLoadSuccessResult } from '../loader/fragment-loader';
-import { appendUint8Array } from '../utils/mp4-tools';
+import FragmentLoader from '../loader/fragment-loader';
 
 const TICK_INTERVAL = 100; // how often to tick in ms
 
@@ -1285,15 +1280,12 @@ export default class StreamController extends BaseStreamController {
     if (!data || this.state !== State.PARSING) {
       return;
     }
-    const { data1, data2  } = data;
-    let buffer = data1;
-    if (data1 && data2) {
-      buffer = appendUint8Array(data1, data2);
-    }
 
-    if (!buffer.length) {
+    const buffer = this.combineFragmentData(data.data1, data.data2);
+    if (!buffer || !buffer.length) {
       return;
     }
+
     this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: 'main', content: 'data' });
     this.tick();
   }

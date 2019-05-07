@@ -8,8 +8,8 @@ import Fragment from '../loader/fragment';
 import TransmuxerInterface from '../demux/transmuxer-interface';
 import FragmentLoader, { FragLoadSuccessResult, FragmentLoadProgressCallback } from '../loader/fragment-loader';
 import * as LevelHelper from './level-helper';
-import { LoaderStats } from '../types/loader';
 import { TransmuxIdentifier } from '../types/transmuxer';
+import { appendUint8Array } from '../utils/mp4-tools';
 
 export const State = {
   STOPPED: 'STOPPED',
@@ -44,7 +44,6 @@ export default class BaseStreamController extends TaskLoop {
   protected fragLoadError: number = 0;
   protected levels: Array<any> | null = null;
   protected fragmentLoader!: FragmentLoader;
-  protected stats!: LoaderStats;
 
   protected readonly logPrefix: string = '';
 
@@ -219,7 +218,6 @@ export default class BaseStreamController extends TaskLoop {
     this.state = State.FRAG_LOADING;
     this.hls.trigger(Event.FRAG_LOADING, { frag });
 
-    // TODO: nextLoadPos should only be set on successful frag load
     const errorHandler = (e) => {
       const errorData = e ? e.data : null;
       if (errorData && errorData.details === ErrorDetails.INTERNAL_ABORTED) {
@@ -281,6 +279,15 @@ export default class BaseStreamController extends TaskLoop {
     return { frag, level: currentLevel };
   }
 
+  protected combineFragmentData (data1?: Uint8Array, data2?: Uint8Array) {
+    let buffer = data1;
+    if (data1 && data2) {
+      // Combine the moof + mdat so that we buffer with a single append
+      buffer = appendUint8Array(data1, data2);
+    }
+    return buffer;
+  }
+
   protected log (msg) {
     logger.log(`${this.logPrefix}: ${msg}`);
   }
@@ -291,6 +298,7 @@ export default class BaseStreamController extends TaskLoop {
 
   private handleFragLoadAborted (frag: Fragment) {
     const { fragPrevious, transmuxer } = this;
+    // TODO: nextLoadPos should only be set on successful frag load
     if (fragPrevious) {
       this.nextLoadPosition = fragPrevious.start + fragPrevious.duration;
     } else {

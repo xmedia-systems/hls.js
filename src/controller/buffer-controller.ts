@@ -168,6 +168,10 @@ export default class BufferController extends EventHandler {
     });
     this.sourceBuffer = {};
     this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
+    this.listeners = {
+      audio: [],
+      video: []
+    };
   }
 
   onBufferCodecs (tracks: TrackSet) {
@@ -387,8 +391,6 @@ export default class BufferController extends EventHandler {
     const { hls, _live, media, mediaSource, _msDuration } = this;
     const mediaDuration = media.duration;
 
-    this.getSourceBufferTypes().map(type => this.assertNotUpdating(type));
-
     // initialise to the value that the media source is reporting
     let msDuration = _msDuration;
     if (msDuration === null) {
@@ -521,6 +523,7 @@ export default class BufferController extends EventHandler {
     const removeEnd = Math.min(media.duration, endOffset);
     if (removeEnd > removeStart) {
       logger.log(`[buffer-controller]: Removing [${removeStart},${removeEnd}] from the ${type} SourceBuffer`);
+      console.assert(!sb.updating, `${type} sourceBuffer must not be updating`);
       sb.remove(removeStart, removeEnd);
     } else {
       // Cycle the queue
@@ -539,7 +542,7 @@ export default class BufferController extends EventHandler {
     }
 
     sb.ended = false;
-    this.assertNotUpdating(type);
+    console.assert(!sb.updating, `${type} sourceBuffer must not be updating`);
     sb.appendBuffer(segment.data);
   }
 
@@ -555,9 +558,9 @@ export default class BufferController extends EventHandler {
       return;
     }
     logger.log(`[buffer-controller]: Aborting the ${type} SourceBuffer`);
+    console.assert(!sb.updating, `${type} sourceBuffer must not be updating`);
     sb.abort();
-    // updateend is only triggered if aborting while updating is true; because we're queuing aborts, it should always be false
-    this.assertNotUpdating(type);
+    // updateend is only triggered if aborting while updating is true
     this._onSBUpdateEnd(type);
   }
 
@@ -587,11 +590,6 @@ export default class BufferController extends EventHandler {
         }
       })
     });
-  }
-
-  private assertNotUpdating (type: SourceBufferName) {
-    const sb = this.sourceBuffer[type];
-    console.assert(!sb || !sb.updating, `${type} sourceBuffer must exist, and must not be updating`);
   }
 
   private getSourceBufferTypes () : Array<SourceBufferName> {

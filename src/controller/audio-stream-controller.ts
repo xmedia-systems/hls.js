@@ -1,7 +1,3 @@
-/*
- * Audio Stream Controller
-*/
-
 import { BufferHelper } from '../utils/buffer-helper';
 import TransmuxerInterface from '../demux/transmuxer-interface';
 import Event from '../events';
@@ -15,7 +11,6 @@ import { ElementaryStreamTypes } from '../loader/fragment';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
 import { findFragmentByPTS } from './fragment-finders';
-import { appendUint8Array } from '../utils/mp4-tools';
 
 const { performance } = window;
 
@@ -669,12 +664,8 @@ class AudioStreamController extends BaseStreamController {
 
     LevelHelper.updateFragPTSDTS(currentLevel.details, frag, data.startPTS, data.endPTS, data.startDTS, data.endDTS);
 
-    const { data1, data2 } = data;
-    let buffer = data1;
-    if (data1 && data2) {
-      buffer = appendUint8Array(data1, data2);
-    }
-    if (!buffer.length) {
+    const buffer = this.combineFragmentData(data.data1, data.data2);
+    if (!buffer || !buffer.length) {
       return;
     }
 
