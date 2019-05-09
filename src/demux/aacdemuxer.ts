@@ -4,16 +4,20 @@
 import * as ADTS from './adts';
 import { logger } from '../utils/logger';
 import ID3 from '../demux/id3';
-import { DemuxerResult } from '../types/demuxer';
-import NonProgressiveDemuxer from './non-progressive-demuxer';
+import { DemuxerResult, Demuxer } from '../types/demuxer';
 import { dummyTrack } from './dummy-demuxed-track';
+import ChunkCache from './chunk-cache';
 
-class AACDemuxer extends NonProgressiveDemuxer {
+class AACDemuxer implements Demuxer {
   private observer: any;
   private config: any;
   private _audioTrack!: any;
+  private cache = new ChunkCache();
+  private eof: Boolean = false;
+  private frameIndex: number = 0;
+  private result!: DemuxerResult;
+
   constructor (observer, config) {
-    super();
     this.observer = observer;
     this.config = config;
   }
@@ -48,26 +52,31 @@ class AACDemuxer extends NonProgressiveDemuxer {
   }
 
   // feed incoming data to the front of the parsing pipeline
-  demuxInternal (data, timeOffset): DemuxerResult {
+  demux (data, timeOffset): DemuxerResult {
     let track = this._audioTrack;
     let id3Data = ID3.getID3Data(data, 0) || [];
     let timestamp = ID3.getTimeStamp(id3Data);
     let pts = Number.isFinite(timestamp) ? timestamp * 90 : timeOffset * 90000;
-    let frameIndex = 0;
     let stamp = pts;
     let length = data.length;
     let offset = id3Data.length;
 
     let id3Samples = [{ pts: stamp, dts: stamp, data: id3Data }];
+    
+    if (this.eof) {
+      this.frameIndex = 0;
+      this.eof = false;
+    }
 
     while (offset < length - 1) {
       if (ADTS.isHeader(data, offset) && (offset + 5) < length) {
         ADTS.initTrackConfig(track, this.observer, data, offset, track.manifestCodec);
-        let frame = ADTS.appendFrame(track, data, offset, pts, frameIndex);
+        let frame = ADTS.appendFrame(track, data, offset, pts, this.frameIndex);
+
         if (frame) {
           offset += frame.length;
           stamp = frame.sample.pts;
-          frameIndex++;
+          this.frameIndex++;
         } else {
           logger.log('Unable to parse AAC frame');
           break;
@@ -82,16 +91,29 @@ class AACDemuxer extends NonProgressiveDemuxer {
       }
     }
 
-    return {
+    if (offset === length) {
+      this.cache.push(data);
+      this.eof = true;
+    }
+
+    this.result = {
       audioTrack: track,
       avcTrack: dummyTrack(),
       id3Track: dummyTrack(),
       textTrack: dummyTrack()
     };
+
+    return this.result;
   }
 
   demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number): Promise<DemuxerResult> {
     return Promise.reject(new Error('The AAC demuxer does not support Sample-AES decryption'));
+  }
+
+  flush (timeOffset): DemuxerResult {
+    debugger;
+    this.frameIndex = 0;
+    return this.result;
   }
 
   destroy () {
