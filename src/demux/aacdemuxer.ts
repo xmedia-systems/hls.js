@@ -65,6 +65,7 @@ class AACDemuxer implements Demuxer {
 
     if (this.remainderData) {
       data = appendUint8Array(this.remainderData, data);
+      this.remainderData = null;
     }
 
     while (offset < length - 1) {
@@ -73,12 +74,15 @@ class AACDemuxer implements Demuxer {
         let frame = ADTS.appendFrame(track, data, offset, pts, this.frameIndex);
         if (frame) {
           offset += frame.length;
+          // console.log(`>>> stamp before ${stamp} after ${frame.sample.pts} diff ${frame.sample.pts - stamp} frameIndex ${this.frameIndex}`);
+          if (frame.sample.pts - stamp === 0 || frame.sample.pts === undefined) {
+            // debugger
+          }
           stamp = frame.sample.pts;
           this.frameIndex++;
         } else {
           logger.log('Unable to parse AAC frame');
           this.remainderData = data.slice(offset);
-          debugger;
           break;
         }
       } else if (ID3.isHeader(data, offset)) {

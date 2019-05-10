@@ -1,6 +1,7 @@
 /**
  * fMP4 remuxer
 */
+window.audioSamples = []
 
 import AAC from './aac-helper';
 import MP4 from './mp4-generator';
@@ -469,6 +470,8 @@ class MP4Remuxer implements Remuxer {
     let inputSamples: Array<any> = track.samples;
     let outputSamples: Array<any> = [];
     let nextAudioPts = this.nextAudioPts;
+
+    window.audioSamples.push(inputSamples.slice())
 
 
     // for audio samples, also consider consecutive fragments as being contiguous (even if a level switch occurs),

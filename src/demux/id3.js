@@ -87,6 +87,7 @@ class ID3 {
         // ID3 footer is 10 bytes
         length += 10;
       }
+      console.log('>>> min demux size', length);
 
       offset += length;
     }
