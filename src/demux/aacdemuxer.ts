@@ -6,16 +6,16 @@ import { logger } from '../utils/logger';
 import ID3 from '../demux/id3';
 import { DemuxerResult, Demuxer } from '../types/demuxer';
 import { dummyTrack } from './dummy-demuxed-track';
-import ChunkCache from './chunk-cache';
+import { appendUint8Array } from '../utils/mp4-tools';
 
 class AACDemuxer implements Demuxer {
   private observer: any;
   private config: any;
   private _audioTrack!: any;
-  private cache = new ChunkCache();
-  private eof: Boolean = false;
   private frameIndex: number = 0;
   private result!: DemuxerResult;
+  private remainderData: any = 0;
+  private eof: Boolean = false;
 
   constructor (observer, config) {
     this.observer = observer;
@@ -62,23 +62,23 @@ class AACDemuxer implements Demuxer {
     let offset = id3Data.length;
 
     let id3Samples = [{ pts: stamp, dts: stamp, data: id3Data }];
-    
-    if (this.eof) {
-      this.frameIndex = 0;
-      this.eof = false;
+
+    if (this.remainderData) {
+      data = appendUint8Array(this.remainderData, data);
     }
 
     while (offset < length - 1) {
       if (ADTS.isHeader(data, offset) && (offset + 5) < length) {
         ADTS.initTrackConfig(track, this.observer, data, offset, track.manifestCodec);
         let frame = ADTS.appendFrame(track, data, offset, pts, this.frameIndex);
-
         if (frame) {
           offset += frame.length;
           stamp = frame.sample.pts;
           this.frameIndex++;
         } else {
           logger.log('Unable to parse AAC frame');
+          this.remainderData = data.slice(offset);
+          debugger;
           break;
         }
       } else if (ID3.isHeader(data, offset)) {
@@ -87,23 +87,17 @@ class AACDemuxer implements Demuxer {
         offset += id3Data.length;
       } else {
         // nothing found, keep looking
-        offset++;
+        this.remainderData = data.slice(offset);
+        break;
       }
     }
 
-    if (offset === length) {
-      this.cache.push(data);
-      this.eof = true;
-    }
-
-    this.result = {
+    return {
       audioTrack: track,
       avcTrack: dummyTrack(),
       id3Track: dummyTrack(),
       textTrack: dummyTrack()
     };
-
-    return this.result;
   }
 
   demuxSampleAes (data: Uint8Array, decryptData: Uint8Array, timeOffset: number): Promise<DemuxerResult> {
@@ -111,12 +105,24 @@ class AACDemuxer implements Demuxer {
   }
 
   flush (timeOffset): DemuxerResult {
-    debugger;
+    // this.demux(this.cache.flush(), timeOffset);
+    this.remainderData = null;
     this.frameIndex = 0;
-    return this.result;
+    // this.reset();
+    return {
+      audioTrack: this._audioTrack,
+      avcTrack: dummyTrack(),
+      id3Track: dummyTrack(),
+      textTrack: dummyTrack()
+    };
   }
 
   destroy () {
+  }
+
+  private reset () {
+    debugger;
+    this.cache.reset();
   }
 }
 

@@ -221,7 +221,7 @@ export function appendFrame (track, data, offset, pts, frameIndex) {
     let headerLength = header.headerLength;
     let frameLength = header.frameLength;
 
-    // logger.log(`AAC frame, offset/length/total/pts:${offset+headerLength}/${frameLength}/${data.byteLength}/${(stamp/90).toFixed(0)}`);
+    logger.log(`AAC frame, offset/length/total/pts:${offset + headerLength}/${frameLength}/${data.byteLength}/${(stamp / 90).toFixed(0)}`);
     let aacSample = {
       unit: data.subarray(offset + headerLength, offset + headerLength + frameLength),
       pts: stamp,
