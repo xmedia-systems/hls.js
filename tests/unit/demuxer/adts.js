@@ -406,6 +406,5 @@ describe('appendFrame', function () {
 
     expect(appendFrame(track, data, 0, 0, 0)).to.be.undefined;
     expect(track.samples.length).to.equal(0);
-    expect(track.len).to.equal(0);
   });
 });
