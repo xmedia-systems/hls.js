@@ -6,5 +6,6 @@ export const dummyTrack = () : DemuxedTrack => ({
   pid: -1,
   inputTimeScale: 90000,
   sequenceNumber: -1,
-  samples: []
+  samples: [],
+  dropped: 0
 });

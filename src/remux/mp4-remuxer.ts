@@ -61,9 +61,10 @@ export default class MP4Remuxer implements Remuxer {
     const isAudioContiguous = Number.isFinite(this.nextAudioPts!);
     const isVideoContiguous = Number.isFinite(this.nextAvcDts!);
     if (!isVideoContiguous && this.config.forceKeyFrameOnDiscontinuity) {
+      const length = videoTrack.samples.length;
       dropSamplesUntilKeyframe(videoTrack);
       if (videoTrack.dropped) {
-        logger.warn(`[mp4-remuxer]: Dropped ${videoTrack.dropped} video samples due to a missing keyframe`);
+        logger.warn(`[mp4-remuxer]: Dropped ${videoTrack.dropped} out of ${length} video samples due to a missing keyframe`);
       }
     }
 
@@ -248,7 +249,7 @@ export default class MP4Remuxer implements Remuxer {
     // handle broken streams with PTS < DTS, tolerance up 200ms (18000 in 90kHz timescale)
     const PTSDTSshift = inputSamples.reduce((prev, curr) => Math.max(Math.min(prev, curr.pts - curr.dts), -18000), 0);
     if (PTSDTSshift < 0) {
-      logger.warn(`[mp4-remuxer]: PTS < DTS detected in video samples, shifting DTS by ${Math.round(PTSDTSshift / 90)} ms to overcome this issue`);
+      logger.log(`[mp4-remuxer]: PTS < DTS detected in video samples, shifting DTS by ${Math.round(PTSDTSshift / 90)} ms to overcome this issue`);
       for (let i = 0; i < inputSamples.length; i++) {
         inputSamples[i].dts += PTSDTSshift;
       }

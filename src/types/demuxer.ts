@@ -23,7 +23,7 @@ export interface DemuxedTrack {
   samples: any
   timescale?: number
   container?: string
-  dropped?: number
+  dropped: number
   duration?: number
   pesData?: ElementaryStreamData | null
   codec?: string

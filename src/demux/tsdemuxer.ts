@@ -110,7 +110,7 @@ class TSDemuxer implements Demuxer {
       inputTimeScale: 90000,
       sequenceNumber: 0,
       samples: [],
-      dropped: type === 'video' ? 0 : undefined,
+      dropped: 0,
       duration: type === 'audio' ? duration : undefined
     };
   }
@@ -1045,7 +1045,7 @@ class TSDemuxer implements Demuxer {
     if (aacOverFlow && aacLastPTS) {
       let newPTS = aacLastPTS + frameDuration;
       if (Math.abs(newPTS - pts) > 1) {
-        logger.log(`AAC: align PTS for overlapping frames by ${Math.round((newPTS - pts) / 90)}`);
+        logger.log(`[tsdemuxer]: AAC: align PTS for overlapping frames by ${Math.round((newPTS - pts) / 90)}`);
         pts = newPTS;
       }
     }
