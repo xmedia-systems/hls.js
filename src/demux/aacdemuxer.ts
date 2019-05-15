@@ -14,6 +14,7 @@ class AACDemuxer implements Demuxer {
   private _audioTrack!: any;
   private frameIndex: number = 0;
   private cachedData: Uint8Array = new Uint8Array();
+  static readonly minProbeByteLength: number = 9;
   
   constructor (observer, config) {
     this.observer = observer;
@@ -51,31 +52,30 @@ class AACDemuxer implements Demuxer {
 
   // feed incoming data to the front of the parsing pipeline
   demux (data, timeOffset): DemuxerResult {
-    // Append cached data to data.
     if (this.cachedData.length) {
       data = appendUint8Array(this.cachedData, data);
-      // Clear Cache
       this.cachedData = new Uint8Array();
     }
 
     let id3Data = ID3.getID3Data(data, 0) || [];
-    let track = this._audioTrack;
-    let timestamp = ID3.getTimeStamp(id3Data);
-    let pts = Number.isFinite(timestamp) ? timestamp * 90 : timeOffset * 90000;
-    let stamp = pts;
-    let length = data.length;
     let offset = id3Data.length;
-    let id3Samples = [{ pts: stamp, dts: stamp, data: id3Data }];
-    
-    // Iteratively parse data for ADTS Headers and ID3 Headers
+    let pts;
+    const track = this._audioTrack;
+    const timestamp = ID3.getTimeStamp(id3Data);
+    const initialPts = Number.isFinite(timestamp) ? timestamp * 90 : timeOffset * 90000;
+    const length = data.length;
+    const id3Samples = [{ pts: initialPts, dts: initialPts, data: id3Data }];
+   
+    pts = initialPts;
+    // Iteratively parse data for ADTS Headers and ID3 headers
     while (offset <= length) {
-      //  Only begin parsing if there's at least one full frame.
-      if (ADTS.isHeader(data, offset) && (offset + 5) < length && ADTS.getFullFrameLength(data, offset) < length - offset) {
+      //  Only begin parsing if there's at least one full frame
+      if (ADTS.canParse(data, offset)) {
         ADTS.initTrackConfig(track, this.observer, data, offset, track.manifestCodec);
-        let frame = ADTS.appendFrame(track, data, offset, pts, this.frameIndex);
+        let frame = ADTS.appendFrame(track, data, offset, initialPts, this.frameIndex);
         if (frame) {
           offset += frame.length;
-          stamp = frame.sample.pts;
+          pts = frame.sample.pts;
           this.frameIndex++;
         } else {
           logger.log('Unable to parse AAC frame');
@@ -84,10 +84,10 @@ class AACDemuxer implements Demuxer {
         }
       } else if (ID3.isHeader(data, offset)) {
         id3Data = ID3.getID3Data(data, offset);
-        id3Samples.push({ pts: stamp, dts: stamp, data: id3Data });
+        id3Samples.push({ pts: pts, dts: pts, data: id3Data });
         offset += id3Data.length;
       } else {
-        // nothing found, cache and keep looking
+        // Nothing found, cache and keep looking
         this.cachedData = data.slice(offset);
         break;
       }
