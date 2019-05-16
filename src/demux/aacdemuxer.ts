@@ -82,7 +82,7 @@ class AACDemuxer implements Demuxer {
           this.cachedData = data.slice(offset);
           break;
         }
-      } else if (ID3.isHeader(data, offset)) {
+      } else if (ID3.canParse(data, offset)) {
         id3Data = ID3.getID3Data(data, offset);
         id3Samples.push({ pts: pts, dts: pts, data: id3Data });
         offset += id3Data.length;
