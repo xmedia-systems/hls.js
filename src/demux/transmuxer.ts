@@ -131,7 +131,6 @@ export default class Transmuxer {
     return result;
   }
 
-  // TODO: Probe for demuxer on flush
   flush (transmuxIdentifier: TransmuxIdentifier) : TransmuxerResult | Promise<TransmuxerResult>  {
     const { demuxer, remuxer, cache, currentTransmuxState, decryptionPromise, observer } = this;
     if (decryptionPromise) {
