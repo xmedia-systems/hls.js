@@ -54,7 +54,7 @@ class MP3Demuxer implements Demuxer {
     const length = data.length;
     const id3Samples: any[] = [];
     
-    if (!this.initPTS) {
+    if (this.initPTS === undefined) {
       this.initPTS = timestamp ? 90 * timestamp : timeOffset * 90000;
     }
 
@@ -106,7 +106,7 @@ class MP3Demuxer implements Demuxer {
     }
     
     this.frameIndex = 0;
-    this.initPTS = 0;
+    this.initPTS = undefined;
     this.cachedData = new Uint8Array();
     
     return {

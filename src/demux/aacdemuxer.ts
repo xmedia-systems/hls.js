@@ -66,7 +66,7 @@ class AACDemuxer implements Demuxer {
     const length = data.length;
     const id3Samples: any[] = [];
 
-    if (!this.initPTS) {
+    if (this.initPTS === undefined) {
       this.initPTS = Number.isFinite(timestamp) ? timestamp * 90 : timeOffset * 90000;
     }
     
@@ -126,7 +126,7 @@ class AACDemuxer implements Demuxer {
     
     this.frameIndex = 0;
     this.cachedData = new Uint8Array();
-    this.initPTS = 0;
+    this.initPTS = undefined;
     
     return {
       audioTrack: this._audioTrack,
