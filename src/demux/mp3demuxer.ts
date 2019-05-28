@@ -12,7 +12,7 @@ class MP3Demuxer implements Demuxer {
   private _audioTrack!: any;
   private cachedData: Uint8Array = new Uint8Array();
   private frameIndex: number = 0;
-  private initPTS?: number;
+  private initPTS?: number | null;
 
   resetInitSegment (audioCodec, videoCodec, duration) {
     this._audioTrack = { container: 'audio/mpeg', type: 'audio', id: -1, sequenceNumber: 0, isAAC: false, samples: [], len: 0, manifestCodec: audioCodec, duration: duration, inputTimeScale: 90000 };
@@ -54,7 +54,7 @@ class MP3Demuxer implements Demuxer {
     const length = data.length;
     const id3Samples: any[] = [];
     
-    if (this.initPTS === undefined) {
+    if (this.initPTS === (null || undefined)) {
       this.initPTS = timestamp ? 90 * timestamp : timeOffset * 90000;
     }
 
@@ -106,7 +106,7 @@ class MP3Demuxer implements Demuxer {
     }
     
     this.frameIndex = 0;
-    this.initPTS = undefined;
+    this.initPTS = null;
     this.cachedData = new Uint8Array();
     
     return {

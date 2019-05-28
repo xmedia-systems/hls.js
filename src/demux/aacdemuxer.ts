@@ -14,7 +14,7 @@ class AACDemuxer implements Demuxer {
   private _audioTrack!: any;
   private frameIndex: number = 0;
   private cachedData: Uint8Array = new Uint8Array();
-  private initPTS?: number;
+  private initPTS?: number | null;
   static readonly minProbeByteLength: number = 9;
   
   constructor (observer, config) {
@@ -66,7 +66,7 @@ class AACDemuxer implements Demuxer {
     const length = data.length;
     const id3Samples: any[] = [];
 
-    if (this.initPTS === undefined) {
+    if (this.initPTS === (null || undefined)) {
       this.initPTS = Number.isFinite(timestamp) ? timestamp * 90 : timeOffset * 90000;
     }
     
@@ -126,7 +126,7 @@ class AACDemuxer implements Demuxer {
     
     this.frameIndex = 0;
     this.cachedData = new Uint8Array();
-    this.initPTS = undefined;
+    this.initPTS = null;
     
     return {
       audioTrack: this._audioTrack,
