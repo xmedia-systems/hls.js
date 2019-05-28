@@ -13,6 +13,7 @@ class MP3Demuxer implements Demuxer {
   private cachedData: Uint8Array = new Uint8Array();
   private frameIndex: number = 0;
   private initPTS?: number | null;
+  static readonly minProbeByteLength: number = 4;
 
   resetInitSegment (audioCodec, videoCodec, duration) {
     this._audioTrack = { container: 'audio/mpeg', type: 'audio', id: -1, sequenceNumber: 0, isAAC: false, samples: [], len: 0, manifestCodec: audioCodec, duration: duration, inputTimeScale: 90000 };
