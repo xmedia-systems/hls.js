@@ -12,7 +12,7 @@ class MP3Demuxer implements Demuxer {
   private _audioTrack!: any;
   private cachedData: Uint8Array = new Uint8Array();
   private frameIndex: number = 0;
-  private initPTS?: number | null;
+  private initPTS: number | null = null;
   static readonly minProbeByteLength: number = 4;
 
   resetInitSegment (audioCodec, videoCodec, duration) {
@@ -55,7 +55,7 @@ class MP3Demuxer implements Demuxer {
     const length = data.length;
     const id3Samples: any[] = [];
     
-    if (this.initPTS === (null || undefined)) {
+    if (this.initPTS === null) {
       this.initPTS = timestamp ? 90 * timestamp : timeOffset * 90000;
     }
 
