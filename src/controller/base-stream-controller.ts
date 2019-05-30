@@ -84,7 +84,7 @@ export default class BaseStreamController extends TaskLoop {
   }
 
   protected onMediaSeeking () {
-    const { config, media, mediaBuffer, state } = this;
+    const { config, fragCurrent, media, mediaBuffer, state } = this;
     const currentTime = media ? media.currentTime : null;
     const bufferInfo = BufferHelper.bufferInfo(mediaBuffer || media, currentTime, this.config.maxBufferHole);
 
@@ -92,40 +92,32 @@ export default class BaseStreamController extends TaskLoop {
       this.log(`media seeking to ${currentTime.toFixed(3)}, state: ${state}`);
     }
 
-    // TODO: Handle frag abort while progressively parsing (state is PARSING after the first progress event)
-    if (state === State.FRAG_LOADING) {
-      let fragCurrent = this.fragCurrent;
-      // check if we are seeking to a unbuffered area AND if frag loading is in progress
-      if (!bufferInfo.len && fragCurrent) {
-        const tolerance = config.maxFragLookUpTolerance;
-        const fragStartOffset = fragCurrent.start - tolerance;
-        const fragEndOffset = fragCurrent.start + fragCurrent.duration + tolerance;
-        // check if we seek position will be out of currently loaded frag range : if out cancel frag load, if in, don't do anything
-        if (currentTime < fragStartOffset || currentTime > fragEndOffset) {
-          if (fragCurrent.loader) {
-            this.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
-            fragCurrent.loader.abort();
-          }
-          this.fragCurrent = null;
-          this.fragPrevious = null;
-          // switch to IDLE state to load new fragment
-          this.state = State.IDLE;
-        } else {
-          this.log('seeking outside of buffer but within currently loaded fragment range');
-        }
-      } else {
-        this.log(`didn't cancel, len: ${bufferInfo.len}, fragCurrent: ${fragCurrent}`);
-      }
-    } else if (state === State.ENDED) {
+    if (state === State.ENDED) {
       // if seeking to unbuffered area, clean up fragPrevious
-      if (bufferInfo.len === 0) {
+      if (!bufferInfo.len) {
         this.fragPrevious = null;
         this.fragCurrent = null;
       }
-
       // switch to IDLE state to check for potential new fragment
       this.state = State.IDLE;
+    } else if (fragCurrent && !bufferInfo.len) {
+      // check if we are seeking to a unbuffered area AND if frag loading is in progress
+      const tolerance = config.maxFragLookUpTolerance;
+      const fragStartOffset = fragCurrent.start - tolerance;
+      const fragEndOffset = fragCurrent.start + fragCurrent.duration + tolerance;
+      // check if we seek position will be out of currently loaded frag range : if out cancel frag load, if in, don't do anything
+      if (currentTime < fragStartOffset || currentTime > fragEndOffset) {
+        if (fragCurrent.loader) {
+          this.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
+          fragCurrent.loader.abort();
+        }
+        this.fragCurrent = null;
+        this.fragPrevious = null;
+        // switch to IDLE state to load new fragment
+        this.state = State.IDLE;
+      }
     }
+
     if (media) {
       this.lastCurrentTime = currentTime;
     }
