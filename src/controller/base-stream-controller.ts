@@ -246,9 +246,10 @@ export default class BaseStreamController extends TaskLoop {
     if (!context) {
       return;
     }
-    const { frag } = context;
+    const { frag, level } = context;
     frag.stats.tparsed = window.performance.now();
 
+    this.updateLevelTiming(frag, level);
     this.state = State.PARSED;
     this.hls.trigger(Event.FRAG_PARSED, { frag });
   }
@@ -274,21 +275,25 @@ export default class BaseStreamController extends TaskLoop {
     return { frag, level: currentLevel };
   }
 
-  protected combineFragmentData (data1?: Uint8Array, data2?: Uint8Array) {
+  // TODO: Emit moof+mdat as a single Uint8 instead of data1 & data2
+  protected bufferFragmentData (data, parent) {
+    if (!data || this.state !== State.PARSING) {
+      return;
+    }
+
+    const { data1, data2 } = data;
     let buffer = data1;
     if (data1 && data2) {
       // Combine the moof + mdat so that we buffer with a single append
       buffer = appendUint8Array(data1, data2);
     }
-    return buffer;
-  }
 
-  protected log (msg) {
-    logger.log(`${this.logPrefix}: ${msg}`);
-  }
+    if (!buffer || !buffer.length) {
+      return;
+    }
 
-  protected warn (msg) {
-    logger.warn(`${this.logPrefix}: ${msg}`);
+    this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent, content: 'data' });
+    this.tick();
   }
 
   private handleFragLoadAborted (frag: Fragment) {
@@ -302,7 +307,27 @@ export default class BaseStreamController extends TaskLoop {
     if (transmuxer && frag.sn !== 'initSegment') {
       transmuxer.flush({ sn: frag.sn, level: frag.level });
     }
+
+    Object.keys(frag.elementaryStreams).forEach(type => frag.elementaryStreams[type] = null);
     this.log(`Fragment ${frag.sn} of level ${frag.level} was aborted, flushing transmuxer & resetting nextLoadPosition to ${this.nextLoadPosition}`);
+  }
+
+  private updateLevelTiming (frag, currentLevel) {
+    const { details } = currentLevel;
+    Object.keys(frag.elementaryStreams).forEach(type => {
+      const info = frag.elementaryStreams[type];
+      if (info) {
+        const drift = LevelHelper.updateFragPTSDTS(details, frag, info.startPTS, info.endPTS, info.startDTS, info.endDTS);
+        this.hls.trigger(Event.LEVEL_PTS_UPDATED, {
+          details,
+          level: currentLevel,
+          drift,
+          type,
+          start: info.startPTS,
+          end: info.endPTS
+        });
+      }
+    });
   }
 
   set state (nextState) {
@@ -315,5 +340,13 @@ export default class BaseStreamController extends TaskLoop {
 
   get state () {
     return this._state;
+  }
+
+  protected log (msg) {
+    logger.log(`${this.logPrefix}: ${msg}`);
+  }
+
+  protected warn (msg) {
+    logger.warn(`${this.logPrefix}: ${msg}`);
   }
 }
