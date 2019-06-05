@@ -107,6 +107,7 @@ export default class TransmuxerInterface {
     const lastFrag = this.frag;
 
     if (startingNewTransmuxSession(currentTransmuxSession, chunkMeta)) {
+      frag.stats.parsing.start = performance.now();
       const discontinuity = !(lastFrag && (frag.cc === lastFrag.cc));
       const trackSwitch = !(lastFrag && (frag.level === lastFrag.level));
       const nextSN = !!(lastFrag && (frag.sn === (lastFrag.sn as number + 1)));
@@ -155,6 +156,7 @@ export default class TransmuxerInterface {
   flush (chunkMeta: ChunkMetadata) {
     const { transmuxer, worker } = this;
     this.currentTransmuxSession = null;
+    chunkMeta.transmuxing.start = performance.now();
     if (worker) {
       worker.postMessage({
         cmd: 'flush',

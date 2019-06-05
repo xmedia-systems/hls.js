@@ -7,9 +7,10 @@ import EventHandler from '../event-handler';
 import { logger } from '../utils/logger';
 import { ErrorDetails, ErrorTypes } from '../errors';
 import { getMediaSource } from '../utils/mediasource-helper';
+import Fragment from '../loader/fragment';
 
 import { TrackSet } from '../types/track';
-import { Segment } from '../types/segment';
+import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
 import { ElementaryStreamTypes } from '../loader/fragment';
 import BufferOperationQueue from './buffer-operation-queue';
 
@@ -20,6 +21,7 @@ import {
   SourceBufferName,
   SourceBufferListener
 } from '../types/buffer';
+import { ChunkMetadata } from '../types/transmuxer';
 
 const MediaSource = getMediaSource();
 
@@ -39,6 +41,7 @@ export default class BufferController extends EventHandler {
   private listeners: { [key in SourceBufferName]: Array<SourceBufferListener> } = {
     audio: [],
     video: [],
+    audiovideo: []
   };
 
   // this is optional because this property is removed from the class sometimes
@@ -173,7 +176,8 @@ export default class BufferController extends EventHandler {
     this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
     this.listeners = {
       audio: [],
-      video: []
+      video: [],
+      audiovideo: []
     };
   }
 
@@ -194,25 +198,39 @@ export default class BufferController extends EventHandler {
     }
   }
 
-  onBufferAppending (data: Segment) {
+  onBufferAppending (eventData: BufferAppendingEventPayload) {
     const { hls, operationQueue } = this;
-    const type = data.type;
+    const { data, type, frag, chunkMeta } = eventData;
+    const chunkStats = chunkMeta.buffering;
+    const fragStats = frag.stats;
+    const now = performance.now();
+    chunkStats.start = now;
+    if (!frag.stats.buffering.start) {
+      frag.stats.buffering.start = now;
+    }
 
     const operation: BufferOperation = {
-      execute: this.appendExecuteor.bind(this, data, type),
+      execute: () => {
+        chunkStats.executeStart = performance.now();
+        this.appendExecuteor(data, type);
+      },
       onComplete: () => {
+        chunkStats.executeEnd = chunkStats.end = performance.now();
+        fragStats.buffering.cumulative += (chunkStats.end - chunkStats.start);
+        fragStats.buffering.executeCumulative += (chunkStats.executeEnd - chunkStats.executeStart);
+
         const { sourceBuffer } = this;
         const timeRanges = {};
         for (let type in sourceBuffer) {
           timeRanges[type] = sourceBuffer[type].buffered;
         }
         this.appendError = 0;
-        this.hls.trigger(Events.BUFFER_APPENDED, { parent: data.parent, timeRanges });
+        this.hls.trigger(Events.BUFFER_APPENDED, { parent: frag.type, timeRanges, chunkMeta });
       },
       onError: (err) => {
         // in case any error occured while appending, put back segment in segments table
         logger.error(`[buffer-controller]: Error encountered while trying to append to the ${type} SourceBuffer`, err);
-        const event = { type: ErrorTypes.MEDIA_ERROR, parent: data.parent, details: '', fatal: false };
+        const event = { type: ErrorTypes.MEDIA_ERROR, parent: frag.type, details: '', fatal: false };
         if (err.code === 22) {
           // TODO: Should queues be cleared on this error?
           // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
@@ -253,7 +271,8 @@ export default class BufferController extends EventHandler {
     }
   }
 
-  onFragParsed ({ frag }) {
+  onFragParsed (data: { frag: Fragment }) {
+    const { frag } = data;
     let buffersAppendedTo: Array<SourceBufferName> = [];
 
     if (frag.elementaryStreams[ElementaryStreamTypes.AUDIO]) {
@@ -266,7 +285,7 @@ export default class BufferController extends EventHandler {
 
     logger.log(`[buffer-controller]: All fragment chunks received, enqueueing operation to signal fragment buffered`);
     const onUnblocked = () => {
-      frag.stats.tbuffered = window.performance.now();
+      frag.stats.buffering.end = window.performance.now();
       this.hls.trigger(Events.FRAG_BUFFERED, { frag, stats: frag.stats, id: frag.type });
     };
     this.blockBuffers(onUnblocked, buffersAppendedTo);
@@ -537,7 +556,7 @@ export default class BufferController extends EventHandler {
   }
 
   // This method must result in an updateend event; if append is not called, _onSBUpdateEnd must be called manually
-  private appendExecuteor (segment: Segment, type: SourceBufferName) {
+  private appendExecuteor (data: Uint8Array, type: SourceBufferName) {
     const { operationQueue, sourceBuffer } = this;
     const sb = sourceBuffer[type];
     if (!sb) {
@@ -548,7 +567,7 @@ export default class BufferController extends EventHandler {
 
     sb.ended = false;
     console.assert(!sb.updating, `${type} sourceBuffer must not be updating`);
-    sb.appendBuffer(segment.data);
+    sb.appendBuffer(data);
   }
 
   // SourceBuffers can be aborted while the updating flag is true, but only if it is because of an append operation -
