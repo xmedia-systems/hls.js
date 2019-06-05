@@ -20,7 +20,8 @@ import EMEController from './controller/eme-controller';
 
 import { requestMediaKeySystemAccess } from './utils/mediakeys-helper';
 
-const loader = fetchSupported() ? FetchLoader : XhrLoader;
+const canStreamProgressively = fetchSupported();
+const loader = canStreamProgressively ? FetchLoader : XhrLoader;
 
 export const hlsDefaultConfig = {
   autoStartLoad: true, // used by stream-controller
@@ -47,7 +48,7 @@ export const hlsDefaultConfig = {
   liveBackBufferLength: Infinity, // used by buffer-controller
   maxMaxBufferLength: 600, // used by stream-controller
   enableWorker: true, // used by demuxer
-  enableSoftwareAES: true, // used by decrypter
+  enableSoftwareAES: canStreamProgressively, // used by decrypter
   manifestLoadingTimeOut: 10000, // used by playlist-loader
   manifestLoadingMaxRetry: 1, // used by playlist-loader
   manifestLoadingRetryDelay: 1000, // used by playlist-loader
