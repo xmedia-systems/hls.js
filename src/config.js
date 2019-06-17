@@ -34,7 +34,6 @@ export const hlsDefaultConfig = {
   maxBufferLength: 30, // used by stream-controller
   maxBufferSize: 60 * 1000 * 1000, // used by stream-controller
   maxBufferHole: 0.5, // used by stream-controller
-
   lowBufferWatchdogPeriod: 0.5, // used by stream-controller
   highBufferWatchdogPeriod: 3, // used by stream-controller
   nudgeOffset: 0.1, // used by stream-controller
@@ -71,7 +70,7 @@ export const hlsDefaultConfig = {
   pLoader: void 0, // used by playlist-loader
   xhrSetup: void 0, // used by xhr-loader
   licenseXhrSetup: void 0, // used by eme-controller
-  // fetchSetup: void 0,
+  fetchSetup: void 0,
   abrController: AbrController,
   bufferController: BufferController,
   capLevelController: CapLevelController,
