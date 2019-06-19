@@ -18,8 +18,8 @@ export default class Decrypter {
   private disableWebCrypto: boolean;
   private subtle: boolean = false;
   private softwareDecrypter: AESDecryptor | null = null;
-  private key: any | null = null;
-  private fastAesKey: any | null = null;
+  private key: ArrayBuffer | null = null;
+  private fastAesKey: FastAESKey | null = null;
   private remainderData: Uint8Array | null = null;
   private currentIV: ArrayBuffer | null = null;
   private currentResult: ArrayBuffer | null = null;
@@ -124,7 +124,7 @@ export default class Decrypter {
 
   private webCryptoDecrypt (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer, callback: (buffer: ArrayBuffer) => void): void  {
     const subtle = this.subtle;
-    if (this.key !== key) {
+    if (this.key !== key || !this.fastAesKey) {
       this.key = key;
       this.fastAesKey = new FastAESKey(subtle, key);
     }
