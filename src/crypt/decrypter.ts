@@ -25,7 +25,6 @@ export default class Decrypter {
   private currentResult: ArrayBuffer | null = null;
 
   constructor (observer, config, { removePKCS7Padding = true } = {}) {
-    this.logEnabled = true;
     this.observer = observer;
     this.config = config;
     this.removePKCS7Padding = removePKCS7Padding;
