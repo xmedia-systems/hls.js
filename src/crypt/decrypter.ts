@@ -49,7 +49,6 @@ export default class Decrypter {
     // Only software decryption works for progressive parsing. On construction of Hls.js, enableSoftwareAES is set to
     // true if using the progressive Fetch loader
     if (config.enableSoftwareAES) {
-      this.logOnce('JS AES decrypt');
       this.decryptProgressively(data, key, iv, callback);
     } else {
       this.logOnce('WebCrypto AES decrypt');
@@ -87,17 +86,13 @@ export default class Decrypter {
     }
   }
 
-  private decryptProgressively (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer, callback: (buffer: ArrayBuffer) => void): void {
+  public softwareDecrypt (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer): Uint8Array | null {
     let { currentIV, currentResult, softwareDecrypter, remainderData } = this;
-
+    this.logOnce('JS AES decrypt');
     // The output is staggered during progressive parsing - the current result is cached, and emitted on the next call
     // This is done in order to strip PKCS7 padding, which is found at the end of each segment. We only know we've reached
     // the end on flush(), but by that time we have already received all bytes for the segment.
     // Progressive decryption does not work with WebCrypto
-    if (currentResult) {
-      callback(currentResult);
-      this.currentResult = null;
-    }
 
     if (remainderData) {
       data = appendUint8Array(remainderData, data);
@@ -107,7 +102,7 @@ export default class Decrypter {
     // Byte length must be a multiple of 16 (AES-128 = 128 bit blocks = 16 bytes)
     const currentChunk = this.getValidChunk(data);
     if (!currentChunk.length) {
-      return;
+      return null;
     }
 
     if (currentIV) {
@@ -117,30 +112,32 @@ export default class Decrypter {
       softwareDecrypter = this.softwareDecrypter = new AESDecryptor();
     }
     softwareDecrypter.expandKey(key);
+
+    const result = currentResult;
+
     this.currentResult = softwareDecrypter.decrypt(currentChunk.buffer, 0, iv);
     this.currentIV = currentChunk.slice(-16).buffer;
+
+    return new Uint8Array(result);
   }
 
-  private webCryptoDecrypt (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer, callback: (buffer: ArrayBuffer) => void): void  {
+  public webCryptoDecrypt (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer): Promise<ArrayBuffer>  {
     const subtle = this.subtle;
     if (this.key !== key || !this.fastAesKey) {
       this.key = key;
       this.fastAesKey = new FastAESKey(subtle, key);
     }
-    this.fastAesKey.expandKey()
+    return this.fastAesKey.expandKey()
       .then((aesKey) => {
         // decrypt using web crypto
-        let crypto = new AESCrypto(subtle, iv);
-        crypto.decrypt(data.buffer, aesKey)
+        const crypto = new AESCrypto(subtle, iv);
+        return crypto.decrypt(data.buffer, aesKey)
           .catch((err) => {
-            this.onWebCryptoError(err, data, key, iv, callback);
+            return this.onWebCryptoError(err, data, key, iv);
           })
-          .then((result) => {
-            callback(result);
-          });
       })
       .catch((err) => {
-        this.onWebCryptoError(err, data, key, iv, callback);
+        return this.onWebCryptoError(err, data, key, iv);
       });
   }
 
