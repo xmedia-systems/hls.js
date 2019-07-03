@@ -165,16 +165,19 @@ export default class TransmuxerInterface {
       if (transmuxResult.then) {
         // @ts-ignore
         transmuxResult.then(data => {
-          this.onTransmuxComplete(data);
-          this.onFlush(transmuxIdentifier);
+          this.handleFlushResult(data, transmuxIdentifier);
         });
       } else {
-        (transmuxResult as Array<TransmuxerResult>).forEach(result => {
-          this.onTransmuxComplete(result);
-        });
-        this.onFlush(transmuxIdentifier);
+        this.handleFlushResult(transmuxResult as Array<TransmuxerResult>, transmuxIdentifier);
       }
     }
+  }
+
+  private handleFlushResult (results: Array<TransmuxerResult>, transmuxIdentifier: TransmuxIdentifier) {
+    results.forEach(result => {
+      this.onTransmuxComplete(result);
+    });
+    this.onFlush(transmuxIdentifier);
   }
 
   private onWorkerMessage (ev: any): void {

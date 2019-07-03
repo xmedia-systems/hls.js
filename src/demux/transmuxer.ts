@@ -74,9 +74,9 @@ export default class Transmuxer {
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
     let uintData = new Uint8Array(data);
-    const encryptionType = getEncryptionType(uintData, decryptdata);
     const { cache, config, currentTransmuxState: state, transmuxConfig } = this;
 
+    const encryptionType = getEncryptionType(uintData, decryptdata);
     if (encryptionType === 'AES-128') {
       const decrypter = this.getDecrypter();
       // Software decryption is synchronous; webCrypto is not
@@ -141,13 +141,14 @@ export default class Transmuxer {
   }
 
   // Due to data caching, flush calls can produce more than one TransmuxerResult (hence the Array type)
-  flush (transmuxIdentifier: TransmuxIdentifier) : Array<TransmuxerResult> | Promise<TransmuxerResult>  {
+  flush (transmuxIdentifier: TransmuxIdentifier) : Array<TransmuxerResult> | Promise<TransmuxerResult> {
     const { decrypter, cache, currentTransmuxState, decryptionPromise, observer } = this;
     const transmuxResults: Array<TransmuxerResult> = [];
 
     if (decryptionPromise) {
       // Upon resolution, the decryption promise calls push() and returns its TransmuxerResult up the stack. Therefore
       // only flushing is required for async decryption
+      // @ts-ignore
       return decryptionPromise.then(() => {
         return this.flush(transmuxIdentifier);
       });

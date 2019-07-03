@@ -15,7 +15,6 @@ export default class Decrypter {
   private observer: any;
   private config: any;
   private removePKCS7Padding: boolean;
-  private disableWebCrypto: boolean;
   private subtle: boolean = false;
   private softwareDecrypter: AESDecryptor | null = null;
   private key: ArrayBuffer | null = null;
@@ -37,23 +36,10 @@ export default class Decrypter {
         }
       } catch (e) {}
     }
-    this.disableWebCrypto = !this.subtle || config.enableSoftwareAES;
   }
 
   isSync () {
-    return (this.disableWebCrypto && this.config.enableSoftwareAES);
-  }
-
-  decrypt (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer, callback: (buffer: ArrayBuffer) => void): void {
-    const { config } = this;
-    // Only software decryption works for progressive parsing. On construction of Hls.js, enableSoftwareAES is set to
-    // true if using the progressive Fetch loader
-    if (config.enableSoftwareAES) {
-      this.decryptProgressively(data, key, iv, callback);
-    } else {
-      this.logOnce('WebCrypto AES decrypt');
-      this.webCryptoDecrypt(data, key, iv, callback);
-    }
+    return  this.config.enableSoftwareAES;
   }
 
   flush (): Uint8Array | void {
@@ -68,13 +54,6 @@ export default class Decrypter {
     }
     this.reset();
     return new Uint8Array(data);
-  }
-
-  onWebCryptoError (err, data, key, iv, callback) {
-    logger.warn('[decrypter.ts]: WebCrypto Error, disable WebCrypto API');
-    this.disableWebCrypto = true;
-    this.logEnabled = true;
-    this.decrypt(data, key, iv, callback);
   }
 
   reset () {
@@ -118,6 +97,9 @@ export default class Decrypter {
     this.currentResult = softwareDecrypter.decrypt(currentChunk.buffer, 0, iv);
     this.currentIV = currentChunk.slice(-16).buffer;
 
+    if (!result) {
+      return null;
+    }
     return new Uint8Array(result);
   }
 
@@ -140,6 +122,14 @@ export default class Decrypter {
         return this.onWebCryptoError(err, data, key, iv);
       });
   }
+
+  private onWebCryptoError (err, data, key, iv)  {
+    logger.warn('[decrypter.ts]: WebCrypto Error, disable WebCrypto API:', err);
+    this.config.enableSoftwareAES = true;
+    this.logEnabled = true;
+    return this.softwareDecrypt(data, key, iv);
+  }
+
 
   private getValidChunk (data: Uint8Array) : Uint8Array {
     let currentChunk = data;
