@@ -39,7 +39,7 @@ export default class Decrypter {
   }
 
   isSync () {
-    return  this.config.enableSoftwareAES;
+    return this.config.enableSoftwareAES;
   }
 
   flush (): Uint8Array | void {
