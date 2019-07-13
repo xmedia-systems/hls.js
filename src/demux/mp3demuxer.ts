@@ -22,6 +22,9 @@ class MP3Demuxer implements Demuxer {
   resetTimeStamp () {
   }
 
+  resetContiguity (): void {
+  }
+
   static probe (data) {
     // check if data contains ID3 timestamp and MPEG sync word
     let offset, length;
