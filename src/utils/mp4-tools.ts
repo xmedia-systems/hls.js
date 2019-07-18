@@ -286,7 +286,19 @@ export function getStartDTS (initData, fragment) {
   return isFinite(result) ? result : 0;
 }
 
-// TODO: Handle non-constant sample duration
+/*
+  For Reference:
+  aligned(8) class TrackFragmentHeaderBox
+           extends FullBox(‘tfhd’, 0, tf_flags){
+     unsigned int(32)  track_ID;
+     // all the following are optional fields
+     unsigned int(64)  base_data_offset;
+     unsigned int(32)  sample_description_index;
+     unsigned int(32)  default_sample_duration;
+     unsigned int(32)  default_sample_size;
+     unsigned int(32)  default_sample_flags
+  }
+ */
 export function getDuration (data, initData) {
   let duration = 0;
   const trafs = findBox(data, ['moof', 'traf']);
@@ -298,10 +310,16 @@ export function getDuration (data, initData) {
 
     const tfhdFlags = readUint32(tfhd, 0);
     let sampleDuration;
-    if (tfhdFlags & 0x00002) {
-      sampleDuration = readUint32(tfhd, 12);
-    } else {
-      sampleDuration = readUint32(tfhd, 8);
+    if (tfhdFlags & 0x000008) {
+      // 0x000008 indicates the presence of the default_sample_duration field
+      if (tfhdFlags & 0x000002) {
+        // 0x000002 indicates the presence of the sample_description_index field, which precedes default_sample_duration
+        // If present, the default_sample_duration exists at byte offset 12
+        sampleDuration = readUint32(tfhd, 12);
+      } else {
+        // Otherwise, the duration is at byte offset 8
+        sampleDuration = readUint32(tfhd, 8);
+      }
     }
 
     const id = readUint32(tfhd, 4);
