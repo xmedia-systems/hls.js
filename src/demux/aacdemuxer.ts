@@ -116,7 +116,7 @@ class AACDemuxer implements Demuxer {
         offset++;
       }
       // At end of fragment, if there is remaining data, append everything since last useable data to cache.
-      if (offset === length && lastDataIndex !== length) {
+      if (lastDataIndex !== length) {
           let partialData = data.slice(lastDataIndex);
           this.cachedData = appendUint8Array(this.cachedData, partialData);
       }
