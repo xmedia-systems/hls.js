@@ -84,6 +84,7 @@ class MP3Demuxer implements Demuxer {
           offset += frame.length;
           pts = frame.sample.pts;
           this.frameIndex++;
+          lastDataIndex = offset;
         } else {
           let partialData = data.slice(offset);
 
@@ -94,12 +95,17 @@ class MP3Demuxer implements Demuxer {
         id3Data = ID3.getID3Data(data, offset);
         id3Track.samples.push({ pts: pts, dts: pts, data: id3Data });
         offset += id3Data.length;
+        lastDataIndex = offset;
       } else {
         let partialData = data.slice(offset);
 
         this.cachedData = appendUint8Array(this.cachedData, partialData);
         offset += partialData.length;
       }
+      if (offset === length && lastDataIndex !== length) {
+        let partialData = data.slice(lastDataIndex);
+        this.cachedData = appendUint8Array(this.cachedData, partialData);
+    }
     }
 
     return {
