@@ -105,7 +105,7 @@ class MP3Demuxer implements Demuxer {
       if (lastDataIndex !== length) {
         let partialData = data.slice(lastDataIndex);
         this.cachedData = appendUint8Array(this.cachedData, partialData);
-    }
+      }
     }
 
     return {
