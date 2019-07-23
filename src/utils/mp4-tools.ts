@@ -300,11 +300,12 @@ export function getStartDTS (initData, fragment) {
   }
  */
 export function getDuration (data, initData) {
+  let rawDuration = 0;
   let duration = 0;
   const trafs = findBox(data, ['moof', 'traf']);
   for (let i = 0; i < trafs.length; i++) {
     const traf = trafs[i];
-    // There must be only one tfhd & trun per traf
+    // There is only one tfhd & trun per traf
     const tfhd = findBox(traf, ['tfhd'])[0];
     const trun = findBox(traf, ['trun'])[0];
 
@@ -320,13 +321,74 @@ export function getDuration (data, initData) {
         // Otherwise, the duration is at byte offset 8
         sampleDuration = readUint32(tfhd, 8);
       }
+      const sampleCount = readUint32(trun, 4);
+      rawDuration += sampleDuration * sampleCount;
+    } else {
+      rawDuration = computeRawDurationFromSamples(trun);
     }
 
     const id = readUint32(tfhd, 4);
     const scale = initData[id].timescale || 90e3;
-    const sampleCount = readUint32(trun, 4);
+    duration += rawDuration / scale;
+  }
+  return duration;
+}
 
-    duration += ((sampleDuration * sampleCount) / scale);
+/*
+  For Reference:
+  aligned(8) class TrackRunBox
+           extends FullBox(‘trun’, version, tr_flags) {
+     unsigned int(32)  sample_count;
+     // the following are optional fields
+     signed int(32) data_offset;
+     unsigned int(32)  first_sample_flags;
+     // all fields in the following array are optional
+     {
+        unsigned int(32)  sample_duration;
+        unsigned int(32)  sample_size;
+        unsigned int(32)  sample_flags
+        if (version == 0)
+           { unsigned int(32)
+        else
+           { signed int(32)
+     }[ sample_count ]
+  }
+ */
+export function computeRawDurationFromSamples (trun): number {
+  const flags = readUint32(trun, 0);
+  // Flags are at offset 0, non-optional sample_count is at offset 4. Therefore we start 8 bytes in.
+  // Each field is an int32, which is 4 bytes
+  let offset = 8;
+  // data-offset-present flag
+  if (flags & 0x000001) {
+    offset += 4;
+  }
+  // first-sample-flags-present flag
+  if (flags & 0x000004) {
+    offset += 4;
+  }
+
+  let duration = 0;
+  const sampleCount = readUint32(trun, 4);
+  for (let i = 0; i < sampleCount; i++) {
+    // sample-duration-present flag
+    if (flags & 0x000100) {
+      const sampleDuration = readUint32(trun, offset);
+      duration += sampleDuration;
+      offset += 4;
+    }
+    // sample-size-present flag
+    if (flags & 0x000200) {
+      offset += 4;
+    }
+    // sample-flags-present flag
+    if (flags & 0x000400) {
+      offset += 4;
+    }
+    // sample-composition-time-offsets-present flag
+    if (flags & 0x000800) {
+      offset += 4;
+    }
   }
   return duration;
 }
