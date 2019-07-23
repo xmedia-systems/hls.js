@@ -102,7 +102,7 @@ class MP3Demuxer implements Demuxer {
         this.cachedData = appendUint8Array(this.cachedData, partialData);
         offset += partialData.length;
       }
-      if (lastDataIndex !== length) {
+      if (offset === length && lastDataIndex !== length) {
         let partialData = data.slice(lastDataIndex);
         this.cachedData = appendUint8Array(this.cachedData, partialData);
       }
