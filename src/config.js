@@ -116,9 +116,10 @@ export function mergeConfig (defaultConfig, passedConfig) {
 const canStreamProgressively = fetchSupported();
 export function setStreamingMode (config, allowProgressive) {
   const currentLoader = config.loader;
-  if (currentLoader !== FetchLoader || currentLoader !== XhrLoader) {
+  if (currentLoader !== FetchLoader && currentLoader !== XhrLoader) {
     // If a developer has configured their own loader, respect that choice
     logger.log('[config]: Custom loader detected, cannot enable progressive streaming');
+    config.progressive = false;
     return;
   }
 
