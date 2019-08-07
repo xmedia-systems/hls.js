@@ -1,6 +1,6 @@
 import { DemuxedTrack } from '../types/demuxer';
 
-export const dummyTrack = () : DemuxedTrack => ({
+export const dummyTrack: DemuxedTrack = Object.freeze({
   type: '',
   id: -1,
   pid: -1,
