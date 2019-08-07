@@ -149,4 +149,3 @@ if (__USE_ALT_AUDIO__) {
 if (__USE_EME_DRM__) {
   hlsDefaultConfig.emeController = EMEController;
 }
-
