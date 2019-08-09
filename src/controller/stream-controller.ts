@@ -534,8 +534,9 @@ export default class StreamController extends BaseStreamController {
     // this.log(`Transmuxing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
     const transmuxer = this.transmuxer = this.transmuxer ||
           new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
-    const transmuxIdentifier = { level: frag.level, sn: frag.sn };
+    const transmuxIdentifier = { level: frag.level, sn: frag.sn, start: performance.now(), end: 0 };
 
+    console.log('>>> tick');
     transmuxer.push(
       payload,
       initSegmentData,
@@ -846,12 +847,18 @@ export default class StreamController extends BaseStreamController {
     const { hls } = this;
     const { remuxResult, transmuxIdentifier } = transmuxResult;
 
+    transmuxIdentifier.end = performance.now();
+    console.log('>>> tock');
+
     const context = this.getCurrentContext(transmuxIdentifier);
     if (!context) {
       this.warn(`The loading context changed while buffering fragment ${transmuxIdentifier.sn} of level ${transmuxIdentifier.level}. This chunk will not be buffered.`);
       return;
     }
     const { frag, level } = context;
+    const stats = frag.stats;
+    stats.parseCumulative += (transmuxIdentifier.end - transmuxIdentifier.start);
+    console.log('>>> parseInstance', transmuxIdentifier.end - transmuxIdentifier.start, stats.parseCumulative);
 
     let { audio, video, text, id3, initSegment } = remuxResult;
     // The audio-stream-controller handles audio buffering if Hls.js is playing an alternate audio track

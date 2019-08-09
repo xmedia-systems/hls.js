@@ -6,5 +6,7 @@ export interface TransmuxerResult {
 }
 export interface TransmuxIdentifier {
     sn: number
-    level: number
+    level: number,
+    start: number,
+    end: number
 }

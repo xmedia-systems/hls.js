@@ -43,8 +43,6 @@ export interface LoaderStats {
   tfirst: number
   // performance.now() on load complete
   tload: number
-  // performance.now() on transmux start
-  tparsing: number
   // performance.now() on transmux complete
   tparsed: number
   // performance.now() on fragment buffered
@@ -57,8 +55,8 @@ export interface LoaderStats {
   retry: number,
   // the request was cancelled or timed out
   aborted: boolean,
-  // The bandwidth estimate recorded while the download was occurring
-  bwEstimate: number
+  lastParseStart: number | null
+  parseCumulative: number
 }
 
 type LoaderOnSuccess < T extends LoaderContext > = (

@@ -178,7 +178,7 @@ export default class BaseStreamController extends TaskLoop {
         compatibilityEventData.frag = frag;
         this.hls.trigger(Event.FRAG_LOADED, compatibilityEventData);
         // Pass through the whole payload; controllers not implementing progressive loading receive data from this callback
-        this._handleFragmentLoadComplete(frag, data.payload);
+        this._handleFragmentLoadComplete(frag);
       });
   }
 
@@ -209,12 +209,12 @@ export default class BaseStreamController extends TaskLoop {
     return frag.level !== fragCurrent.level || frag.sn !== fragCurrent.sn;
   }
 
-  protected _handleFragmentLoadComplete (frag, payload?: ArrayBuffer) {
+  protected _handleFragmentLoadComplete (frag) {
     const { transmuxer } = this;
     if (!transmuxer) {
       return;
     }
-    transmuxer.flush({ level: frag.level, sn: frag.sn });
+    transmuxer.flush({ level: frag.level, sn: frag.sn, start: performance.now(), end: 0 });
   }
 
   protected _handleFragmentLoadProgress (frag, payload) {}
@@ -247,7 +247,6 @@ export default class BaseStreamController extends TaskLoop {
       return;
     }
     const { frag, level } = context;
-    frag.stats.tparsed = window.performance.now();
 
     this.updateLevelTiming(frag, level);
     this.state = State.PARSED;
@@ -547,7 +546,7 @@ export default class BaseStreamController extends TaskLoop {
       this.nextLoadPosition = this.lastCurrentTime;
     }
     if (transmuxer && frag.sn !== 'initSegment') {
-      transmuxer.flush({ sn: frag.sn, level: frag.level });
+      transmuxer.flush({ sn: frag.sn, level: frag.level, start: performance.now(), end: 0 });
     }
 
     Object.keys(frag.elementaryStreams).forEach(type => frag.elementaryStreams[type] = null);

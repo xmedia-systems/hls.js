@@ -140,7 +140,7 @@ class PerformanceAnalyzer {
   private onFragBuffered (e: string, data: { frag: Fragment, stats: LoaderStats }) {
     const { frag, stats } = data;
     const tLoad = stats.tload - stats.trequest;
-    const tTransmux = stats.tparsed - stats.tparsing;
+    const tParse = stats.parseCumulative;
     const tTotal = stats.tbuffered - stats.trequest;
     const tBuffer = stats.tbuffered - stats.tparsed;
 
@@ -149,7 +149,7 @@ class PerformanceAnalyzer {
       SN: ${frag.sn},
       Size: ${(stats.total / 1024)} kB,
       Load time: ${tLoad},
-      Transmux time: ${tTransmux},
+      parse time: ${tParse},
       Buffer time: ${tBuffer},
       Total: ${tTotal}
     `);
@@ -176,7 +176,8 @@ interface Measurement {
 
 const mediaElement = document.querySelector('video');
 const hlsInstance = new Hls({
-  progressive: true
+  progressive: true,
+  debug: true
 });
 const analyzer = new PerformanceAnalyzer(hlsInstance, mediaElement);
 analyzer.setup();

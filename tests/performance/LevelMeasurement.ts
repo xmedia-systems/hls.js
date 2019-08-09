@@ -18,7 +18,7 @@ export default class LevelMeasurement {
 
   updateFragmentMeasures (stats: LoaderStats) {
     this.fragLoadCMA.update(stats.tload - stats.trequest);
-    this.fragParseCMA.update(stats.tparsed - stats.tparsing);
+    this.fragParseCMA.update(stats.parseCumulative);
     this.fragBufferCMA.update(stats.tbuffered - stats.tparsed);
     this.fragTotalCMA.update(stats.tbuffered - stats.trequest);
 

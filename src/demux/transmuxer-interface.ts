@@ -122,7 +122,6 @@ export default class TransmuxerInterface {
       const config = new TransmuxConfig(audioCodec, videoCodec, new Uint8Array(initSegment), duration, defaultInitPTS);
       const state = new TransmuxState(discontinuity, contiguous, accurateTimeOffset, trackSwitch, timeOffset);
       this.configureTransmuxer(config, state);
-      frag.stats.tparsing = performance.now();
     }
 
     this.frag = frag;
