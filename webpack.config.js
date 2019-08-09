@@ -215,6 +215,24 @@ const multiConfig = [
     },
     plugins: mainPlugins,
     devtool: 'source-map'
+  },
+  {
+    name: 'performance',
+    entry: './tests/performance/performance-analyzer',
+    mode: 'development',
+    output: {
+      filename: 'hls-performance-analyzer.js',
+      chunkFilename: '[name].js',
+      sourceMapFilename: 'hls-performance-analyzer.js.map',
+      path: path.resolve(__dirname, 'tests/performance/dist/'),
+      publicPath: '/tests/performance/dist/',
+      library: 'HlsPerformanceAnalyzer',
+      libraryTarget: 'umd',
+      libraryExport: 'default',
+      globalObject: 'this'
+    },
+    plugins: mainPlugins,
+    devtool: 'source-map'
   }
 ].map(config => merge(baseConfig, config));
 

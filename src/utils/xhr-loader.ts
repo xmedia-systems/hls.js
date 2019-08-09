@@ -89,9 +89,6 @@ class XhrLoader implements Loader<LoaderContext> {
 
     xhr.onreadystatechange = this.readystatechange.bind(this);
     xhr.responseType = context.responseType as XMLHttpRequestResponseType;
-    if (this.callbacks.onProgress) {
-      xhr.onprogress = this.loadprogress.bind(this);
-    }
     // setup timeout before we perform request
     this.requestTimeout = window.setTimeout(this.loadtimeout.bind(this), this.config.timeout);
     xhr.send();
@@ -170,19 +167,6 @@ class XhrLoader implements Loader<LoaderContext> {
     logger.warn(`timeout while loading ${this.context.url}`);
     this.abortInternal();
     this.callbacks.onTimeout(this.stats, this.context, this.loader);
-  }
-
-  loadprogress (event): void {
-    const xhr = event.currentTarget;
-    const stats = this.stats;
-    const data = (this.context.responseType === 'arraybuffer') ? new ArrayBuffer(0) : '';
-
-    stats.loaded = event.loaded;
-    if (event.lengthComputable) {
-      stats.total = event.total;
-    }
-    const onProgress = this.callbacks.onProgress as Function;
-    onProgress(stats, this.context, data, xhr);
   }
 
   getResponseHeader(name: string): string | null {

@@ -8,6 +8,7 @@ export default class LoadStats implements LoaderStats {
   tfirst: number = 0;
   tload: number = 0;
   total: number = 0;
+  tparsing: number = 0;
   tparsed: number = 0;
   trequest: number = 0;
   bwEstimate: number = 0;

@@ -535,6 +535,7 @@ export default class StreamController extends BaseStreamController {
     const transmuxer = this.transmuxer = this.transmuxer ||
           new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
     const transmuxIdentifier = { level: frag.level, sn: frag.sn };
+
     transmuxer.push(
       payload,
       initSegmentData,

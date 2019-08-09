@@ -43,7 +43,9 @@ export interface LoaderStats {
   tfirst: number
   // performance.now() on load complete
   tload: number
-  // performance.now() on parse completion
+  // performance.now() on transmux start
+  tparsing: number
+  // performance.now() on transmux complete
   tparsed: number
   // performance.now() on fragment buffered
   tbuffered: number

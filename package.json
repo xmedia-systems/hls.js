@@ -21,6 +21,7 @@
     "build:debug": "webpack --progress --env.debug",
     "build:watch": "webpack --progress --env.debug --watch",
     "build:types": "tsc --emitDeclarationOnly",
+    "build:performance": "webpack --env.performance",
     "dev": "webpack-dev-server --progress --env.debug --port 8000",
     "docs": "esdoc",
     "lint": "eslint src/ && eslint tests/",
