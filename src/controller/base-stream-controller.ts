@@ -203,7 +203,7 @@ export default class BaseStreamController extends TaskLoop {
       });
   }
 
-  protected _fragLoadAborted (frag) {
+  protected _fragLoadAborted (frag: Fragment | null) {
     const { fragCurrent } = this;
     if (!frag || !fragCurrent) {
       return true;
@@ -560,7 +560,7 @@ export default class BaseStreamController extends TaskLoop {
     this.log(`Fragment ${frag.sn} of level ${frag.level} was aborted, flushing transmuxer & resetting nextLoadPosition to ${this.nextLoadPosition}`);
   }
 
-  private updateLevelTiming (frag, currentLevel) {
+  private updateLevelTiming (frag: Fragment, currentLevel) {
     const { details } = currentLevel;
     Object.keys(frag.elementaryStreams).forEach(type => {
       const info = frag.elementaryStreams[type];

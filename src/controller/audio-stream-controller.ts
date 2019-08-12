@@ -5,7 +5,7 @@ import TimeRanges from '../utils/time-ranges';
 import { ErrorDetails, ErrorTypes } from '../errors';
 import { logger } from '../utils/logger';
 import { FragmentState } from './fragment-tracker';
-import { ElementaryStreamTypes } from '../loader/fragment';
+import Fragment, { ElementaryStreamTypes } from '../loader/fragment';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
 import LevelDetails from '../loader/level-details';
@@ -342,7 +342,7 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  _handleFragmentLoadProgress (frag, payload) {
+  _handleFragmentLoadProgress (frag: Fragment, payload: Uint8Array) {
     const { config, trackId, levels } = this;
     if (!levels) {
       this.warn(`Audio tracks were reset while fragment load was in progress. Fragment ${frag.sn} of level ${frag.level} will not be buffered`);
@@ -368,7 +368,7 @@ class AudioStreamController extends BaseStreamController {
     // this.log(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
     // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
     let accurateTimeOffset = false; // details.PTSKnown || !details.live;
-    const transmuxIdentifier = { level: frag.level, sn: frag.sn, start: performance.now(), end: 0 };
+    const transmuxIdentifier = { level: frag.level, sn: frag.sn as number, start: performance.now(), end: 0 };
     transmuxer.push(payload, initSegmentData, audioCodec, '', frag, details.totalduration, accurateTimeOffset, transmuxIdentifier, initPTS);
   }
 
@@ -388,7 +388,7 @@ class AudioStreamController extends BaseStreamController {
     }
   }
 
-  onFragBuffered (data) {
+  onFragBuffered (data: { frag: Fragment }) {
     const { frag } = data;
     if (frag && frag.type !== 'audio') {
       return;
@@ -575,7 +575,7 @@ class AudioStreamController extends BaseStreamController {
     this.tick();
   }
 
-  private loadFragment (frag) {
+  private loadFragment (frag: Fragment) {
     // only load if fragment is not loaded or if in audio switch
     // we force a frag loading in audio switch as fragment tracker might not have evicted previous frags in case of quick audio switch
     const fragState = this.fragmentTracker.getState(frag);

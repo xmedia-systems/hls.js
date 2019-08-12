@@ -222,7 +222,7 @@ export default class StreamController extends BaseStreamController {
     }
   }
 
-  _loadKey (frag) {
+  _loadKey (frag: Fragment) {
     this.state = State.KEY_LOADING;
     this.hls.trigger(Event.KEY_LOADING, { frag });
   }
@@ -260,7 +260,7 @@ export default class StreamController extends BaseStreamController {
     return this.fragmentTracker.getBufferedFrag(position, PlaylistLoader.LevelType.MAIN);
   }
 
-  followingBufferedFrag (frag) {
+  followingBufferedFrag (frag: Fragment) {
     if (frag) {
       // try to get range of next fragment (500ms after this range)
       return this.getBufferedFrag(frag.endPTS + 0.5);
@@ -516,7 +516,7 @@ export default class StreamController extends BaseStreamController {
     }
   }
 
-  _handleFragmentLoadProgress (frag, payload) {
+  _handleFragmentLoadProgress (frag: Fragment, payload) {
     const { levels, media } = this;
     if (!levels) {
       this.warn(`Levels were reset while fragment load was in progress. Fragment ${frag.sn} of level ${frag.level} will not be buffered`);
@@ -534,7 +534,7 @@ export default class StreamController extends BaseStreamController {
     // this.log(`Transmuxing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
     const transmuxer = this.transmuxer = this.transmuxer ||
           new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
-    const transmuxIdentifier = { level: frag.level, sn: frag.sn, start: performance.now(), end: 0 };
+    const transmuxIdentifier = { level: frag.level, sn: frag.sn as number, start: performance.now(), end: 0 };
 
     // console.log('>>> tick');
     transmuxer.push(
@@ -962,7 +962,7 @@ export default class StreamController extends BaseStreamController {
     this.tick();
   }
 
-  private backtrack (frag, nextLoadPosition) {
+  private backtrack (frag: Fragment, nextLoadPosition: number) {
     // Return back to the IDLE state without appending to buffer
     // Causes findFragments to backtrack a segment and find the keyframe
     // Audio fragments arriving before video sets the nextLoadPosition, causing _findFragments to skip the backtracked fragment
@@ -1049,7 +1049,7 @@ export default class StreamController extends BaseStreamController {
   }
 }
 
-function _hasDroppedFrames (frag, dropped, startSN) {
+function _hasDroppedFrames (frag: Fragment, dropped: number, startSN: number) {
   // Detect gaps in a fragment  and try to fix it by finding a keyframe in the previous fragment (see _findFragments)
   if (dropped) {
     frag.dropped = dropped;
