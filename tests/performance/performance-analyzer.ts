@@ -140,19 +140,12 @@ class PerformanceAnalyzer {
     const tParse = stats.parsing.end - stats.parsing.start;
     const tTotal = stats.buffering.end - stats.loading.start;
 
-    console.log(`Fragment Stats:
-      Level: ${frag.level}
-      SN: ${frag.sn}
-      Size: ${((stats.total / 1024)).toFixed(3)} kB
-      Chunk Count: ${stats.chunkCount}
-      Load time: ${tLoad.toFixed(3)} ms
-      First Byte Delay: ${(stats.loading.firstByte - stats.loading.start).toFixed(3)} ms
-      Parse Time: ${(tParse).toFixed(3)} ms
-      Cumulative Transmux Time: ${(stats.parsing.cumulative).toFixed(3)} ms
-      Buffer Time: ${(tBuffer).toFixed(3)} ms
-      Total: ${(tTotal).toFixed(3)} ms
-    `);
-
+    console.log(`Fragment ${frag.sn} of level ${frag.level} stats:
+        First Byte -> Request: ${(stats.loading.firstByte - stats.loading.start).toFixed(3)} ms
+        First Parse -> First Byte: ${(stats.parsing.start - stats.loading.firstByte).toFixed(3)} ms
+        Last Parse -> Load End: ${(stats.parsing.end - stats.loading.end).toFixed(3)} ms
+        First Buffer -> First Parse: ${(stats.buffering.start - stats.parsing.start).toFixed(3)} ms
+        Last Buffer -> Last Parse: ${(stats.buffering.end - stats.parsing.end).toFixed(3)} ms`);
     // console.log('Frag stats', frag.stats);
 
     const levelAnalyzer = this.levelAnalyzers[frag.level];

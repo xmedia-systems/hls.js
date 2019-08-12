@@ -6,6 +6,7 @@ export default class LoadStats implements LoaderStats {
   retry: number = 0;
   total: number = 0;
   chunkCount: number = 0;
+  bwEstimate: number = 0;
   loading: HlsNetworkTiming = { start: 0, firstByte: 0, end: 0 };
   parsing: HlsProgressivePerformanceTiming = { start: 0, end: 0, cumulative: 0 };
   buffering: HlsProgressivePerformanceTiming = { start: 0, end: 0, cumulative: 0 };

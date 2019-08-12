@@ -823,7 +823,7 @@ export default class StreamController extends BaseStreamController {
     return audioCodec;
   }
 
-  private _loadBitrateTestFrag (frag) {
+  private _loadBitrateTestFrag (frag: Fragment) {
     this._doFragLoad(frag)
       .then((data) => {
         const { hls } = this;
@@ -836,7 +836,8 @@ export default class StreamController extends BaseStreamController {
         this.bitrateTest = false;
         frag.bitrateTest = false;
         const stats = frag.stats;
-        stats.tparsed = stats.tbuffered = window.performance.now();
+        // Bitrate tests fragments are neither parsed nor buffered
+        stats.parsing.start = stats.parsing.end = stats.buffering.start = stats.buffering.end = window.performance.now();
         hls.trigger(Event.FRAG_BUFFERED, { stats, frag, id: 'main' });
         this.tick();
       });
