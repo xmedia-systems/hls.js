@@ -48,7 +48,7 @@ class FetchLoader implements Loader<LoaderContext> {
 
   load (context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>): void {
     const stats = this.stats;
-    stats.trequest = performance.now();
+    stats.loading.start = performance.now();
 
     const initParams = getRequestParameters(context, this.controller.signal);
     const onProgress = callbacks.onProgress;
@@ -71,7 +71,7 @@ class FetchLoader implements Loader<LoaderContext> {
         const { status, statusText } = response;
         throw new FetchError(statusText || 'fetch, bad network response', status, response);
       }
-      stats.tfirst = Math.max(performance.now(), stats.trequest);
+      stats.loading.firstByte = Math.max(performance.now(), stats.loading.start);
       stats.total = parseInt(response.headers.get('Content-Length') || '0');
 
       if (onProgress) {
@@ -100,7 +100,7 @@ class FetchLoader implements Loader<LoaderContext> {
     }).then((responseData: string | ArrayBuffer) => {
       const { response } = this;
       clearTimeout(this.requestTimeout);
-      stats.tload = Math.max(performance.now(), stats.tfirst);
+      stats.loading.end = Math.max(performance.now(), stats.loading.firstByte);
       stats.loaded = stats.total = responseData[LENGTH];
 
       const loaderResponse = {

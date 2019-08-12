@@ -73,6 +73,8 @@ export default class Transmuxer {
     decryptdata: any | null,
     transmuxIdentifier: TransmuxIdentifier
   ): TransmuxerResult | Promise<TransmuxerResult> {
+    // transmuxIdentifier.start = now();
+
     let uintData = new Uint8Array(data);
     const { cache, config, currentTransmuxState: state, transmuxConfig } = this;
 
@@ -85,6 +87,7 @@ export default class Transmuxer {
         // data is handled in the flush() call
         const decryptedData = decrypter.softwareDecrypt(uintData, decryptdata.key.buffer, decryptdata.iv.buffer);
         if (!decryptedData) {
+          // transmuxIdentifier.end = now();
           return emptyResult(transmuxIdentifier);
         }
        uintData = decryptedData;
@@ -128,6 +131,7 @@ export default class Transmuxer {
 
     if (!demuxer || !remuxer) {
       cache.push(uintData);
+      // transmuxIdentifier.end = now();
       return emptyResult(transmuxIdentifier);
     }
 
@@ -137,6 +141,7 @@ export default class Transmuxer {
     state.discontinuity = false;
     state.trackSwitch = false;
 
+    // transmuxIdentifier.end = now();
     return result;
   }
 
@@ -185,6 +190,7 @@ export default class Transmuxer {
       transmuxIdentifier
     });
 
+    // transmuxIdentifier.end = now();
     return transmuxResults;
   }
 

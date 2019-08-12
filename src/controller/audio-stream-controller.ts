@@ -533,7 +533,7 @@ class AudioStreamController extends BaseStreamController {
     }
     if (audio) {
       frag.setElementaryStreamInfo(ElementaryStreamTypes.AUDIO, audio.startPTS, audio.endPTS, audio.startDTS, audio.endDTS);
-      this.bufferFragmentData(audio, 'audio');
+      this.bufferFragmentData(audio, frag);
     }
     if (id3) {
       id3.frag = frag;

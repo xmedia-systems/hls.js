@@ -7,6 +7,7 @@ import EventHandler from '../event-handler';
 import { logger } from '../utils/logger';
 import { ErrorDetails, ErrorTypes } from '../errors';
 import { getMediaSource } from '../utils/mediasource-helper';
+import Fragment from '../loader/fragment';
 
 import { TrackSet } from '../types/track';
 import { Segment } from '../types/segment';
@@ -253,7 +254,8 @@ export default class BufferController extends EventHandler {
     }
   }
 
-  onFragParsed ({ frag }) {
+  onFragParsed (data: { frag: Fragment }) {
+    const { frag } = data;
     let buffersAppendedTo: Array<SourceBufferName> = [];
 
     if (frag.elementaryStreams[ElementaryStreamTypes.AUDIO]) {
@@ -266,7 +268,7 @@ export default class BufferController extends EventHandler {
 
     logger.log(`[buffer-controller]: All fragment chunks received, enqueueing operation to signal fragment buffered`);
     const onUnblocked = () => {
-      frag.stats.tbuffered = window.performance.now();
+      frag.stats.buffering.end = window.performance.now();
       this.hls.trigger(Events.FRAG_BUFFERED, { frag, stats: frag.stats, id: frag.type });
     };
     this.blockBuffers(onUnblocked, buffersAppendedTo);

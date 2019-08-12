@@ -49,7 +49,7 @@ class XhrLoader implements Loader<LoaderContext> {
     this.context = context;
     this.config = config;
     this.callbacks = callbacks;
-    this.stats.trequest = performance.now();
+    this.stats.loading.start = performance.now();
     this.retryDelay = config.retryDelay;
     this.loadInternal();
   }
@@ -59,7 +59,7 @@ class XhrLoader implements Loader<LoaderContext> {
     const xhr = this.loader = new XMLHttpRequest();
 
     const stats = this.stats;
-    stats.tfirst = 0;
+    stats.loading.firstByte = 0;
     stats.loaded = 0;
     const xhrSetup = this.xhrSetup;
 
@@ -108,15 +108,15 @@ class XhrLoader implements Loader<LoaderContext> {
     if (readyState >= 2) {
       // clear xhr timeout and rearm it if readyState less than 4
       window.clearTimeout(this.requestTimeout);
-      if (stats.tfirst === 0) {
-        stats.tfirst = Math.max(performance.now(), stats.trequest);
+      if (stats.loading.firstByte === 0) {
+        stats.loading.firstByte = Math.max(performance.now(), stats.loading.start);
       }
 
       if (readyState === 4) {
         const status = xhr.status;
         // http status between 200 to 299 are all successful
         if (status >= 200 && status < 300) {
-          stats.tload = Math.max(performance.now(), stats.tfirst);
+          stats.loading.end = Math.max(performance.now(), stats.loading.firstByte);
           let data;
           let len : number;
           if (context.responseType === 'arraybuffer') {

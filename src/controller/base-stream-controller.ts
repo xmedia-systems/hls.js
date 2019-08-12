@@ -156,13 +156,14 @@ export default class BaseStreamController extends TaskLoop {
     super.onHandlerDestroyed();
   }
 
-  protected _loadFragForPlayback (frag) {
+  protected _loadFragForPlayback (frag: Fragment) {
     const progressCallback: FragmentLoadProgressCallback = ({ payload }) => {
       if (this._fragLoadAborted(frag)) {
         this.warn(`Fragment ${frag.sn} of level ${frag.level} was aborted during progressive download.`);
         this.fragmentTracker.removeFragment(frag);
         return;
       }
+      frag.stats.chunkCount++;
       this._handleFragmentLoadProgress(frag, payload);
     };
 
@@ -182,7 +183,7 @@ export default class BaseStreamController extends TaskLoop {
       });
   }
 
-  protected _loadInitSegment (frag) {
+  protected _loadInitSegment (frag: Fragment) {
     this._doFragLoad(frag)
       .then((data: FragLoadSuccessResult) => {
         const { fragCurrent, hls, levels } = this;
@@ -194,7 +195,8 @@ export default class BaseStreamController extends TaskLoop {
         this.state = State.IDLE;
         this.fragLoadError = 0;
         levels[frag.level].details.initSegment.data = payload;
-        stats.tparsed = stats.tbuffered = window.performance.now();
+        stats.parsing.start = stats.buffering.start = window.performance.now();
+        stats.parsing.end = stats.buffering.end = window.performance.now();
         // TODO: set id from calling class
         hls.trigger(Event.FRAG_BUFFERED, { stats, frag: fragCurrent, id: frag.type });
         this.tick();
@@ -209,17 +211,17 @@ export default class BaseStreamController extends TaskLoop {
     return frag.level !== fragCurrent.level || frag.sn !== fragCurrent.sn;
   }
 
-  protected _handleFragmentLoadComplete (frag) {
+  protected _handleFragmentLoadComplete (frag: Fragment) {
     const { transmuxer } = this;
     if (!transmuxer) {
       return;
     }
-    transmuxer.flush({ level: frag.level, sn: frag.sn, start: performance.now(), end: 0 });
+    transmuxer.flush({ level: frag.level, sn: frag.sn as number, start: performance.now(), end: 0 });
   }
 
-  protected _handleFragmentLoadProgress (frag, payload) {}
+  protected _handleFragmentLoadProgress (frag: Fragment, payload) {}
 
-  protected _doFragLoad (frag, progressCallback?: FragmentLoadProgressCallback) {
+  protected _doFragLoad (frag: Fragment, progressCallback?: FragmentLoadProgressCallback) {
     this.state = State.FRAG_LOADING;
     this.hls.trigger(Event.FRAG_LOADING, { frag });
 
@@ -247,6 +249,7 @@ export default class BaseStreamController extends TaskLoop {
       return;
     }
     const { frag, level } = context;
+    frag.stats.parsing.end = performance.now();
 
     this.updateLevelTiming(frag, level);
     this.state = State.PARSED;
@@ -274,9 +277,13 @@ export default class BaseStreamController extends TaskLoop {
     return { frag, level: currentLevel };
   }
 
-  protected bufferFragmentData (data, parent) {
+  protected bufferFragmentData (data: { data1: Uint8Array, data2: Uint8Array, type: string }, frag: Fragment) {
     if (!data || this.state !== State.PARSING) {
       return;
+    }
+
+    if (!frag.stats.buffering.start) {
+      frag.stats.buffering.start = performance.now();
     }
 
     const { data1, data2 } = data;
@@ -290,7 +297,7 @@ export default class BaseStreamController extends TaskLoop {
       return;
     }
 
-    this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent, content: 'data' });
+    this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: frag.type, content: 'data' });
     this.tick();
   }
 

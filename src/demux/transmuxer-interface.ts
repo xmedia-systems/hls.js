@@ -107,6 +107,8 @@ export default class TransmuxerInterface {
     const lastFrag = this.frag;
 
     if (startingNewTransmuxSession(currentTransmuxSession, transmuxIdentifier)) {
+      frag.stats.parsing.start = performance.now();
+
       const discontinuity = !(lastFrag && (frag.cc === lastFrag.cc));
       const trackSwitch = !(lastFrag && (frag.level === lastFrag.level));
       const nextSN = !!(lastFrag && (frag.sn === (lastFrag.sn as number + 1)));

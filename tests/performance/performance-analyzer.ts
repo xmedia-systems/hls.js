@@ -80,10 +80,6 @@ class PerformanceAnalyzer {
   private hls: any;
   private mediaElement: HTMLMediaElement;
   private listeners: HlsListener[];
-
-  private numSamples: number = 0;
-  private byteNormalizedTransmuxTime: number = 0;
-
   private levelAnalyzers: LevelMeasurement[] = [];
 
   constructor (hls, mediaElement) {
@@ -139,23 +135,28 @@ class PerformanceAnalyzer {
 
   private onFragBuffered (e: string, data: { frag: Fragment, stats: LoaderStats }) {
     const { frag, stats } = data;
-    const tLoad = stats.tload - stats.trequest;
-    const tParse = stats.parseCumulative;
-    const tTotal = stats.tbuffered - stats.trequest;
-    const tBuffer = stats.tbuffered - stats.tparsed;
+    const tLoad = stats.loading.end - stats.loading.start;
+    const tBuffer = stats.buffering.end - stats.buffering.start;
+    const tParse = stats.parsing.end - stats.parsing.start;
+    const tTotal = stats.buffering.end - stats.loading.start;
 
     console.log(`Fragment Stats:
-      Level: ${frag.level},
-      SN: ${frag.sn},
-      Size: ${(stats.total / 1024)} kB,
-      Load time: ${tLoad},
-      parse time: ${tParse},
-      Buffer time: ${tBuffer},
-      Total: ${tTotal}
+      Level: ${frag.level}
+      SN: ${frag.sn}
+      Size: ${((stats.total / 1024)).toFixed(3)} kB
+      Chunk Count: ${stats.chunkCount}
+      Load time: ${tLoad.toFixed(3)} ms
+      First Byte Delay: ${(stats.loading.firstByte - stats.loading.start).toFixed(3)} ms
+      Parse Time: ${(tParse).toFixed(3)} ms
+      Cumulative Transmux Time: ${(stats.parsing.cumulative).toFixed(3)} ms
+      Buffer Time: ${(tBuffer).toFixed(3)} ms
+      Total: ${(tTotal).toFixed(3)} ms
     `);
 
+    // console.log('Frag stats', frag.stats);
+
     const levelAnalyzer = this.levelAnalyzers[frag.level];
-    levelAnalyzer.updateFragmentMeasures(stats);
+    levelAnalyzer.updateFragmentMeasures(tLoad, tParse, stats.parsing.cumulative, tBuffer, tTotal, stats);
   }
 
   private measure (eventFrom: string, eventTo: string) {
@@ -176,8 +177,9 @@ interface Measurement {
 
 const mediaElement = document.querySelector('video');
 const hlsInstance = new Hls({
-  progressive: true,
-  debug: true
+  progressive: false,
+  debug: true,
+  enableWorker: true
 });
 const analyzer = new PerformanceAnalyzer(hlsInstance, mediaElement);
 analyzer.setup();

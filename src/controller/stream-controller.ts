@@ -536,7 +536,7 @@ export default class StreamController extends BaseStreamController {
           new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
     const transmuxIdentifier = { level: frag.level, sn: frag.sn, start: performance.now(), end: 0 };
 
-    console.log('>>> tick');
+    // console.log('>>> tick');
     transmuxer.push(
       payload,
       initSegmentData,
@@ -622,7 +622,7 @@ export default class StreamController extends BaseStreamController {
     }
   }
 
-  onFragBuffered (data) {
+  onFragBuffered (data: { frag: Fragment }) {
     const { frag } = data;
     if (frag && frag.type !== 'main') {
       return;
@@ -636,7 +636,7 @@ export default class StreamController extends BaseStreamController {
     const media = this.mediaBuffer ? this.mediaBuffer : this.media;
     const stats = frag.stats;
     this.fragPrevious = frag;
-    this.fragLastKbps = Math.round(8 * stats.total / (stats.tbuffered - stats.tfirst));
+    this.fragLastKbps = Math.round(8 * stats.total / (stats.buffering.end- stats.loading.firstByte));
 
     this.log(`Buffered fragment ${frag.sn} of level ${frag.level}. PTS:[${frag.startPTS},${frag.endPTS}],DTS:[${frag.startDTS}/${frag.endDTS}], Buffered: ${TimeRanges.toString(media.buffered)}`);
     this.state = State.IDLE;
@@ -848,7 +848,7 @@ export default class StreamController extends BaseStreamController {
     const { remuxResult, transmuxIdentifier } = transmuxResult;
 
     transmuxIdentifier.end = performance.now();
-    console.log('>>> tock');
+    // console.log('>>> tock');
 
     const context = this.getCurrentContext(transmuxIdentifier);
     if (!context) {
@@ -857,8 +857,8 @@ export default class StreamController extends BaseStreamController {
     }
     const { frag, level } = context;
     const stats = frag.stats;
-    stats.parseCumulative += (transmuxIdentifier.end - transmuxIdentifier.start);
-    console.log('>>> parseInstance', transmuxIdentifier.end - transmuxIdentifier.start, stats.parseCumulative);
+    stats.parsing.cumulative += (transmuxIdentifier.end - transmuxIdentifier.start);
+    // console.log('>>> parseInstance', transmuxIdentifier.end - transmuxIdentifier.start, stats.parseCumulative);
 
     let { audio, video, text, id3, initSegment } = remuxResult;
     // The audio-stream-controller handles audio buffering if Hls.js is playing an alternate audio track
@@ -885,13 +885,13 @@ export default class StreamController extends BaseStreamController {
         return;
       } else {
         frag.setElementaryStreamInfo(ElementaryStreamTypes.VIDEO, video.startPTS, video.endPTS, video.startDTS, video.endDTS);
-        this.bufferFragmentData(video, 'main');
+        this.bufferFragmentData(video, frag);
       }
     }
 
     if (audio) {
       frag.setElementaryStreamInfo(ElementaryStreamTypes.AUDIO, audio.startPTS, audio.endPTS, audio.startDTS, audio.endDTS);
-      this.bufferFragmentData(audio, 'main');
+      this.bufferFragmentData(audio, frag);
     }
 
     if (id3) {

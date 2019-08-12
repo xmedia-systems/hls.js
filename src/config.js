@@ -50,7 +50,7 @@ export const hlsDefaultConfig = {
   manifestLoadingMaxRetry: 1, // used by playlist-loader
   manifestLoadingRetryDelay: 1000, // used by playlist-loader
   manifestLoadingMaxRetryTimeout: 64000, // used by playlist-loader
-  startLevel: void 0, // used by level-controller
+  startLevel: 4, // used by level-controller
   levelLoadingTimeOut: 10000, // used by playlist-loader
   levelLoadingMaxRetry: 4, // used by playlist-loader
   levelLoadingRetryDelay: 1000, // used by playlist-loader

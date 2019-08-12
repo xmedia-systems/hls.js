@@ -15,7 +15,9 @@ export interface SourceBufferFlushRange {
 export interface BufferOperation {
   execute: Function
   onComplete: Function
-  onError: Function
+  onError: Function,
+  start?: number
+  end?: number
 }
 
 export interface SourceBufferListener {

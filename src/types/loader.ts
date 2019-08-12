@@ -37,26 +37,27 @@ export interface LoaderResponse {
 }
 
 export interface LoaderStats {
-  // performance.now() just after load() has been called
-  trequest: number
-  // performance.now() of first received byte
-  tfirst: number
-  // performance.now() on load complete
-  tload: number
-  // performance.now() on transmux complete
-  tparsed: number
-  // performance.now() on fragment buffered
-  tbuffered: number
-  // number of loaded bytes
-  loaded: number
-  // total number of bytes
-  total: number,
-  // number of retries attempted
-  retry: number,
-  // the request was cancelled or timed out
-  aborted: boolean,
-  lastParseStart: number | null
-  parseCumulative: number
+  aborted: boolean;
+  loaded: number;
+  retry: number;
+  total: number;
+  chunkCount: number;
+  loading: HlsNetworkTiming;
+  parsing: HlsProgressivePerformanceTiming;
+  buffering: HlsProgressivePerformanceTiming;
+}
+
+export interface HlsPerformanceTiming {
+  start: number;
+  end: number;
+}
+
+export interface HlsNetworkTiming extends HlsPerformanceTiming {
+  firstByte: number;
+}
+
+export interface HlsProgressivePerformanceTiming extends HlsPerformanceTiming {
+  cumulative: number;
 }
 
 type LoaderOnSuccess < T extends LoaderContext > = (
