@@ -13,7 +13,8 @@ export function fetchSupported () {
     return false;
 }
 
-class FetchLoader implements Loader<LoaderContext> {
+class
+FetchLoader implements Loader<LoaderContext> {
   private fetchSetup: Function;
   private requestTimeout?: number;
   private request!: Request;

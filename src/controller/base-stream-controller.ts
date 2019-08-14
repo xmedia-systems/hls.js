@@ -287,11 +287,13 @@ export default class BaseStreamController extends TaskLoop {
       return;
     }
 
-    const { data1, data2 } = data;
+    let { data1, data2 } = data;
     let buffer = data1;
     if (data1 && data2) {
       // Combine the moof + mdat so that we buffer with a single append
       buffer = appendUint8Array(data1, data2);
+      data1 = null;
+      data2 = null;
     }
 
     if (!buffer || !buffer.length) {
