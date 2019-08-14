@@ -1,5 +1,6 @@
 import { RemuxerResult } from './remuxer';
 import { HlsChunkPerformanceTiming } from './loader';
+import { SourceBufferListener, SourceBufferName } from './buffer';
 
 export interface TransmuxerResult {
     remuxResult: RemuxerResult
@@ -10,7 +11,11 @@ export class ChunkMetadata {
     public level: number;
     public sn: number;
     public transmuxing: HlsChunkPerformanceTiming = { start: 0, executeStart: 0, executeEnd: 0, end: 0 };
-    public buffering: HlsChunkPerformanceTiming = { start: 0, executeStart: 0, executeEnd: 0, end: 0 };
+    public buffering:  { [key in SourceBufferName]: HlsChunkPerformanceTiming } = {
+        audio: { start: 0, executeStart: 0, executeEnd: 0, end: 0 },
+        video: { start: 0, executeStart: 0, executeEnd: 0, end: 0 },
+        audiovideo: { start: 0, executeStart: 0, executeEnd: 0, end: 0 }
+    };
 
     constructor (level, sn) {
         this.level = level;

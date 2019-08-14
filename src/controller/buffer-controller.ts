@@ -201,12 +201,13 @@ export default class BufferController extends EventHandler {
   onBufferAppending (eventData: BufferAppendingEventPayload) {
     const { hls, operationQueue } = this;
     const { data, type, frag, chunkMeta } = eventData;
-    const chunkStats = chunkMeta.buffering;
-    const fragStats = frag.stats;
-    const now = performance.now();
-    chunkStats.start = now;
-    if (!frag.stats.buffering.start) {
-      frag.stats.buffering.start = now;
+    const chunkStats = chunkMeta.buffering[type];
+    const fragStats = frag.stats.buffering;
+
+    const start = performance.now();
+    chunkStats.start = start;
+    if (!fragStats.start) {
+      fragStats.start = start;
     }
 
     const operation: BufferOperation = {
@@ -216,8 +217,8 @@ export default class BufferController extends EventHandler {
       },
       onComplete: () => {
         chunkStats.executeEnd = chunkStats.end = performance.now();
-        fragStats.buffering.cumulative += (chunkStats.end - chunkStats.start);
-        fragStats.buffering.executeCumulative += (chunkStats.executeEnd - chunkStats.executeStart);
+        fragStats.idling += (chunkStats.executeStart - start);
+        fragStats.executing += (chunkStats.executeEnd - chunkStats.executeStart);
 
         const { sourceBuffer } = this;
         const timeRanges = {};

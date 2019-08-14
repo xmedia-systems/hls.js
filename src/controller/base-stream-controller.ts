@@ -15,6 +15,7 @@ import { alignStream } from '../utils/discontinuities';
 import { findFragmentByPDT, findFragmentByPTS, findFragWithCC } from './fragment-finders';
 import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
 import { SourceBufferName } from '../types/buffer';
+import { HlsChunkPerformanceTiming, HlsProgressivePerformanceTiming, LoaderStats } from '../types/loader';
 
 export const State = {
   STOPPED: 'STOPPED',
@@ -543,6 +544,12 @@ export default class BaseStreamController extends TaskLoop {
     }
 
     return pos;
+  }
+
+  protected recordTransmuxStats (fragStats: HlsProgressivePerformanceTiming, chunkStats: HlsChunkPerformanceTiming) {
+    const executionTime = chunkStats.executeEnd - chunkStats.executeStart;
+    fragStats.executing += executionTime;
+    fragStats.idling += ((chunkStats.end - chunkStats.start) - executionTime);
   }
 
   private handleFragLoadAborted (frag: Fragment) {

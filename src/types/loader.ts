@@ -63,8 +63,8 @@ export interface HlsNetworkTiming extends HlsPerformanceTiming {
 }
 
 export interface HlsProgressivePerformanceTiming extends HlsPerformanceTiming {
-  executeCumulative: number;
-  cumulative: number;
+  idling: number;
+  executing: number;
 }
 
 type LoaderOnSuccess < T extends LoaderContext > = (

@@ -356,10 +356,10 @@ function logFragStats (frag: Fragment) {
         Parse Time: ${(tParse).toFixed(3)} ms
         Buffer Time: ${(tBuffer).toFixed(3)} ms
         End-To-End Time: ${(tTotal).toFixed(3)} ms
-        Cumulative Transmux Time: ${(stats.parsing.cumulative).toFixed(3)} ms
-        Cumulative Transmux Execution Time: ${(stats.parsing.executeCumulative).toFixed(3)} ms
-        Cumulative Buffering Time: ${(stats.buffering.cumulative).toFixed(3)} ms
-        Cumulative Buffering Execution Time: ${(stats.buffering.executeCumulative).toFixed(3)} ms`);
+        Transmuxing Idling Total: ${(stats.parsing.idling).toFixed(3)} ms
+        Transmuxer Executing Total: ${(stats.parsing.executing).toFixed(3)} ms
+        Buffering Idling Total: ${(stats.buffering.idling).toFixed(3)} ms
+        Buffering Executing Total: ${(stats.buffering.executing).toFixed(3)} ms`);
 }
 
 export default AbrController;

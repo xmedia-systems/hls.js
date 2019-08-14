@@ -854,7 +854,6 @@ export default class StreamController extends BaseStreamController {
     const id = 'main';
     const { hls } = this;
     const { remuxResult, chunkMeta } = transmuxResult;
-    chunkMeta.transmuxing.end = performance.now();
 
     const context = this.getCurrentContext(chunkMeta);
     if (!context) {
@@ -862,9 +861,7 @@ export default class StreamController extends BaseStreamController {
       return;
     }
     const { frag, level } = context;
-    const stats = frag.stats;
-    stats.parsing.cumulative += (chunkMeta.transmuxing.end - chunkMeta.transmuxing.start);
-    stats.parsing.executeCumulative += (chunkMeta.transmuxing.executeEnd - chunkMeta.transmuxing.executeStart);
+    this.recordTransmuxStats(frag.stats.parsing, chunkMeta.transmuxing);
 
     let { audio, video, text, id3, initSegment } = remuxResult;
     // The audio-stream-controller handles audio buffering if Hls.js is playing an alternate audio track
