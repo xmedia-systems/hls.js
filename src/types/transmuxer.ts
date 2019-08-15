@@ -10,15 +10,51 @@ export interface TransmuxerResult {
 export class ChunkMetadata {
     public level: number;
     public sn: number;
-    public transmuxing: HlsChunkPerformanceTiming = { start: 0, executeStart: 0, executeEnd: 0, end: 0 };
-    public buffering:  { [key in SourceBufferName]: HlsChunkPerformanceTiming } = {
-        audio: { start: 0, executeStart: 0, executeEnd: 0, end: 0 },
-        video: { start: 0, executeStart: 0, executeEnd: 0, end: 0 },
-        audiovideo: { start: 0, executeStart: 0, executeEnd: 0, end: 0 }
-    };
+    public chunkId: number;
 
-    constructor (level, sn) {
+    public transmuxing: HlsChunkPerformanceTiming;
+    public buffering:  { [key in SourceBufferName]: HlsChunkPerformanceTiming };
+
+    constructor (level, sn, chunkId) {
         this.level = level;
         this.sn = sn;
+        this.chunkId = chunkId;
+
+        this.transmuxing = statFactory(this, 'transmuxing');
+        this.buffering = {
+          audio: statFactory(this, 'buffering-audio'),
+          video: statFactory(this, 'buffering-video'),
+          audiovideo: statFactory(this, 'buffering-audiovideo'),
+        };
     }
+}
+
+export const statHash = (chunkMeta: ChunkMetadata, bucket: string, statName: string) => `${chunkMeta.level}-${chunkMeta.sn}-${chunkMeta.chunkId}-${bucket}-${statName}`;
+
+function statFactory (chunkMeta: ChunkMetadata, bucket: string): HlsChunkPerformanceTiming {
+    const startHash = statHash(chunkMeta, bucket,'start');
+    const endHash = statHash(chunkMeta, bucket, 'end');
+    const execStartHash = statHash(chunkMeta, bucket, 'executeStart');
+    const execEndHash = statHash(chunkMeta, bucket, 'executeEnd');
+
+    const markableStat = (markHash: string) => {
+        let value = 0;
+        return {
+            get () {
+              return value;
+            },
+            set (val) {
+              performance.mark(markHash);
+              value = val;
+            },
+          enumerable: true
+        };
+    };
+
+    return Object.defineProperties({ recorded: false }, {
+        start: markableStat(startHash),
+        end: markableStat(endHash),
+        executeStart: markableStat(execStartHash),
+        executeEnd: markableStat(execEndHash),
+    });
 }

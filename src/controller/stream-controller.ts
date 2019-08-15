@@ -541,8 +541,7 @@ export default class StreamController extends BaseStreamController {
     const transmuxer = this.transmuxer = this.transmuxer ||
           new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
 
-    const chunkMeta = new ChunkMetadata(frag.level, frag.sn);
-    chunkMeta.transmuxing.start = performance.now();
+    const chunkMeta = new ChunkMetadata(frag.level, frag.sn, frag.stats.chunkCount);
 
     transmuxer.push(
       payload,
@@ -854,6 +853,10 @@ export default class StreamController extends BaseStreamController {
     const id = 'main';
     const { hls } = this;
     const { remuxResult, chunkMeta } = transmuxResult;
+
+    if (!chunkMeta.transmuxing.end) {
+      debugger
+    }
 
     const context = this.getCurrentContext(chunkMeta);
     if (!context) {

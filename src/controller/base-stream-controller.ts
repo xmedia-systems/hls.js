@@ -219,8 +219,7 @@ export default class BaseStreamController extends TaskLoop {
     if (!transmuxer) {
       return;
     }
-    const chunkMeta = new ChunkMetadata(frag.level, frag.sn);
-    chunkMeta.transmuxing.start = performance.now();
+    const chunkMeta = new ChunkMetadata(frag.level, frag.sn, frag.stats.chunkCount);
     transmuxer.flush(chunkMeta);
   }
 
@@ -555,7 +554,8 @@ export default class BaseStreamController extends TaskLoop {
       this.nextLoadPosition = this.lastCurrentTime;
     }
     if (transmuxer && frag.sn !== 'initSegment') {
-      transmuxer.flush(new ChunkMetadata(frag.level, frag.sn));
+      const meta = new ChunkMetadata(frag.level, frag.sn, frag.stats.chunkCount);
+      transmuxer.flush(meta);
     }
 
     Object.keys(frag.elementaryStreams).forEach(type => frag.elementaryStreams[type] = null);

@@ -125,6 +125,7 @@ export default class TransmuxerInterface {
       this.configureTransmuxer(config, state);
     }
 
+    chunkMeta.transmuxing.start = performance.now();
     this.frag = frag;
     // Frags with sn of 'initSegment' are not transmuxed
     if (worker) {

@@ -371,7 +371,7 @@ class AudioStreamController extends BaseStreamController {
     // this.log(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
     // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
     let accurateTimeOffset = false; // details.PTSKnown || !details.live;
-    const chunkMeta = new ChunkMetadata(frag.level, frag.sn);
+    const chunkMeta = new ChunkMetadata(frag.level, frag.sn, frag.chunkCount);
     transmuxer.push(payload, initSegmentData, audioCodec, '', frag, details.totalduration, accurateTimeOffset, chunkMeta, initPTS);
   }
 
