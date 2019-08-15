@@ -861,8 +861,6 @@ export default class StreamController extends BaseStreamController {
       return;
     }
     const { frag, level } = context;
-    this.recordTransmuxStats(frag.stats.parsing, chunkMeta.transmuxing);
-
     let { audio, video, text, id3, initSegment } = remuxResult;
     // The audio-stream-controller handles audio buffering if Hls.js is playing an alternate audio track
     if (this.altAudio) {

@@ -217,9 +217,6 @@ export default class BufferController extends EventHandler {
       },
       onComplete: () => {
         chunkStats.executeEnd = chunkStats.end = performance.now();
-        fragStats.idling += (chunkStats.executeStart - start);
-        fragStats.executing += (chunkStats.executeEnd - chunkStats.executeStart);
-
         const { sourceBuffer } = this;
         const timeRanges = {};
         for (let type in sourceBuffer) {

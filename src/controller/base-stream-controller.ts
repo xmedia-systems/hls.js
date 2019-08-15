@@ -292,8 +292,6 @@ export default class BaseStreamController extends TaskLoop {
     if (data1 && data2) {
       // Combine the moof + mdat so that we buffer with a single append
       buffer = appendUint8Array(data1, data2);
-      data1 = null;
-      data2 = null;
     }
 
     if (!buffer || !buffer.length) {
@@ -546,12 +544,6 @@ export default class BaseStreamController extends TaskLoop {
     }
 
     return pos;
-  }
-
-  protected recordTransmuxStats (fragStats: HlsProgressivePerformanceTiming, chunkStats: HlsChunkPerformanceTiming) {
-    const executionTime = chunkStats.executeEnd - chunkStats.executeStart;
-    fragStats.executing += executionTime;
-    fragStats.idling += ((chunkStats.end - chunkStats.start) - executionTime);
   }
 
   private handleFragLoadAborted (frag: Fragment) {

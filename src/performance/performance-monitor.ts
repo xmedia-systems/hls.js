@@ -64,12 +64,13 @@ function logFragStats (frag: Fragment) {
         Load Duration:              ${tLoad.toFixed(3)} ms
         Parse Duration:             ${(tParse).toFixed(3)} ms
         Buffer Duration:            ${(tBuffer).toFixed(3)} ms
-        End-To-End Duration:        ${(tTotal).toFixed(3)} ms
+        End-To-End Duration:        ${(tTotal).toFixed(3)} ms`);
         
-        Transmuxing Idling Total:   ${(stats.parsing.idling).toFixed(3)} ms
-        Transmuxer Executing Total: ${(stats.parsing.executing).toFixed(3)} ms
-        Buffering Idling Total:     ${(stats.buffering.idling).toFixed(3)} ms
-        Buffering Executing Total:  ${(stats.buffering.executing).toFixed(3)} ms`);
+        // Transmuxing Idling Total:   ${(stats.parsing.idling).toFixed(3)} ms
+        // Transmuxer Executing Total: ${(stats.parsing.executing).toFixed(3)} ms
+        // Buffering Idling Total:     ${(stats.buffering.idling).toFixed(3)} ms
+        // Buffering Executing Total:  ${(stats.buffering.executing).toFixed(3)} ms`
+  // );
 
   // const record: FragStatsRecord = {
   //   size: stats.loaded,
