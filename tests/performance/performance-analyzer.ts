@@ -3,36 +3,10 @@ import Fragment from '../../src/loader/fragment';
 import LevelMeasurement from './LevelMeasurement';
 import { Level } from '../../src/types/level';
 import level from '../../../media-lighthouse/src/hls/level';
+import {ChunkMetadata} from "../../src/types/transmuxer";
 
 const Hls = window.Hls;
 const Events = Hls.Events;
-// const {
-//   MEDIA_ATTACHING,
-//   MEDIA_ATTACHED,
-//   MEDIA_DETACHED,
-//   MANIFEST_LOADING,
-//   MANIFEST_LOADED,
-//   MANIFEST_PARSED,
-//   LEVEL_SWITCHING,
-//   LEVEL_SWITCHED,
-//   LEVEL_LOADED,
-//   LEVEL_UPDATED,
-//   LEVEL_PTS_UPDATED,
-//   FRAG_CHANGED,
-//   LEVEL_SWITCHED,
-//   FRAG_PARSING_METADATA,
-//   BUFFER_APPENDING,
-//   BUFFER_APPENDED,
-//   BUFFER_CODECS,
-//   FRAG_BUFFERED,
-//   INIT_PTS_FOUND,
-//   KEY_LOADING,
-//   SUBTITLE_TRACKS_UPDATED,
-//   NON_NATIVE_TEXT_TRACKS_FOUND,
-//   CUES_PARSED,
-//   AUDIO_TRACKS_UPDATED,
-//   ERROR
-// } = Hls.Events;
 
 const setupEvents = [
   Events.MEDIA_ATTACHING,
@@ -70,16 +44,10 @@ const fragLifecycleEvents = [
 
 const measuredEvents = [...setupEvents, ...playlistEvents, ...fragLifecycleEvents];
 
-const setupTimeMeasurement = {
-  name: 'Setup',
-  eventFrom: Events.MEDIA_ATTACHING,
-  eventTo: Events.BUFFER_CREATED
-};
-
 class PerformanceAnalyzer {
   private hls: any;
   private mediaElement: HTMLMediaElement;
-  private listeners: HlsListener[];
+  private listeners: HlsListener[] = [];
   private levelAnalyzers: LevelMeasurement[] = [];
 
   constructor (hls, mediaElement) {
@@ -108,16 +76,18 @@ class PerformanceAnalyzer {
 
   private createListeners (): HlsListener[] {
     const advancedListeners = [
+      { name: Events.BUFFER_APPENDED, fn: this.onBufferAppended.bind(this) },
       { name: Events.MANIFEST_PARSED, fn: this.onManifestParsed.bind(this) },
       { name: Events.FRAG_BUFFERED, fn: this.onFragBuffered.bind(this) }
     ];
 
-    const simpleListeners = measuredEvents.map(event => ({
-      name: event,
-      fn: () => {
-        performance.mark(event);
-      }
-    }));
+    const simpleListeners = [];
+    //   measuredEvents.map(event => ({
+    //   name: event,
+    //   fn: () => {
+    //     performance.mark(event);
+    //   }
+    // }));
 
     return [...simpleListeners, ...advancedListeners];
   }
@@ -130,30 +100,18 @@ class PerformanceAnalyzer {
     });
 
     mediaElement.play();
-    this.measure(Events.MEDIA_ATTACHED, Events.MANIFEST_PARSED);
   }
 
   private onFragBuffered (e: string, data: { frag: Fragment, stats: LoaderStats }) {
     const { frag, stats } = data;
-    const tLoad = stats.loading.end - stats.loading.start;
-    const tBuffer = stats.buffering.end - stats.buffering.start;
-    const tParse = stats.parsing.end - stats.parsing.start;
-    const tTotal = stats.buffering.end - stats.loading.start;
-
-    console.log(`Fragment ${frag.sn} of level ${frag.level} stats:
-        First Byte -> Request: ${(stats.loading.firstByte - stats.loading.start).toFixed(3)} ms
-        First Parse -> First Byte: ${(stats.parsing.start - stats.loading.firstByte).toFixed(3)} ms
-        Last Parse -> Load End: ${(stats.parsing.end - stats.loading.end).toFixed(3)} ms
-        First Buffer -> First Parse: ${(stats.buffering.start - stats.parsing.start).toFixed(3)} ms
-        Last Buffer -> Last Parse: ${(stats.buffering.end - stats.parsing.end).toFixed(3)} ms`);
-    // console.log('Frag stats', frag.stats);
-
     const levelAnalyzer = this.levelAnalyzers[frag.level];
-    levelAnalyzer.updateFragmentMeasures(tLoad, tParse, stats.parsing.cumulative, tBuffer, tTotal, stats);
+    levelAnalyzer.updateFragmentMeasures(stats);
   }
 
-  private measure (eventFrom: string, eventTo: string) {
-    performance.measure(`${eventFrom} -> ${eventTo}`, eventFrom, eventTo);
+  private onBufferAppended (e: string, data: { type: string, chunkMeta: ChunkMetadata }) {
+    const { chunkMeta, type } = data;
+    const levelAnalyzer = this.levelAnalyzers[chunkMeta.level];
+    levelAnalyzer.updateChunkMeasures(chunkMeta, type);
   }
 }
 
@@ -162,17 +120,12 @@ interface HlsListener {
   fn: (e: string, data: any) => void
 }
 
-interface Measurement {
-  name: string,
-  eventFrom: string
-  eventTo: string
-}
-
 const mediaElement = document.querySelector('video');
 const hlsInstance = new Hls({
   progressive: false,
   debug: true,
-  enableWorker: true
+  enableWorker: true,
+  capLevelToPlayerSize: false
 });
 const analyzer = new PerformanceAnalyzer(hlsInstance, mediaElement);
 analyzer.setup();

@@ -4,7 +4,13 @@
     <title>Hls.js demo - basic usage</title>
 </head>
 <body>
-    <video id="hls-performance" controls="true"></video>
+    <div class="video-container">
+        <video id="hls-performance" controls="true" width="640" height="480"></video>
+    </div>
+    <div class="stats-container">
+        <div class="chunk"></div>
+        <div class="frag"></div>
+    </div>
     <script src="../../dist/hls.js"></script>
     <script src="./dist/hls-performance-analyzer.js"></script>
 </body>
