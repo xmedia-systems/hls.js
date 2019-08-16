@@ -53,12 +53,18 @@ export interface HlsPerformanceTiming {
   end: number;
 }
 
+export interface HlsChunkPerformanceTiming extends HlsPerformanceTiming {
+  executeStart: number;
+  executeEnd: number;
+}
+
 export interface HlsNetworkTiming extends HlsPerformanceTiming {
   firstByte: number;
 }
 
 export interface HlsProgressivePerformanceTiming extends HlsPerformanceTiming {
-  cumulative: number;
+  idling: number;
+  executing: number;
 }
 
 type LoaderOnSuccess < T extends LoaderContext > = (

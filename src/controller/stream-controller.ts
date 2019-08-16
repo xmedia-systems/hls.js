@@ -11,6 +11,12 @@ import { alignStream } from '../utils/discontinuities';
 import GapController from './gap-controller';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
+import { ChunkMetadata, TransmuxerResult } from '../types/transmuxer';
+import LevelDetails from '../loader/level-details';
+import { Level } from '../types/level';
+import { TrackSet } from '../types/track';
+import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
+import { SourceBufferName } from '../types/buffer';
 
 const TICK_INTERVAL = 100; // how often to tick in ms
 
@@ -260,7 +266,7 @@ export default class StreamController extends BaseStreamController {
     return this.fragmentTracker.getBufferedFrag(position, PlaylistLoader.LevelType.MAIN);
   }
 
-  followingBufferedFrag (frag: Fragment) {
+  followingBufferedFrag (frag: Fragment | null) {
     if (frag) {
       // try to get range of next fragment (500ms after this range)
       return this.getBufferedFrag(frag.endPTS + 0.5);
@@ -534,9 +540,9 @@ export default class StreamController extends BaseStreamController {
     // this.log(`Transmuxing ${frag.sn} of [${details.startSN} ,${details.endSN}],level ${frag.level}, cc ${frag.cc}`);
     const transmuxer = this.transmuxer = this.transmuxer ||
           new TransmuxerInterface(this.hls, 'main', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
-    const transmuxIdentifier = { level: frag.level, sn: frag.sn as number, start: performance.now(), end: 0 };
 
-    // console.log('>>> tick');
+    const chunkMeta = new ChunkMetadata(frag.level, frag.sn, frag.stats.chunkCount);
+
     transmuxer.push(
       payload,
       initSegmentData,
@@ -545,7 +551,7 @@ export default class StreamController extends BaseStreamController {
       frag,
       details.totalduration,
       accurateTimeOffset,
-      transmuxIdentifier
+      chunkMeta
     );
   }
 
@@ -843,38 +849,35 @@ export default class StreamController extends BaseStreamController {
       });
   }
 
-  private _handleTransmuxComplete (transmuxResult) {
+  private _handleTransmuxComplete (transmuxResult: TransmuxerResult) {
     const id = 'main';
     const { hls } = this;
-    const { remuxResult, transmuxIdentifier } = transmuxResult;
+    const { remuxResult, chunkMeta } = transmuxResult;
 
-    transmuxIdentifier.end = performance.now();
-    // console.log('>>> tock');
+    if (!chunkMeta.transmuxing.end) {
+      debugger
+    }
 
-    const context = this.getCurrentContext(transmuxIdentifier);
+    const context = this.getCurrentContext(chunkMeta);
     if (!context) {
-      this.warn(`The loading context changed while buffering fragment ${transmuxIdentifier.sn} of level ${transmuxIdentifier.level}. This chunk will not be buffered.`);
+      this.warn(`The loading context changed while buffering fragment ${chunkMeta.sn} of level ${chunkMeta.level}. This chunk will not be buffered.`);
       return;
     }
     const { frag, level } = context;
-    const stats = frag.stats;
-    stats.parsing.cumulative += (transmuxIdentifier.end - transmuxIdentifier.start);
-    // console.log('>>> parseInstance', transmuxIdentifier.end - transmuxIdentifier.start, stats.parseCumulative);
-
     let { audio, video, text, id3, initSegment } = remuxResult;
     // The audio-stream-controller handles audio buffering if Hls.js is playing an alternate audio track
     if (this.altAudio) {
-      audio = null;
+      audio = undefined;
     }
 
     this.state = State.PARSING;
 
     if (initSegment) {
       if (initSegment.tracks) {
-        this._bufferInitSegment(level,initSegment.tracks);
+        this._bufferInitSegment(level, initSegment.tracks, frag, chunkMeta);
         hls.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { frag, id, tracks: initSegment.tracks });
       }
-      if (Number.isFinite(initSegment.initPTS)) {
+      if (Number.isFinite(initSegment.initPTS as number)) {
         hls.trigger(Event.INIT_PTS_FOUND, { frag, id, initPTS: initSegment.initPTS });
       }
     }
@@ -886,28 +889,30 @@ export default class StreamController extends BaseStreamController {
         return;
       } else {
         frag.setElementaryStreamInfo(ElementaryStreamTypes.VIDEO, video.startPTS, video.endPTS, video.startDTS, video.endDTS);
-        this.bufferFragmentData(video, frag);
+        this.bufferFragmentData(video, frag, chunkMeta);
       }
     }
 
     if (audio) {
       frag.setElementaryStreamInfo(ElementaryStreamTypes.AUDIO, audio.startPTS, audio.endPTS, audio.startDTS, audio.endDTS);
-      this.bufferFragmentData(audio, frag);
+      this.bufferFragmentData(audio, frag, chunkMeta);
     }
 
     if (id3) {
-      id3.frag = frag;
-      id3.id = id;
-      hls.trigger(Event.FRAG_PARSING_METADATA, id3);
+      const emittedID3: any = id3;
+      emittedID3.frag = frag;
+      emittedID3.id = id;
+      hls.trigger(Event.FRAG_PARSING_METADATA, emittedID3);
     }
     if (text) {
-      text.frag = frag;
-      text.id = id;
-      hls.trigger(Event.FRAG_PARSING_USERDATA, text);
+      const emittedText: any = text;
+      emittedText.frag = frag;
+      emittedText.id = id;
+      hls.trigger(Event.FRAG_PARSING_USERDATA, emittedText);
     }
   }
 
-  private _bufferInitSegment (currentLevel, tracks) {
+  private _bufferInitSegment (currentLevel: Level, tracks: TrackSet, frag: Fragment, chunkMeta: ChunkMetadata) {
     if (this.state !== State.PARSING) {
       return;
     }
@@ -955,7 +960,8 @@ export default class StreamController extends BaseStreamController {
       const initSegment = track.initSegment;
       this.log(`Main track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]`);
       if (initSegment) {
-        this.hls.trigger(Event.BUFFER_APPENDING, { type: trackName, data: initSegment, parent: 'main', content: 'initSegment' });
+        const segment: BufferAppendingEventPayload = { type: trackName as SourceBufferName, data: initSegment, frag, chunkMeta };
+        this.hls.trigger(Event.BUFFER_APPENDING, segment);
       }
     });
     // trigger handler right now
@@ -1049,7 +1055,7 @@ export default class StreamController extends BaseStreamController {
   }
 }
 
-function _hasDroppedFrames (frag: Fragment, dropped: number, startSN: number) {
+function _hasDroppedFrames (frag, dropped: number | undefined, startSN: number) {
   // Detect gaps in a fragment  and try to fix it by finding a keyframe in the previous fragment (see _findFragments)
   if (dropped) {
     frag.dropped = dropped;

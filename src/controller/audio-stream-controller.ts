@@ -9,6 +9,9 @@ import Fragment, { ElementaryStreamTypes } from '../loader/fragment';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
 import LevelDetails from '../loader/level-details';
+import { ChunkMetadata, TransmuxerResult } from '../types/transmuxer';
+import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
+import { TrackSet } from '../types/track';
 
 const { performance } = window;
 
@@ -368,8 +371,8 @@ class AudioStreamController extends BaseStreamController {
     // this.log(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
     // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
     let accurateTimeOffset = false; // details.PTSKnown || !details.live;
-    const transmuxIdentifier = { level: frag.level, sn: frag.sn as number, start: performance.now(), end: 0 };
-    transmuxer.push(payload, initSegmentData, audioCodec, '', frag, details.totalduration, accurateTimeOffset, transmuxIdentifier, initPTS);
+    const chunkMeta = new ChunkMetadata(frag.level, frag.sn, frag.chunkCount);
+    transmuxer.push(payload, initSegmentData, audioCodec, '', frag, details.totalduration, accurateTimeOffset, chunkMeta, initPTS);
   }
 
   onBufferReset () {
@@ -508,14 +511,14 @@ class AudioStreamController extends BaseStreamController {
     this.fragPrevious = null;
   }
 
-  private _handleTransmuxComplete (transmuxResult) {
+  private _handleTransmuxComplete (transmuxResult: TransmuxerResult) {
     const id = 'audio';
     const { hls } = this;
-    const { remuxResult, transmuxIdentifier } = transmuxResult;
+    const { remuxResult, chunkMeta } = transmuxResult;
 
-    const context = this.getCurrentContext(transmuxIdentifier);
+    const context = this.getCurrentContext(chunkMeta);
     if (!context) {
-      this.warn(`The loading context changed while buffering fragment ${transmuxIdentifier.sn} of level ${transmuxIdentifier.level}. This chunk will not be buffered.`);
+      this.warn(`The loading context changed while buffering fragment ${chunkMeta.sn} of level ${chunkMeta.level}. This chunk will not be buffered.`);
       return;
     }
     const { frag } = context;
@@ -527,27 +530,30 @@ class AudioStreamController extends BaseStreamController {
     }
 
     if (initSegment && initSegment.tracks) {
-      this._bufferInitSegment(initSegment.tracks);
+      this._bufferInitSegment(initSegment.tracks, frag, chunkMeta);
       hls.trigger(Event.FRAG_PARSING_INIT_SEGMENT, { frag, id, tracks: initSegment.tracks });
       // Only flush audio from old audio tracks when PTS is known on new audio track
     }
     if (audio) {
       frag.setElementaryStreamInfo(ElementaryStreamTypes.AUDIO, audio.startPTS, audio.endPTS, audio.startDTS, audio.endDTS);
-      this.bufferFragmentData(audio, frag);
+      this.bufferFragmentData(audio, frag, chunkMeta);
     }
+
     if (id3) {
-      id3.frag = frag;
-      id3.id = id;
-      hls.trigger(Event.FRAG_PARSING_METADATA, id3);
+      const emittedID3: any = id3;
+      emittedID3.frag = frag;
+      emittedID3.id = id;
+      hls.trigger(Event.FRAG_PARSING_METADATA, emittedID3);
     }
     if (text) {
-      text.frag = frag;
-      text.id = id;
-      hls.trigger(Event.FRAG_PARSING_USERDATA, text);
+      const emittedText: any = text;
+      emittedText.frag = frag;
+      emittedText.id = id;
+      hls.trigger(Event.FRAG_PARSING_USERDATA, emittedText);
     }
   }
 
-  private _bufferInitSegment (tracks) {
+  private _bufferInitSegment (tracks: TrackSet, frag: Fragment, chunkMeta: ChunkMetadata) {
     if (this.state !== State.PARSING) {
       return;
     }
@@ -568,8 +574,8 @@ class AudioStreamController extends BaseStreamController {
     this.log(`Audio, container:${track.container}, codecs[level/parsed]=[${track.levelCodec}/${track.codec}]`);
     let initSegment = track.initSegment;
     if (initSegment) {
-      let appendObj = { type: 'audio', data: initSegment, parent: 'audio', content: 'initSegment' };
-      this.hls.trigger(Event.BUFFER_APPENDING, appendObj);
+      let segment: BufferAppendingEventPayload = { type: 'audio', data: initSegment, frag, chunkMeta };
+      this.hls.trigger(Event.BUFFER_APPENDING, segment);
     }
     // trigger handler right now
     this.tick();

@@ -6,7 +6,7 @@ import Hls from '../../../src/hls';
 import BufferOperationQueue from '../../../src/controller/buffer-operation-queue';
 import BufferController from '../../../src/controller/buffer-controller';
 import { BufferOperation, SourceBufferName } from '../../../src/types/buffer';
-import { Segment } from '../../../src/types/segment';
+import { BufferAppendingEventPayload } from '../../../src/types/bufferAppendingEventPayload';
 import Events from '../../../src/events';
 import { ErrorDetails, ErrorTypes } from '../../../src/errors';
 import Fragment, { ElementaryStreamTypes } from '../../../src/loader/fragment';
@@ -138,7 +138,7 @@ describe('BufferController SourceBuffer operation queueing', function () {
       queueNames.forEach((name, i) => {
         const buffer = buffers[name];
         const segmentData = new Uint8Array();
-        const data: Segment = {
+        const data: BufferAppendingEventPayload = {
           type: name,
           data: segmentData,
           parent: 'main',

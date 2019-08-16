@@ -8,11 +8,14 @@ import Fragment from '../loader/fragment';
 import TransmuxerInterface from '../demux/transmuxer-interface';
 import FragmentLoader, { FragLoadSuccessResult, FragmentLoadProgressCallback } from '../loader/fragment-loader';
 import * as LevelHelper from './level-helper';
-import { TransmuxIdentifier } from '../types/transmuxer';
+import { ChunkMetadata } from '../types/transmuxer';
 import { appendUint8Array } from '../utils/mp4-tools';
 import LevelDetails from '../loader/level-details';
 import { alignStream } from '../utils/discontinuities';
 import { findFragmentByPDT, findFragmentByPTS, findFragWithCC } from './fragment-finders';
+import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
+import { SourceBufferName } from '../types/buffer';
+import { HlsChunkPerformanceTiming, HlsProgressivePerformanceTiming, LoaderStats } from '../types/loader';
 
 export const State = {
   STOPPED: 'STOPPED',
@@ -216,7 +219,8 @@ export default class BaseStreamController extends TaskLoop {
     if (!transmuxer) {
       return;
     }
-    transmuxer.flush({ level: frag.level, sn: frag.sn as number, start: performance.now(), end: 0 });
+    const chunkMeta = new ChunkMetadata(frag.level, frag.sn, frag.stats.chunkCount);
+    transmuxer.flush(chunkMeta);
   }
 
   protected _handleFragmentLoadProgress (frag: Fragment, payload) {}
@@ -238,13 +242,13 @@ export default class BaseStreamController extends TaskLoop {
       .catch(errorHandler);
   }
 
-  protected _handleTransmuxerFlush (identifier: TransmuxIdentifier) {
+  protected _handleTransmuxerFlush (chunkMeta: ChunkMetadata) {
     if (this.state !== State.PARSING) {
       this.warn(`State is expected to be PARSING on transmuxer flush, but is ${this.state}.`);
       return;
     }
 
-    const context = this.getCurrentContext(identifier);
+    const context = this.getCurrentContext(chunkMeta);
     if (!context) {
       return;
     }
@@ -256,9 +260,9 @@ export default class BaseStreamController extends TaskLoop {
     this.hls.trigger(Event.FRAG_PARSED, { frag });
   }
 
-  protected getCurrentContext (identifier: TransmuxIdentifier) : { frag: Fragment, level: any } | null {
+  protected getCurrentContext (chunkMeta: ChunkMetadata) : { frag: Fragment, level: any } | null {
     const { fragCurrent, levels } = this;
-    const { level, sn } = identifier;
+    const { level, sn } = chunkMeta;
     if (!levels || !levels[level]) {
       this.warn(`Levels object was unset while buffering fragment ${sn} of level ${level}. The current chunk will not be buffered.`);
       return null;
@@ -277,16 +281,12 @@ export default class BaseStreamController extends TaskLoop {
     return { frag, level: currentLevel };
   }
 
-  protected bufferFragmentData (data: { data1: Uint8Array, data2: Uint8Array, type: string }, frag: Fragment) {
+  protected bufferFragmentData (data: { data1: Uint8Array, data2?: Uint8Array, type: SourceBufferName }, frag: Fragment, chunkMeta: ChunkMetadata) {
     if (!data || this.state !== State.PARSING) {
       return;
     }
 
-    if (!frag.stats.buffering.start) {
-      frag.stats.buffering.start = performance.now();
-    }
-
-    const { data1, data2 } = data;
+    let { data1, data2 } = data;
     let buffer = data1;
     if (data1 && data2) {
       // Combine the moof + mdat so that we buffer with a single append
@@ -297,7 +297,8 @@ export default class BaseStreamController extends TaskLoop {
       return;
     }
 
-    this.hls.trigger(Event.BUFFER_APPENDING, { type: data.type, data: buffer, parent: frag.type, content: 'data' });
+    const segment: BufferAppendingEventPayload = { type: data.type, data: buffer, frag, chunkMeta };
+    this.hls.trigger(Event.BUFFER_APPENDING, segment);
     this.tick();
   }
 
@@ -553,7 +554,8 @@ export default class BaseStreamController extends TaskLoop {
       this.nextLoadPosition = this.lastCurrentTime;
     }
     if (transmuxer && frag.sn !== 'initSegment') {
-      transmuxer.flush({ sn: frag.sn, level: frag.level, start: performance.now(), end: 0 });
+      const meta = new ChunkMetadata(frag.level, frag.sn, frag.stats.chunkCount);
+      transmuxer.flush(meta);
     }
 
     Object.keys(frag.elementaryStreams).forEach(type => frag.elementaryStreams[type] = null);

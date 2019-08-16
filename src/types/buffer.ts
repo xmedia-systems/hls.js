@@ -1,4 +1,4 @@
-export type SourceBufferName = 'video' | 'audio';
+export type SourceBufferName = 'video' | 'audio' | 'audiovideo';
 
 export type ExtendedSourceBuffer = SourceBuffer & {
   ended?: boolean

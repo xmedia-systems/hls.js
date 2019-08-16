@@ -7,7 +7,7 @@ import { getMediaSource } from '../utils/mediasource-helper';
 import { getSelfScope } from '../utils/get-self-scope';
 import { Observer } from '../observer';
 import Fragment from '../loader/fragment';
-import { TransmuxerResult, TransmuxIdentifier } from '../types/transmuxer';
+import { ChunkMetadata, TransmuxerResult } from '../types/transmuxer';
 
 // see https://stackoverflow.com/a/11237259/589493
 const global = getSelfScope(); // safeguard for code that might run both on worker and main thread
@@ -24,7 +24,7 @@ export default class TransmuxerInterface {
   private onTransmuxComplete: Function;
   private onFlush: Function;
 
-  private currentTransmuxSession: TransmuxIdentifier | null = null;
+  private currentTransmuxSession: ChunkMetadata | null = null;
 
   constructor (hls, id, onTransmuxComplete, onFlush) {
     this.hls = hls;
@@ -100,15 +100,14 @@ export default class TransmuxerInterface {
     }
   }
 
-  push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, transmuxIdentifier: TransmuxIdentifier, defaultInitPTS?: number): void {
+  push (data: Uint8Array, initSegment: any, audioCodec: string, videoCodec: string, frag: Fragment, duration: number, accurateTimeOffset: boolean, chunkMeta: ChunkMetadata, defaultInitPTS?: number): void {
     const { currentTransmuxSession, transmuxer, worker } = this;
     const timeOffset = Number.isFinite(frag.startPTS) ? frag.startPTS : frag.start;
     const decryptdata = frag.decryptdata;
     const lastFrag = this.frag;
 
-    if (startingNewTransmuxSession(currentTransmuxSession, transmuxIdentifier)) {
+    if (startingNewTransmuxSession(currentTransmuxSession, chunkMeta)) {
       frag.stats.parsing.start = performance.now();
-
       const discontinuity = !(lastFrag && (frag.cc === lastFrag.cc));
       const trackSwitch = !(lastFrag && (frag.level === lastFrag.level));
       const nextSN = !!(lastFrag && (frag.sn === (lastFrag.sn as number + 1)));
@@ -120,12 +119,13 @@ export default class TransmuxerInterface {
         contiguous: ${contiguous}
         accurateTimeOffset: ${accurateTimeOffset}
         timeOffset: ${timeOffset}`);
-      this.currentTransmuxSession = transmuxIdentifier;
+      this.currentTransmuxSession = chunkMeta;
       const config = new TransmuxConfig(audioCodec, videoCodec, new Uint8Array(initSegment), duration, defaultInitPTS);
       const state = new TransmuxState(discontinuity, contiguous, accurateTimeOffset, trackSwitch, timeOffset);
       this.configureTransmuxer(config, state);
     }
 
+    chunkMeta.transmuxing.start = performance.now();
     this.frag = frag;
     // Frags with sn of 'initSegment' are not transmuxed
     if (worker) {
@@ -134,10 +134,10 @@ export default class TransmuxerInterface {
         cmd: 'demux',
         data,
         decryptdata,
-        transmuxIdentifier
+        chunkMeta
       }, data instanceof ArrayBuffer ? [data] : []);
     } else if (transmuxer) {
-      const transmuxResult = transmuxer.push(data, decryptdata, transmuxIdentifier);
+      const transmuxResult = transmuxer.push(data, decryptdata, chunkMeta);
       if (!transmuxResult) {
         return;
       }
@@ -146,41 +146,42 @@ export default class TransmuxerInterface {
       if (transmuxResult.then) {
         // @ts-ignore
         transmuxResult.then(data => {
-          this.onTransmuxComplete(data);
+          this.handleTransmuxComplete(data);
         });
       } else {
-        this.onTransmuxComplete(transmuxResult);
+        this.handleTransmuxComplete(transmuxResult as TransmuxerResult);
       }
     }
   }
 
-  flush (transmuxIdentifier: TransmuxIdentifier) {
+  flush (chunkMeta: ChunkMetadata) {
     const { transmuxer, worker } = this;
     this.currentTransmuxSession = null;
+    chunkMeta.transmuxing.start = performance.now();
     if (worker) {
       worker.postMessage({
         cmd: 'flush',
-        transmuxIdentifier
+        chunkMeta
       });
     } else if (transmuxer) {
-      const transmuxResult = transmuxer.flush(transmuxIdentifier);
+      const transmuxResult = transmuxer.flush(chunkMeta);
       // @ts-ignore
       if (transmuxResult.then) {
         // @ts-ignore
         transmuxResult.then(data => {
-          this.handleFlushResult(data, transmuxIdentifier);
+          this.handleFlushResult(data, chunkMeta);
         });
       } else {
-        this.handleFlushResult(transmuxResult as Array<TransmuxerResult>, transmuxIdentifier);
+        this.handleFlushResult(transmuxResult as Array<TransmuxerResult>, chunkMeta);
       }
     }
   }
 
-  private handleFlushResult (results: Array<TransmuxerResult>, transmuxIdentifier: TransmuxIdentifier) {
+  private handleFlushResult (results: Array<TransmuxerResult>, chunkMeta: ChunkMetadata) {
     results.forEach(result => {
-      this.onTransmuxComplete(result);
+      this.handleTransmuxComplete(result);
     });
-    this.onFlush(transmuxIdentifier);
+    this.onFlush(chunkMeta);
   }
 
   private onWorkerMessage (ev: any): void {
@@ -194,7 +195,7 @@ export default class TransmuxerInterface {
       }
 
       case 'transmuxComplete': {
-          this.onTransmuxComplete(data.data);
+          this.handleTransmuxComplete(data.data);
           break;
       }
 
@@ -226,9 +227,14 @@ export default class TransmuxerInterface {
       transmuxer.configure(config, state);
     }
   }
+
+  private handleTransmuxComplete (result: TransmuxerResult) {
+    result.chunkMeta.transmuxing.end = performance.now();
+    this.onTransmuxComplete(result);
+  }
 }
 
-function startingNewTransmuxSession (currentIdentifier: TransmuxIdentifier | null, newIdentifier: TransmuxIdentifier) {
+function startingNewTransmuxSession (currentIdentifier: ChunkMetadata | null, newIdentifier: ChunkMetadata) {
   if (!currentIdentifier) {
     return true;
   }

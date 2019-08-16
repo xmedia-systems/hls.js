@@ -193,8 +193,6 @@ class AbrController extends EventHandler {
     if (stats.aborted) {
       return;
     }
-
-    logFragStats(frag);
     // Only count non-alt-audio frags which were actually buffered in our BW calculations
     // TODO: Figure out a heuristical way to see if a frag was loaded from the cache
     if (frag.type !== 'main' || frag.sn === 'initSegment' || frag.bitrateTest) {
@@ -343,20 +341,6 @@ class AbrController extends EventHandler {
   }
 }
 
-function logFragStats (frag: Fragment) {
-  const stats = frag.stats;
-  const tLoad = stats.loading.end - stats.loading.start;
-  const tBuffer = stats.buffering.end - stats.buffering.start;
-  const tParse = stats.parsing.end - stats.parsing.start;
-  const tTotal = stats.buffering.end - stats.loading.start;
-  logger.log(`[abr-controller]: Stats for fragment ${frag.sn} of level ${frag.level}:
-        Size: ${((stats.total / 1024)).toFixed(3)} kB
-        Chunk Count: ${stats.chunkCount}
-        Load time: ${tLoad.toFixed(3)} ms
-        Parse Time: ${(tParse).toFixed(3)} ms
-        Buffer Time: ${(tBuffer).toFixed(3)} ms
-        Cumulative Transmux Time: ${(stats.parsing.cumulative).toFixed(3)} ms
-        Total Processing Time: ${(tTotal).toFixed(3)} ms`);
-}
+
 
 export default AbrController;
