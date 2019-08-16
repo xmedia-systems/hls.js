@@ -17,6 +17,7 @@ export default class LevelMeasurement {
   private chunkVideoBufferCMA = new CMA();
   private chunkVideoBufferIdleCMA = new CMA();
   private chunkAudioBufferCMA = new CMA();
+  private chunkAudioBufferIdleCMA = new CMA();
 
   constructor(level: Level, index: number) {
     this.level = level;
@@ -35,17 +36,26 @@ export default class LevelMeasurement {
       this.chunkVideoBufferIdleCMA.update(buffering.video.executeStart - buffering.video.start);
     } else if (type === 'audio') {
       this.chunkAudioBufferCMA.update(buffering.audio.end - buffering.audio.start);
+      this.chunkAudioBufferIdleCMA.update(buffering.audio.executeStart - buffering.audio.start);
     }
 
-    const statsString = (`Chunk stats:
-      Average transmuxing time:        ${this.chunkTransmuxCMA.avg.toFixed(3)} ms
-      Average video buffering time:    ${this.chunkVideoBufferCMA.avg.toFixed(3)} ms
-      Average audio buffering time:    ${this.chunkAudioBufferCMA.avg.toFixed(3)} ms
-      
-      Average transmux queue wait:     ${this.chunkTransmuxIdleCMA.avg.toFixed(3)} ms
-      Average video buffer queue wait: ${this.chunkVideoBufferIdleCMA.avg.toFixed(3)} ms
-    `);
+    // const statsString = (`Chunk stats:
+    //   Average transmuxing time:        ${this.chunkTransmuxCMA.avg.toFixed(3)} ms
+    //   Average transmux queue wait:     ${this.chunkTransmuxIdleCMA.avg.toFixed(3)} ms
+    //
+    //   Average video buffering time:    ${this.chunkVideoBufferCMA.avg.toFixed(3)} ms
+    //   Average video buffer queue wait: ${this.chunkVideoBufferIdleCMA.avg.toFixed(3)} ms
+    //
+    // `);
+    const statsString = (`
+     ${this.chunkTransmuxCMA.avg.toFixed(3)}
+     ${this.chunkTransmuxIdleCMA.avg.toFixed(3)}
+     ${this.chunkVideoBufferCMA.avg.toFixed(3)}
+     ${this.chunkVideoBufferIdleCMA.avg.toFixed(3)}`);
     document.querySelector('.stats-container .chunk').innerText = statsString;
+
+    //      Average audio buffering time:    ${this.chunkAudioBufferCMA.avg.toFixed(3)} ms
+    //    Average audio buffer queue wait: ${this.chunkAudioBufferIdleCMA.avg.toFixed(3)} ms
 
   }
 
@@ -59,11 +69,18 @@ export default class LevelMeasurement {
     this.fragBufferCMA.update(buffering.end - buffering.start);
     this.fragTotalCMA.update(buffering.end - loading.start);
 
-    const statsString = (`Level ${this.index} Stats:
-      Average frag load time:             ${(this.fragLoadCMA.avg).toFixed(3)} ms
-      Average frag parse time:            ${(this.fragParseCMA.avg).toFixed(3)} ms
-      Average frag buffer time:           ${(this.fragBufferCMA.avg).toFixed(3)} ms
-      Average total frag processing time: ${(this.fragTotalCMA.avg).toFixed(3)} ms
+    // const statsString = (`Level ${this.index} Stats:
+    //   Average frag load time:             ${(this.fragLoadCMA.avg).toFixed(3)} ms
+    //   Average frag parse time:            ${(this.fragParseCMA.avg).toFixed(3)} ms
+    //   Average frag buffer time:           ${(this.fragBufferCMA.avg).toFixed(3)} ms
+    //   Average total frag processing time: ${(this.fragTotalCMA.avg).toFixed(3)} ms
+    // `);
+
+    const statsString = (`
+    ${(this.fragLoadCMA.avg).toFixed(3)}
+    ${(this.fragParseCMA.avg).toFixed(3)}
+    ${(this.fragBufferCMA.avg).toFixed(3)}
+    ${(this.fragTotalCMA.avg).toFixed(3)}
     `);
     console.log(statsString);
     document.querySelector('.stats-container .frag').innerText = statsString;
