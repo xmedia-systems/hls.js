@@ -60,6 +60,7 @@ export default class BufferOperationQueue {
   }
 
   public shiftAndExecuteNext (type: SourceBufferName) {
+    // console.log(`>>> ${type} queue length: ${this.queues[type].length}`);
     this.queues[type].shift();
     this.executeNext(type);
   }

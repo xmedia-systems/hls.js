@@ -26,6 +26,7 @@ export default class PerformanceMonitor extends EventHandler {
   }
 
   onBufferAppending (data: { chunkMeta: ChunkMetadata }) {
+    return;
     const { chunkMeta } = data;
     const parseStartHash = statHash(chunkMeta, 'transmuxing','start');
     const parseEndHash = statHash(chunkMeta, 'transmuxing', 'end');
@@ -38,6 +39,7 @@ export default class PerformanceMonitor extends EventHandler {
   }
 
   onBufferAppended (data: { chunkMeta: ChunkMetadata}) {
+    return;
     const { chunkMeta } = data;
     if (chunkMeta.buffering.video.end && !chunkMeta.buffering.video.recorded) {
       chunkMeta.buffering.video.recorded = true;
