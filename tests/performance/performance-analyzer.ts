@@ -61,10 +61,10 @@ class PerformanceAnalyzer {
     levelAnalyzer.updateFragmentMeasures(stats);
   }
 
-  private onBufferAppended (e: string, data: { type: string, chunkMeta: ChunkMetadata }) {
-    const { chunkMeta, type } = data;
+  private onBufferAppended (e: string, data: { type: string, chunkMeta: ChunkMetadata, fragStats: LoaderStats }) {
+    const { chunkMeta, type, fragStats } = data;
     const levelAnalyzer = this.levelAnalyzers[chunkMeta.level];
-    levelAnalyzer.updateChunkMeasures(chunkMeta, type);
+    levelAnalyzer.updateChunkMeasures(chunkMeta, type, fragStats);
   }
 }
 
@@ -75,7 +75,7 @@ interface HlsListener {
 
 const mediaElement = document.querySelector('video');
 const hlsInstance = new Hls({
-  progressive: false,
+  // progressive: false,
   // debug: true,
   enableWorker: true,
   capLevelToPlayerSize: false,

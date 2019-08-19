@@ -43,6 +43,7 @@ export interface LoaderStats {
   total: number;
   chunkCount: number;
   bwEstimate: number;
+  firstBuffer: number;
   loading: HlsNetworkTiming;
   parsing: HlsProgressivePerformanceTiming;
   buffering: HlsProgressivePerformanceTiming;

@@ -11,6 +11,7 @@ export default class LevelMeasurement {
   private fragParseCMA: CMA = new CMA();
   private fragBufferCMA: CMA = new CMA();
   private fragTotalCMA: CMA = new CMA();
+  private firstBufferCMA: CMA = new CMA();
 
   private chunkTransmuxCMA = new CMA();
   private chunkTransmuxIdleCMA = new CMA();
@@ -24,7 +25,7 @@ export default class LevelMeasurement {
     this.index = index;
   }
 
-  updateChunkMeasures (meta: ChunkMetadata, type: string) {
+  updateChunkMeasures (meta: ChunkMetadata, type: string, fragStats: LoaderStats) {
     const transmuxing = meta.transmuxing;
     const buffering = meta.buffering;
 
@@ -38,6 +39,7 @@ export default class LevelMeasurement {
       this.chunkAudioBufferCMA.update(buffering.audio.end - buffering.audio.start);
       this.chunkAudioBufferIdleCMA.update(buffering.audio.executeStart - buffering.audio.start);
     }
+
 
     // const statsString = (`Chunk stats:
     //   Average transmuxing time:        ${this.chunkTransmuxCMA.avg.toFixed(3)} ms
@@ -68,6 +70,7 @@ export default class LevelMeasurement {
     this.fragParseCMA.update(parsing.end - parsing.start);
     this.fragBufferCMA.update(buffering.end - buffering.start);
     this.fragTotalCMA.update(buffering.end - loading.start);
+    this.firstBufferCMA.update(stats.firstBuffer - loading.start);
 
     // const statsString = (`Level ${this.index} Stats:
     //   Average frag load time:             ${(this.fragLoadCMA.avg).toFixed(3)} ms
@@ -81,6 +84,7 @@ export default class LevelMeasurement {
     ${(this.fragParseCMA.avg).toFixed(3)}
     ${(this.fragBufferCMA.avg).toFixed(3)}
     ${(this.fragTotalCMA.avg).toFixed(3)}
+ fb ${this.firstBufferCMA.avg.toFixed(3)}
     `);
     console.log(statsString);
     document.querySelector('.stats-container .frag').innerText = statsString;

@@ -216,14 +216,18 @@ export default class BufferController extends EventHandler {
         this.appendExecuteor(data, type);
       },
       onComplete: () => {
-        chunkStats.executeEnd = chunkStats.end = performance.now();
+        const now = performance.now();
+        chunkStats.executeEnd = chunkStats.end = now;
+        if (!frag.stats.firstBuffer) {
+          frag.stats.firstBuffer = now;
+        }
         const { sourceBuffer } = this;
         const timeRanges = {};
         for (let type in sourceBuffer) {
           timeRanges[type] = sourceBuffer[type].buffered;
         }
         this.appendError = 0;
-        this.hls.trigger(Events.BUFFER_APPENDED, { type, parent: frag.type, timeRanges, chunkMeta });
+        this.hls.trigger(Events.BUFFER_APPENDED, { type, parent: frag.type, timeRanges, chunkMeta, fragStats: frag.stats });
       },
       onError: (err) => {
         // in case any error occured while appending, put back segment in segments table
