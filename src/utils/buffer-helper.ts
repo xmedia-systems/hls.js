@@ -38,10 +38,9 @@ export class BufferHelper {
   static bufferInfo (media: HTMLMediaElement, pos: number, maxHoleDuration: number): BufferUtilInfo {
     try {
       if (media) {
-        let vbuffered = media.buffered, buffered: Array<{
-          start: number,
-          end: number
-        }> = [], i;
+        let vbuffered = media.buffered;
+        let buffered: BufferedUtilArray = [];
+        let i;
         for (i = 0; i < vbuffered.length; i++) {
           buffered.push({ start: vbuffered.start(i), end: vbuffered.end(i) });
         }
