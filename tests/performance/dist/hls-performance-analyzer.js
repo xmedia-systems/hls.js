@@ -315,7 +315,7 @@ function () {
 var performance_analyzer_mediaElement = document.querySelector('video');
 var hlsInstance = new Hls({
   // progressive: false,
-  // debug: true,
+  debug: true,
   enableWorker: true,
   capLevelToPlayerSize: false,
   maxBufferLength: 60

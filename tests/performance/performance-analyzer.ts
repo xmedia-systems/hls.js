@@ -96,10 +96,10 @@ const hlsInstance = new Hls({
   maxBufferLength: 60
 });
 const analyzer = new PerformanceAnalyzer(hlsInstance, mediaElement);
-// analyzer.setup('http://localhost:9999/100kb/file.m3u8');
+analyzer.setup('http://localhost:9999/100kb/file.m3u8');
 // analyzer.setup('http://localhost:9999/1mb/file.m3u8');
 // analyzer.setup('http://localhost:9999/2.5mb/file.m3u8');
 // analyzer.setup('http://localhost:9999/5mb/file.m3u8');
 // analyzer.setup('http://localhost:9999/10mb/file.m3u8');
-analyzer.setup('http://localhost:9999/25mb/file.m3u8');
+// analyzer.setup('http://localhost:9999/25mb/file.m3u8');
 // analyzer.setup('https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8');
