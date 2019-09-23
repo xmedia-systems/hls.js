@@ -27,7 +27,9 @@ export function addGroupId (level: Level, type: string, id: string): void {
 }
 
 export function updatePTS (fragments: Fragment[], fromIdx: number, toIdx: number): void {
-  let fragFrom = fragments[fromIdx], fragTo = fragments[toIdx], fragToPTS = fragTo.startPTS;
+  const fragFrom = fragments[fromIdx];
+  const fragTo = fragments[toIdx];
+  const fragToPTS = fragTo.startPTS;
   // if we know startPTS[toIdx]
   if (Number.isFinite(fragToPTS)) {
     // update fragment duration.
@@ -58,11 +60,11 @@ export function updateFragPTSDTS (details: LevelDetails, frag: Fragment, startPT
   let maxStartPTS = startPTS;
   if (Number.isFinite(frag.startPTS)) {
     // delta PTS between audio and video
-    let deltaPTS = Math.abs(frag.startPTS - startPTS);
-    if (!Number.isFinite(<number>frag.deltaPTS)) {
+    const deltaPTS = Math.abs(frag.startPTS - startPTS);
+    if (!Number.isFinite(frag.deltaPTS as number)) {
       frag.deltaPTS = deltaPTS;
     } else {
-      frag.deltaPTS = Math.max(deltaPTS, <number>frag.deltaPTS);
+      frag.deltaPTS = Math.max(deltaPTS, frag.deltaPTS as number);
     }
 
     maxStartPTS = Math.max(startPTS, frag.startPTS);
@@ -81,15 +83,14 @@ export function updateFragPTSDTS (details: LevelDetails, frag: Fragment, startPT
   frag.duration = endPTS - startPTS;
   console.assert(frag.duration > 0, 'Fragment should have a positive duration', frag);
 
-  const sn = <number>frag.sn; // 'initSegment'
+  const sn = frag.sn as number; // 'initSegment'
   // exit if sn out of range
   if (!details || sn < details.startSN || sn > details.endSN) {
     return 0;
   }
-
-  let fragIdx, fragments, i;
-  fragIdx = sn - details.startSN;
-  fragments = details.fragments;
+  let i;
+  const fragIdx = sn - details.startSN;
+  const fragments = details.fragments;
   // update frag reference in fragments array
   // rationale is that fragments array might not contain this frag object.
   // this will happen if playlist has been refreshed between frag loading and call to updateFragPTSDTS()
@@ -267,8 +268,9 @@ export function getProgramDateTimeAtEndOfLastEncodedFragment (levelDetails: Leve
   if (levelDetails.hasProgramDateTime) {
     const encodedFragments = levelDetails.fragments.filter((fragment) => !fragment.prefetch);
     const lastEncodedFrag = encodedFragments[encodedFragments.length - 1];
-    if (Number.isFinite(<number>lastEncodedFrag.programDateTime)) {
-      return <number > lastEncodedFrag.programDateTime + lastEncodedFrag.duration * 1000;
+    const programDateTime = lastEncodedFrag.programDateTime as number;
+    if (Number.isFinite(programDateTime)) {
+      return programDateTime + lastEncodedFrag.duration * 1000;
     }
   }
   return null;
