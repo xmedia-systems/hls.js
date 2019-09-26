@@ -4,6 +4,7 @@ import { BufferOperation, SourceBuffers, SourceBufferName } from '../types/buffe
 export default class BufferOperationQueue {
   private buffers: SourceBuffers;
   public queues = {
+    audiovideo: [] as Array<BufferOperation>,
     audio: [] as Array<BufferOperation>,
     video: [] as Array<BufferOperation>
   };
