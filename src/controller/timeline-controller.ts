@@ -271,14 +271,12 @@ class TimelineController extends EventHandler {
           let textTrack: TextTrack | undefined;
           if (index < inUseTracks.length) {
             let inUseTrack: TextTrack | null = null;
-
             for (let i = 0; i < inUseTracks.length; i++) {
               if (canReuseVttTextTrack(inUseTracks[i], track)) {
                 inUseTrack = inUseTracks[i];
                 break;
               }
             }
-
             // Reuse tracks with the same label, but do not reuse 608/708 tracks
             if (inUseTrack) {
               textTrack = inUseTrack;

@@ -84,7 +84,10 @@ module.exports = {
       { 'property': 'findIndex' },  // Intended to block usage of Array.prototype.findIndex
       { 'property': 'find' }        // Intended to block usage of Array.prototype.find
     ],
-
+    'no-restricted-properties': [2,
+      { 'property': 'findIndex' },  // Intended to block usage of Array.prototype.findIndex
+      { 'property': 'find' }        // Intended to block usage of Array.prototype.find
+    ],
     'standard/no-callback-literal': 1,
     'import/first': 1,
     'no-var': 1,
