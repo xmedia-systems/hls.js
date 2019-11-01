@@ -94,6 +94,7 @@ module.exports = {
     'no-empty': 1,
     'no-mixed-operators': 1,
     'no-unused-vars': 1,
+    '@typescript-eslint/no-unused-vars': 1,
     'no-console': 1,
     'no-fallthrough': 1,
     'no-case-declarations': 1,
@@ -109,6 +110,12 @@ module.exports = {
     'no-void': 0,
     'no-useless-catch': 2,
     'lines-between-class-members': 2,
-    'no-prototype-builtins': 0
+    'no-prototype-builtins': 0,
+    '@typescript-eslint/consistent-type-assertions': [ 2, 
+      {
+        'assertionStyle': 'as',
+        'objectLiteralTypeAssertions': 'never'
+      }
+    ]
   }
 };
