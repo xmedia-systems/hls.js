@@ -167,7 +167,7 @@ export default class StreamController extends BaseStreamController {
       return;
     }
     // compute max Buffer Length that we could get from this load level, based on level bitrate. don't buffer more than 60 MB and more than 30s
-    const levelBitrate = levelInfo.bitrate;
+    const levelBitrate = levelInfo.maxBitrate;
     let maxBufLen;
     if (levelBitrate) {
       maxBufLen = Math.max(8 * config.maxBufferSize / levelBitrate, config.maxBufferLength);
@@ -348,7 +348,7 @@ export default class StreamController extends BaseStreamController {
         const nextLevel = levels[nextLevelId];
         const fragLastKbps = this.fragLastKbps;
         if (fragLastKbps && this.fragCurrent) {
-          fetchdelay = this.fragCurrent.duration * nextLevel.bitrate / (1000 * fragLastKbps) + 1;
+          fetchdelay = this.fragCurrent.duration * nextLevel.maxBitrate / (1000 * fragLastKbps) + 1;
         } else {
           fetchdelay = 0;
         }
@@ -824,7 +824,7 @@ export default class StreamController extends BaseStreamController {
     // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
     const startPosition = media.seeking ? currentTime : this.startPosition;
     // if currentTime not matching with expected startPosition or startPosition not buffered but close to first buffered
-    if (currentTime !== startPosition) {
+    if (currentTime !== startPosition && startPosition >= 0) {
       // if startPosition not buffered, let's seek to buffered.start(0)
       this.log(`Target start position not buffered, seek to buffered.start(0) ${startPosition} from current time ${currentTime} `);
       media.currentTime = startPosition;
