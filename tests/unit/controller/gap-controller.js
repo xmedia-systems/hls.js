@@ -13,7 +13,9 @@ describe('checkBuffer', function () {
 
   beforeEach(function () {
     const hls = new Hls({});
-    media = document.createElement('video');
+    media = {
+      currentTime: 0
+    };
     config = hls.config;
     gapController = new GapController(config, media, new FragmentTracker(hls), hls);
     triggerSpy = sinon.spy(hls, 'trigger');
