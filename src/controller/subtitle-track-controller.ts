@@ -2,11 +2,11 @@ import Event from '../events';
 import EventHandler from '../event-handler';
 import { logger } from '../utils/logger';
 import { computeReloadInterval } from './level-helper';
-import { PlaylistMedia } from '../types/level';
-import { TrackLoadedData, ManifestLoadedData, MediaAttachedData } from '../types/events';
+import { MediaPlaylist } from '../types/media-playlist';
+import { TrackLoadedData, ManifestLoadedData, MediaAttachedData, SubtitleTracksUpdated } from '../types/events';
 
 class SubtitleTrackController extends EventHandler {
-  private tracks: PlaylistMedia[];
+  private tracks: MediaPlaylist[];
   private trackId: number = -1;
   private media: HTMLVideoElement | null = null;
   private stopped: boolean = true;
@@ -64,13 +64,14 @@ class SubtitleTrackController extends EventHandler {
 
   // Fired whenever a new manifest is loaded.
   protected onManifestLoaded (data: ManifestLoadedData): void {
-    const tracks = data.subtitles || [];
-    this.tracks = tracks;
-    this.hls.trigger(Event.SUBTITLE_TRACKS_UPDATED, { subtitleTracks: tracks });
+    const subtitleTracks = data.subtitles || [];
+    this.tracks = subtitleTracks;
+    const subtitleTracksUpdated: SubtitleTracksUpdated = { subtitleTracks };
+    this.hls.trigger(Event.SUBTITLE_TRACKS_UPDATED, subtitleTracksUpdated);
 
     // loop through available subtitle tracks and autoselect default if needed
     // TODO: improve selection logic to handle forced, etc
-    tracks.forEach(track => {
+    subtitleTracks.forEach((track: MediaPlaylist) => {
       if (track.default) {
         // setting this.subtitleTrack will trigger internal logic
         // if media has not been attached yet, it will fail
@@ -89,17 +90,18 @@ class SubtitleTrackController extends EventHandler {
     const { id, details } = data;
     const { trackId, tracks } = this;
     const currentTrack = tracks[trackId];
+    const curDetails = currentTrack.details;
+
     if (id >= tracks.length || id !== trackId || !currentTrack || this.stopped) {
       this._clearReloadTimer();
       return;
     }
 
+    currentTrack.details = data.details;
     logger.log(`[subtitle-track-controller]: subtitle track ${id} loaded [${details.startSN},${details.endSN}]`);
 
     if (details.live) {
-      const curDetails = currentTrack.details;
-      details.updated = (!curDetails || details.endSN !== curDetails.endSN || details.url !== curDetails.url);
-      details.availabilityDelay = curDetails && curDetails.availabilityDelay;
+      details.reloaded(curDetails);
       const reloadInterval = computeReloadInterval(details, data.stats);
       logger.log(`[subtitle-track-controller]: live subtitle track ${details.updated ? 'REFRESHED' : 'MISSED'}, reload in ${Math.round(reloadInterval)} ms`);
       this.timer = self.setTimeout(() => {
@@ -121,7 +123,7 @@ class SubtitleTrackController extends EventHandler {
   }
 
   /** get alternate subtitle tracks list from playlist **/
-  get subtitleTracks (): PlaylistMedia[] {
+  get subtitleTracks (): MediaPlaylist[] {
     return this.tracks;
   }
 

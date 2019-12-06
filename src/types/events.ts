@@ -1,26 +1,29 @@
 import Fragment from '../loader/fragment';
 import LevelDetails from '../loader/level-details';
-import { Level, LevelParsed, PlaylistMedia } from './level';
+import { Level, LevelParsed } from './level';
+import { MediaPlaylist } from './media-playlist';
 import { LoaderStats } from './loader';
 import { Track } from './track';
+import { SourceBufferName } from './buffer';
+import { ChunkMetadata } from './transmuxer';
 
 export interface ManifestLoadingData {
   url: string
 }
 
 export interface ManifestLoadedData {
-  audioTracks: PlaylistMedia[]
-  captions?: PlaylistMedia[]
+  audioTracks: MediaPlaylist[]
+  captions?: MediaPlaylist[]
   levels: LevelParsed[]
   networkDetails: any,
   stats: LoaderStats
-  subtitles?: PlaylistMedia[]
+  subtitles?: MediaPlaylist[]
   url: string
 }
 
 export interface ManifestParsedData {
   levels: Level[]
-  audioTracks: PlaylistMedia[]
+  audioTracks: MediaPlaylist[]
   firstLevel: number
   stats: LoaderStats
   audio: boolean
@@ -48,7 +51,20 @@ export interface LevelLoadedData extends TrackLoadedData {
   level: number
 }
 
-export interface AudioTrackSwitchedData {
+export interface LevelUpdatedData {
+  details: LevelDetails
+  level: number
+}
+
+export interface AudioTracksUpdated {
+  audioTracks: MediaPlaylist[]
+}
+
+export interface SubtitleTracksUpdated {
+  subtitleTracks: MediaPlaylist[]
+}
+
+export interface TrackSwitchedData {
   id: number
 }
 
@@ -59,8 +75,20 @@ export interface FragLoadedData {
   stats: LoaderStats
 }
 
+export interface SubtitleFragProcessed {
+  success: boolean,
+  frag: Fragment
+}
+
 export interface MediaAttachedData {
   media: HTMLVideoElement;
+}
+
+export interface BufferAppendingEventPayload {
+  type: SourceBufferName;
+  data: Uint8Array;
+  frag: Fragment;
+  chunkMeta: ChunkMetadata
 }
 
 export interface ErrorData {

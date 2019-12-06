@@ -3,6 +3,7 @@ import FastAESKey from './fast-aes-key';
 import AESDecryptor, { removePadding } from './aes-decryptor';
 import { logger } from '../utils/logger';
 import { appendUint8Array } from '../utils/mp4-tools';
+import { sliceUint8 } from '../utils/typed-array';
 
 const CHUNK_SIZE = 16; // 16 bytes, 128 bits
 
@@ -11,7 +12,7 @@ export default class Decrypter {
   private observer: any;
   private config: any;
   private removePKCS7Padding: boolean;
-  private subtle: any | null = null;
+  private subtle: SubtleCrypto | null = null;
   private softwareDecrypter: AESDecryptor | null = null;
   private key: ArrayBuffer | null = null;
   private fastAesKey: FastAESKey | null = null;
@@ -28,8 +29,7 @@ export default class Decrypter {
       try {
         const browserCrypto = self.crypto;
         if (browserCrypto) {
-          // @ts-ignore
-          this.subtle = browserCrypto.subtle || browserCrypto.webkitSubtle;
+          this.subtle = browserCrypto.subtle || (browserCrypto as any).webkitSubtle as SubtleCrypto;
         } else {
           this.config.enableSoftwareAES = true;
         }
@@ -47,12 +47,12 @@ export default class Decrypter {
       this.reset();
       return;
     }
-    let data = currentResult;
-    if (this.removePKCS7Padding) {
-      data = removePadding(currentResult);
-    }
+    const data = new Uint8Array(currentResult);
     this.reset();
-    return new Uint8Array(data);
+    if (this.removePKCS7Padding) {
+      return removePadding(data);
+    }
+    return data;
   }
 
   reset () {
@@ -64,7 +64,7 @@ export default class Decrypter {
     }
   }
 
-  public softwareDecrypt (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer): Uint8Array | null {
+  public softwareDecrypt (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer): ArrayBuffer | null {
     const { currentIV, currentResult, remainderData } = this;
     this.logOnce('JS AES decrypt');
     // The output is staggered during progressive parsing - the current result is cached, and emitted on the next call
@@ -96,12 +96,12 @@ export default class Decrypter {
     const result = currentResult;
 
     this.currentResult = softwareDecrypter.decrypt(currentChunk.buffer, 0, iv);
-    this.currentIV = currentChunk.slice(-16).buffer;
+    this.currentIV = sliceUint8(currentChunk, -16).buffer;
 
     if (!result) {
       return null;
     }
-    return new Uint8Array(result);
+    return result;
   }
 
   public webCryptoDecrypt (data: Uint8Array, key: ArrayBuffer, iv: ArrayBuffer): Promise<ArrayBuffer> {
@@ -114,17 +114,14 @@ export default class Decrypter {
       .then((aesKey) => {
         // decrypt using web crypto
         const crypto = new AESCrypto(subtle, iv);
-        return crypto.decrypt(data.buffer, aesKey)
-          .catch((err) => {
-            return this.onWebCryptoError(err, data, key, iv);
-          });
+        return crypto.decrypt(data.buffer, aesKey);
       })
       .catch((err) => {
-        return this.onWebCryptoError(err, data, key, iv);
+        return this.onWebCryptoError(err, data, key, iv) as ArrayBuffer;
       });
   }
 
-  private onWebCryptoError (err, data, key, iv) {
+  private onWebCryptoError (err, data, key, iv): ArrayBuffer | null {
     logger.warn('[decrypter.ts]: WebCrypto Error, disable WebCrypto API:', err);
     this.config.enableSoftwareAES = true;
     this.logEnabled = true;
@@ -135,8 +132,8 @@ export default class Decrypter {
     let currentChunk = data;
     const splitPoint = data.length - (data.length % CHUNK_SIZE);
     if (splitPoint !== data.length) {
-      currentChunk = data.slice(0, splitPoint);
-      this.remainderData = data.slice(splitPoint);
+      currentChunk = sliceUint8(data, 0, splitPoint);
+      this.remainderData = sliceUint8(data, splitPoint);
     }
     return currentChunk;
   }

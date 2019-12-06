@@ -4,43 +4,36 @@ export interface LevelParsed {
   attrs: LevelAttributes
   audioCodec?: string
   bitrate: number
-  details: LevelDetails
+  details?: LevelDetails
   height?: number
   id?: number
   level?: number
-  name?: string | undefined
+  name: string
+  textCodec?: string
   unknownCodecs?: string[]
   url: string
   videoCodec?: string
   width?: number
 }
 
-// audioTracks, captions and subtitles returned by `M3U8Parser.parseMasterPlaylistMedia`
-export interface PlaylistMedia {
-  audioCodec?: string
-  autoselect: boolean
-  default: boolean
-  details?: LevelDetails
-  forced: boolean
-  groupId: string | undefined
-  id: number
-  instreamId: string | undefined
-  lang: string | undefined
-  name: string | undefined
-  type: string
-  url?: string
-}
-
 export interface LevelAttributes {
   AUDIO?: string
+  AUTOSELECT?: string
   'AVERAGE-BANDWIDTH'?: string
-  SUBTITLES?: string
   BANDWIDTH?: string
+  BYTERANGE?: string
   'CLOSED-CAPTIONS'?: string
   CODECS?: string
+  DEFAULT?: string
+  FORCED?: string
   'FRAME-RATE'?: string
+  LANGUAGE?: string
+  NAME?: string
   'PROGRAM-ID'?: string
   RESOLUTION?: string
+  SUBTITLES?: string
+  TYPE?: string
+  URI?: string
 }
 
 export class Level {
@@ -48,11 +41,12 @@ export class Level {
   public audioCodec?: string;
   public audioGroupIds?: string[];
   public bitrate: number;
-  public details: LevelDetails | undefined;
+  public details?: LevelDetails;
   public fragmentError: boolean = false;
   public height: number;
   public id: number;
   public loadError: number = 0;
+  public loaded?: any;
   public name: string | undefined;
   public realBitrate: number = 0;
   public textGroupIds?: string[];
@@ -63,7 +57,7 @@ export class Level {
   public unknownCodecs: string[] | undefined;
 
   constructor (data: LevelParsed) {
-    this.url = [ data.url ];
+    this.url = [data.url];
     this.attrs = data.attrs;
     this.bitrate = data.bitrate;
     this.details = data.details;
@@ -74,5 +68,9 @@ export class Level {
     this.audioCodec = data.audioCodec;
     this.videoCodec = data.videoCodec;
     this.unknownCodecs = data.unknownCodecs;
+  }
+
+  get maxBitrate (): number {
+    return Math.max(this.realBitrate, this.bitrate);
   }
 }

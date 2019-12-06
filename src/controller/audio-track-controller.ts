@@ -3,8 +3,15 @@ import { logger } from '../utils/logger';
 import { ErrorTypes, ErrorDetails } from '../errors';
 import { computeReloadInterval } from './level-helper';
 import EventHandler from '../event-handler';
-import { PlaylistMedia } from '../types/level';
-import { AudioTrackSwitchedData, TrackLoadedData, ManifestParsedData, LevelLoadedData, ErrorData } from '../types/events';
+import { MediaPlaylist } from '../types/media-playlist';
+import {
+  TrackSwitchedData,
+  TrackLoadedData,
+  ManifestParsedData,
+  LevelLoadedData,
+  AudioTracksUpdated,
+  ErrorData
+} from '../types/events';
 
 /**
  * @class AudioTrackController
@@ -48,7 +55,7 @@ class AudioTrackController extends EventHandler {
    * All tracks available
    * @member {AudioTrack[]}
    */
-  public tracks: PlaylistMedia[];
+  public tracks: MediaPlaylist[];
 
   /**
    * @public
@@ -64,7 +71,7 @@ class AudioTrackController extends EventHandler {
       Event.MANIFEST_PARSED,
       Event.AUDIO_TRACK_LOADED,
       Event.AUDIO_TRACK_SWITCHED,
-      Event.LEVEL_LOADED,
+      Event.LEVEL_LOADING,
       Event.ERROR
     );
 
@@ -92,7 +99,8 @@ class AudioTrackController extends EventHandler {
    */
   protected onManifestParsed (data: ManifestParsedData): void {
     const tracks = this.tracks = data.audioTracks || [];
-    this.hls.trigger(Event.AUDIO_TRACKS_UPDATED, { audioTracks: tracks });
+    const audioTracksUpdated: AudioTracksUpdated = { audioTracks: tracks };
+    this.hls.trigger(Event.AUDIO_TRACKS_UPDATED, audioTracksUpdated);
   }
 
   /**
@@ -102,19 +110,20 @@ class AudioTrackController extends EventHandler {
    */
   protected onAudioTrackLoaded (data: TrackLoadedData): void {
     const { id, details } = data;
+    const currentTrack = this.tracks[id];
+    const curDetails = currentTrack.details;
 
     if (id >= this.tracks.length) {
       logger.warn('[audio-track-controller]: Invalid audio track id:', id);
       return;
     }
 
+    currentTrack.details = data.details;
     logger.log(`[audio-track-controller]: audioTrack ${id} loaded [${details.startSN},${details.endSN}]`);
 
     // if current playlist is a live playlist, arm a timer to reload it
     if (details.live) {
-      const curDetails = this.tracks[id].details;
-      details.updated = (!curDetails || details.endSN !== curDetails.endSN || details.url !== curDetails.url);
-      details.availabilityDelay = curDetails && curDetails.availabilityDelay;
+      details.reloaded(curDetails);
       const reloadInterval = computeReloadInterval(details, data.stats);
       logger.log(`[audio-track-controller]: live audio track ${details.updated ? 'REFRESHED' : 'MISSED'}, reload in ${Math.round(reloadInterval)} ms`);
       // Stop reloading if the timer was cleared
@@ -152,7 +161,7 @@ class AudioTrackController extends EventHandler {
    *
    * Quality-levels should update to that group ID in this case.
    */
-  protected onAudioTrackSwitched (data: AudioTrackSwitchedData): void {
+  protected onAudioTrackSwitched (data: TrackSwitchedData): void {
     const audioGroupId = this.tracks[data.id].groupId;
     if (audioGroupId && (this.audioGroupId !== audioGroupId)) {
       this.audioGroupId = audioGroupId;
@@ -160,13 +169,13 @@ class AudioTrackController extends EventHandler {
   }
 
   /**
-   * When a level gets loaded, if it has redundant audioGroupIds (in the same ordinality as it's redundant URLs)
+   * When a level is loading, if it has redundant audioGroupIds (in the same ordinality as it's redundant URLs)
    * we are setting our audio-group ID internally to the one set, if it is different from the group ID currently set.
    *
    * If group-ID got update, we re-select the appropriate audio-track with this group-ID matching the currently
    * selected one (based on NAME property).
    */
-  protected onLevelLoaded (data: LevelLoadedData): void {
+  protected onLevelLoading (data: LevelLoadedData): void {
     const levelInfo = this.hls.levels[data.level];
 
     if (!levelInfo.audioGroupIds) {
@@ -200,7 +209,7 @@ class AudioTrackController extends EventHandler {
     this._handleLoadError();
   }
 
-  get audioTracks (): PlaylistMedia[] {
+  get audioTracks (): MediaPlaylist[] {
     return this.tracks;
   }
 
@@ -242,9 +251,7 @@ class AudioTrackController extends EventHandler {
 
   private _selectInitialAudioTrack (): void {
     let tracks = this.tracks;
-    if (!tracks.length) {
-      return;
-    }
+    console.assert(tracks.length, 'Initial audio track should be selected when tracks are known');
 
     const currentAudioTrack = this.tracks[this._trackId];
 
@@ -299,13 +306,13 @@ class AudioTrackController extends EventHandler {
     }
   }
 
-  private _needsTrackLoading (audioTrack: PlaylistMedia): boolean {
+  private _needsTrackLoading (audioTrack: MediaPlaylist): boolean {
     const { details, url } = audioTrack;
 
     return !!url && (!details || details.live);
   }
 
-  private _loadTrackDetailsIfNeeded (audioTrack: PlaylistMedia): void {
+  private _loadTrackDetailsIfNeeded (audioTrack: MediaPlaylist): void {
     if (this._needsTrackLoading(audioTrack)) {
       const { url, id } = audioTrack;
       // track not retrieved yet, or live playlist we need to (re)load it

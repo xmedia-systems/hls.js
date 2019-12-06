@@ -21,7 +21,6 @@ try {
   now = self.performance.now.bind(self.performance);
 } catch (err) {
   logger.debug('Unable to use Performance API on this environment');
-  // @ts-ignore
   now = self.Date.now;
 }
 
@@ -73,7 +72,7 @@ export default class Transmuxer {
     const stats = chunkMeta.transmuxing;
     stats.executeStart = now();
 
-    let uintData = new Uint8Array(data);
+    let uintData: Uint8Array = new Uint8Array(data);
     const { cache, config, currentTransmuxState: state, transmuxConfig } = this;
 
     const encryptionType = getEncryptionType(uintData, decryptdata);
@@ -83,12 +82,12 @@ export default class Transmuxer {
       if (config.enableSoftwareAES) {
         // Software decryption is progressive. Progressive decryption may not return a result on each call. Any cached
         // data is handled in the flush() call
-        const decryptedData = decrypter.softwareDecrypt(uintData, decryptdata.key.buffer, decryptdata.iv.buffer);
+        const decryptedData: ArrayBuffer = decrypter.softwareDecrypt(uintData, decryptdata.key.buffer, decryptdata.iv.buffer);
         if (!decryptedData) {
           stats.executeEnd = now();
           return emptyResult(chunkMeta);
         }
-        uintData = decryptedData;
+        uintData = new Uint8Array(decryptedData);
       } else {
         this.decryptionPromise = decrypter.webCryptoDecrypt(uintData, decryptdata.key.buffer, decryptdata.iv.buffer)
           .then((decryptedData) : TransmuxerResult => {
@@ -154,7 +153,6 @@ export default class Transmuxer {
     if (decryptionPromise) {
       // Upon resolution, the decryption promise calls push() and returns its TransmuxerResult up the stack. Therefore
       // only flushing is required for async decryption
-      // @ts-ignore
       return decryptionPromise.then(() => {
         return this.flush(chunkMeta);
       });
@@ -213,7 +211,7 @@ export default class Transmuxer {
     remuxer.resetNextTimestamp();
   }
 
-  resetInitSegment (initSegmentData: Uint8Array, audioCodec: string, videoCodec: string, duration: number) {
+  resetInitSegment (initSegmentData: Uint8Array, audioCodec: string | undefined, videoCodec: string | undefined, duration: number) {
     const { demuxer, remuxer } = this;
     if (!demuxer || !remuxer) {
       return;
@@ -319,13 +317,13 @@ export function isPromise<T> (p: Promise<T> | any): p is Promise<T> {
 }
 
 export class TransmuxConfig {
-  public audioCodec: string;
-  public videoCodec: string;
+  public audioCodec?: string;
+  public videoCodec?: string;
   public initSegmentData: Uint8Array;
   public duration: number;
   public defaultInitPts?: number;
 
-  constructor (audioCodec: string, videoCodec: string, initSegmentData: Uint8Array, duration: number, defaultInitPts?: number) {
+  constructor (audioCodec: string | undefined, videoCodec: string | undefined, initSegmentData: Uint8Array, duration: number, defaultInitPts?: number) {
     this.audioCodec = audioCodec;
     this.videoCodec = videoCodec;
     this.initSegmentData = initSegmentData;

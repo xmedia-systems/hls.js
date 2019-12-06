@@ -20,12 +20,12 @@ module.exports = {
     'eslint:recommended',
     'standard'
   ],
-  'parser': 'typescript-eslint-parser',
+  'parser': '@typescript-eslint/parser',
   'parserOptions': {
-      'sourceType': 'module'
+    'sourceType': 'module'
   },
   'plugins': [
-      'typescript'
+    '@typescript-eslint'
   ],
   'rules': {
     // our basic style rules
@@ -84,13 +84,17 @@ module.exports = {
       { 'property': 'findIndex' },  // Intended to block usage of Array.prototype.findIndex
       { 'property': 'find' }        // Intended to block usage of Array.prototype.find
     ],
-
+    'no-restricted-properties': [2,
+      { 'property': 'findIndex' },  // Intended to block usage of Array.prototype.findIndex
+      { 'property': 'find' }        // Intended to block usage of Array.prototype.find
+    ],
     'standard/no-callback-literal': 1,
     'import/first': 1,
     'no-var': 1,
     'no-empty': 1,
     'no-mixed-operators': 1,
     'no-unused-vars': 1,
+    '@typescript-eslint/no-unused-vars': 1,
     'no-console': 1,
     'no-fallthrough': 1,
     'no-case-declarations': 1,
@@ -99,6 +103,19 @@ module.exports = {
     'new-cap': 1,
     'no-undefined': 1,
     'no-global-assign': 2,
-    'prefer-const': 2
+    'prefer-const': 2,
+    'dot-notation': 2,
+    'array-bracket-spacing': 2,
+    'quote-props': 2,
+    'no-void': 0,
+    'no-useless-catch': 2,
+    'lines-between-class-members': 2,
+    'no-prototype-builtins': 0,
+    '@typescript-eslint/consistent-type-assertions': [ 2, 
+      {
+        'assertionStyle': 'as',
+        'objectLiteralTypeAssertions': 'never'
+      }
+    ]
   }
 };

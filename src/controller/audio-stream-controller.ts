@@ -8,10 +8,12 @@ import { FragmentState } from './fragment-tracker';
 import Fragment, { ElementaryStreamTypes } from '../loader/fragment';
 import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
+import ChunkCache from '../demux/chunk-cache';
 import LevelDetails from '../loader/level-details';
 import { ChunkMetadata, TransmuxerResult } from '../types/transmuxer';
-import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
+import { BufferAppendingEventPayload, TrackLoadedData, AudioTracksUpdated } from '../types/events';
 import { TrackSet } from '../types/track';
+import { Level } from '../types/level';
 
 const { performance } = self;
 
@@ -27,6 +29,7 @@ class AudioStreamController extends BaseStreamController {
   private videoTrackCC: number = -1;
   private audioSwitch: boolean = false;
   private trackId: number = -1;
+  private waitingData: { frag: Fragment, cache: ChunkCache, complete: boolean } | null = null;
 
   protected readonly logPrefix = '[audio-stream-controller]';
 
@@ -80,7 +83,8 @@ class AudioStreamController extends BaseStreamController {
       this.state = State.IDLE;
     } else {
       this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
-      this.state = State.STARTING;
+      this.loadedmetadata = false;
+      this.state = State.WAITING_TRACK;
     }
     this.nextLoadPosition = this.startPosition = this.lastCurrentTime = startPosition;
     this.tick();
@@ -96,10 +100,6 @@ class AudioStreamController extends BaseStreamController {
     case State.PAUSED:
       // TODO: Remove useless PAUSED state
       // don't do anything in paused state either ...
-      break;
-    case State.STARTING:
-      this.state = State.WAITING_TRACK;
-      this.loadedmetadata = false;
       break;
     case State.IDLE:
       this.doTickIdle();
@@ -125,14 +125,25 @@ class AudioStreamController extends BaseStreamController {
     case State.WAITING_INIT_PTS:
       const videoTrackCC = this.videoTrackCC;
       if (Number.isFinite(this.initPTS[videoTrackCC])) {
-        this.state = State.IDLE;
+        // Ensure we don't get stuck in the WAITING_INIT_PTS state if the waiting frag CC doesn't match any initPTS
+        const waitingData = this.waitingData;
+        if (waitingData) {
+          const { frag, cache, complete } = waitingData;
+          this.waitingData = null;
+          if (videoTrackCC === frag.cc) {
+            this.state = State.FRAG_LOADING;
+            const payload = cache.flush();
+            this._handleFragmentLoadProgress(frag, payload);
+            if (complete) {
+              super._handleFragmentLoadComplete(frag, payload);
+            }
+          } else {
+            this.state = State.IDLE;
+          }
+        } else {
+          this.state = State.IDLE;
+        }
       }
-      break;
-    case State.STOPPED:
-    case State.FRAG_LOADING:
-    case State.PARSING:
-    case State.PARSED:
-    case State.ENDED:
       break;
     default:
       break;
@@ -270,9 +281,9 @@ class AudioStreamController extends BaseStreamController {
     this.stopLoad();
   }
 
-  onAudioTracksUpdated (data) {
+  onAudioTracksUpdated ({ audioTracks }: AudioTracksUpdated) {
     this.log('Audio tracks updated');
-    this.levels = data.audioTracks;
+    this.levels = audioTracks.map(mediaPlaylist => new Level(mediaPlaylist));
   }
 
   onAudioTrackSwitching (data) {
@@ -285,6 +296,7 @@ class AudioStreamController extends BaseStreamController {
       fragCurrent.loader.abort();
     }
     this.fragCurrent = null;
+    this.waitingData = null;
     // destroy useless transmuxer when switching audio to main
     if (!altAudio) {
       if (transmuxer) {
@@ -307,7 +319,7 @@ class AudioStreamController extends BaseStreamController {
     this.tick();
   }
 
-  onAudioTrackLoaded (data: { details: LevelDetails, id: number }) {
+  onAudioTrackLoaded (data: TrackLoadedData) {
     const { levels } = this;
     const { details: newDetails, id: trackId } = data;
     if (!levels) {
@@ -329,7 +341,7 @@ class AudioStreamController extends BaseStreamController {
     if (!this.startFragRequested) {
       this.setStartPosition(track.details, sliding);
     }
-    // only switch batck to IDLE state if we were waiting for track to start downloading a new fragment
+    // only switch back to IDLE state if we were waiting for track to start downloading a new fragment
     if (this.state === State.WAITING_TRACK) {
       this.state = State.IDLE;
     }
@@ -352,8 +364,10 @@ class AudioStreamController extends BaseStreamController {
       return;
     }
 
-    const track = levels[trackId];
-    const details = track.details;
+    const track = levels[trackId] as Level;
+    console.assert(track, 'Audio track is defined on fragment load progress');
+    const details = track.details as LevelDetails;
+    console.assert(details, 'Audio track details are defined on fragment load progress');
     const audioCodec = config.defaultAudioCodec || track.audioCodec || 'mp4a.40.2';
 
     let transmuxer = this.transmuxer;
@@ -362,17 +376,28 @@ class AudioStreamController extends BaseStreamController {
           new TransmuxerInterface(this.hls, 'audio', this._handleTransmuxComplete.bind(this), this._handleTransmuxerFlush.bind(this));
     }
 
-    // initPTS from the video track is required for transmuxing. It should exist before loading a fragment.
+    // Check if we have video initPTS
+    // If not we need to wait for it
     const initPTS = this.initPTS[frag.cc];
-    // TODO: Compile out asserts for production builds so that we can uncomment them
-    // console.assert(Number.isFinite(initPTS), 'initPTS must exist, and must stay set, before and during fragment load');
-
     const initSegmentData = details.initSegment ? details.initSegment.data : [];
-    // this.log(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
-    // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
-    const accurateTimeOffset = false; // details.PTSKnown || !details.live;
-    const chunkMeta = new ChunkMetadata(frag.level, frag.sn, frag.stats.chunkCount, payload.byteLength);
-    transmuxer.push(payload, initSegmentData, audioCodec, '', frag, details.totalduration, accurateTimeOffset, chunkMeta, initPTS);
+    if (details.initSegment || initPTS !== undefined) {
+      // this.log(`Transmuxing ${sn} of [${details.startSN} ,${details.endSN}],track ${trackId}`);
+      // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live)
+      const accurateTimeOffset = false; // details.PTSKnown || !details.live;
+      const chunkMeta = new ChunkMetadata(frag.level, frag.sn, frag.stats.chunkCount, payload.byteLength);
+      transmuxer.push(payload, initSegmentData, audioCodec, '', frag, details.totalduration, accurateTimeOffset, chunkMeta, initPTS);
+    } else {
+      const { cache } = this.waitingData = this.waitingData || { frag, cache: new ChunkCache(), complete: false };
+      cache.push(payload);
+      this.state = State.WAITING_INIT_PTS;
+    }
+  }
+
+  protected _handleFragmentLoadComplete (frag: Fragment, payload: ArrayBuffer | Uint8Array) {
+    if (this.waitingData) {
+      return;
+    }
+    super._handleFragmentLoadComplete(frag, payload);
   }
 
   onBufferReset () {

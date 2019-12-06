@@ -4,21 +4,21 @@ import { BufferHelper } from '../utils/buffer-helper';
 import { logger } from '../utils/logger';
 import Event from '../events';
 import { ErrorDetails } from '../errors';
-import Fragment from '../loader/fragment';
-import TransmuxerInterface from '../demux/transmuxer-interface';
-import FragmentLoader, { FragLoadSuccessResult, FragmentLoadProgressCallback } from '../loader/fragment-loader';
 import * as LevelHelper from './level-helper';
 import { ChunkMetadata } from '../types/transmuxer';
 import { appendUint8Array } from '../utils/mp4-tools';
-import LevelDetails from '../loader/level-details';
 import { alignStream } from '../utils/discontinuities';
 import { findFragmentByPDT, findFragmentByPTS, findFragWithCC } from './fragment-finders';
-import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
-import { SourceBufferName } from '../types/buffer';
+import TransmuxerInterface from '../demux/transmuxer-interface';
+import Fragment from '../loader/fragment';
+import FragmentLoader, { FragLoadSuccessResult, FragmentLoadProgressCallback } from '../loader/fragment-loader';
+import LevelDetails from '../loader/level-details';
+import { BufferAppendingEventPayload } from '../types/events';
+import { Level } from '../types/level';
+import { RemuxedTrack } from '../types/remuxer';
 
 export const State = {
   STOPPED: 'STOPPED',
-  STARTING: 'STARTING',
   IDLE: 'IDLE',
   PAUSED: 'PAUSED',
   KEY_LOADING: 'KEY_LOADING',
@@ -47,7 +47,7 @@ export default class BaseStreamController extends TaskLoop {
   protected startPosition: number = 0;
   protected loadedmetadata: boolean = false;
   protected fragLoadError: number = 0;
-  protected levels: Array<any> | null = null;
+  protected levels: Array<Level> | null = null;
   protected fragmentLoader!: FragmentLoader;
   protected _liveSyncPosition: number | null = null;
   protected levelLastLoaded: number | null = null;
@@ -181,7 +181,7 @@ export default class BaseStreamController extends TaskLoop {
         compatibilityEventData.frag = frag;
         this.hls.trigger(Event.FRAG_LOADED, compatibilityEventData);
         // Pass through the whole payload; controllers not implementing progressive loading receive data from this callback
-        this._handleFragmentLoadComplete(frag);
+        this._handleFragmentLoadComplete(frag, data.payload);
       });
   }
 
@@ -192,11 +192,15 @@ export default class BaseStreamController extends TaskLoop {
         if (!data || this._fragLoadAborted(frag) || !levels) {
           return;
         }
+        const details = levels[frag.level].details as LevelDetails;
+        console.assert(details, 'Level details are defined when init segment is loaded');
+        const initSegment = details.initSegment as Fragment;
+        console.assert(initSegment, 'Fragment initSegment is defined when init segment is loaded');
         const { payload } = data;
         const stats = frag.stats;
         this.state = State.IDLE;
         this.fragLoadError = 0;
-        levels[frag.level].details.initSegment.data = payload;
+        initSegment.data = payload;
         stats.parsing.start = stats.buffering.start = self.performance.now();
         stats.parsing.end = stats.buffering.end = self.performance.now();
         // TODO: set id from calling class
@@ -213,7 +217,7 @@ export default class BaseStreamController extends TaskLoop {
     return frag.level !== fragCurrent.level || frag.sn !== fragCurrent.sn;
   }
 
-  protected _handleFragmentLoadComplete (frag: Fragment) {
+  protected _handleFragmentLoadComplete (frag: Fragment, payload: ArrayBuffer | Uint8Array) {
     const { transmuxer } = this;
     if (!transmuxer) {
       return;
@@ -238,7 +242,26 @@ export default class BaseStreamController extends TaskLoop {
       this.hls.trigger(Event.ERROR, errorData);
     };
 
-    return this.fragmentLoader.load(frag, progressCallback)
+    const level = (this.levels as Array<Level>)[frag.level];
+    const details = level.details as LevelDetails;
+    const media = this.mediaBuffer || this.media;
+    const currentTime = media ? media.currentTime : null;
+    const bufferInfo = BufferHelper.bufferInfo(media, currentTime, this.config.maxBufferHole);
+    const maxBitrate = level.maxBitrate || 0;
+
+    let bitsToBuffer: number = 0;
+    if (bufferInfo.len === 0) {
+      // Attempt to buffer 3 seconds of content when no buffer is available
+      bitsToBuffer = maxBitrate * 3;
+    } else if (details.live || (bufferInfo.end - this.media.currentTime) < details.levelTargetDuration * 2) {
+      // Buffer at least one second at a time
+      bitsToBuffer = Math.min(maxBitrate, Math.round(this.hls.bandwidthEstimate * 0.05));
+    } else {
+      // Load the whole fragment without progress updates
+      bitsToBuffer = Infinity;
+    }
+
+    return this.fragmentLoader.load(frag, progressCallback, Math.round(bitsToBuffer / 8))
       .catch(errorHandler);
   }
 
@@ -281,7 +304,7 @@ export default class BaseStreamController extends TaskLoop {
     return { frag, level: currentLevel };
   }
 
-  protected bufferFragmentData (data: { data1: Uint8Array, data2?: Uint8Array, type: SourceBufferName }, frag: Fragment, chunkMeta: ChunkMetadata) {
+  protected bufferFragmentData (data: RemuxedTrack, frag: Fragment, chunkMeta: ChunkMetadata) {
     if (!data || this.state !== State.PARSING) {
       return;
     }
@@ -471,7 +494,7 @@ export default class BaseStreamController extends TaskLoop {
     return null;
   }
 
-  protected mergeLivePlaylists (oldDetails: LevelDetails, newDetails: LevelDetails): number {
+  protected mergeLivePlaylists (oldDetails: LevelDetails | undefined, newDetails: LevelDetails): number {
     const { levels, levelLastLoaded } = this;
     let lastLevel;
     if (levelLastLoaded) {
@@ -580,8 +603,8 @@ export default class BaseStreamController extends TaskLoop {
   }
 
   set state (nextState) {
-    if (this.state !== nextState) {
-      const previousState = this.state;
+    const previousState = this._state;
+    if (previousState !== nextState) {
       this._state = nextState;
       this.log(`${previousState}->${nextState}`);
     }

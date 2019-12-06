@@ -12,23 +12,25 @@ import BaseStreamController, { State } from './base-stream-controller';
 import FragmentLoader from '../loader/fragment-loader';
 import { ChunkMetadata, TransmuxerResult } from '../types/transmuxer';
 import { Level } from '../types/level';
+import LevelDetails from '../loader/level-details';
 import { TrackSet } from '../types/track';
-import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
 import { SourceBufferName } from '../types/buffer';
+import { LevelUpdatedData, BufferAppendingEventPayload } from '../types/events';
 
 const TICK_INTERVAL = 100; // how often to tick in ms
 
 export default class StreamController extends BaseStreamController {
   private audioCodecSwap: boolean = false;
   private bitrateTest: boolean = false;
-  private gapController: any | null = null;
+  private gapController: GapController | null = null;
   private level: number = -1;
-  private forceStartLoad: boolean = false;
+  private _forceStartLoad: boolean = false;
   private retryDate: number = 0;
   private altAudio: boolean = false;
   private fragPlaying: Fragment | null = null;
   private previouslyPaused: boolean = false;
   private immediateSwitch: boolean = false;
+  private onvplaying: Function | null = null;
   private onvseeking: Function | null = null;
   private onvseeked: Function | null = null;
   private onvended: Function | null = null;
@@ -45,6 +47,7 @@ export default class StreamController extends BaseStreamController {
       Event.MEDIA_DETACHING,
       Event.MANIFEST_LOADING,
       Event.MANIFEST_PARSED,
+      Event.LEVEL_LOADING,
       Event.LEVEL_LOADED,
       Event.KEY_LOADED,
       Event.FRAG_LOAD_EMERGENCY_ABORTED,
@@ -96,13 +99,13 @@ export default class StreamController extends BaseStreamController {
       this.nextLoadPosition = this.startPosition = this.lastCurrentTime = startPosition;
       this.tick();
     } else {
-      this.forceStartLoad = true;
+      this._forceStartLoad = true;
       this.state = State.STOPPED;
     }
   }
 
   stopLoad () {
-    this.forceStartLoad = false;
+    this._forceStartLoad = false;
     super.stopLoad();
   }
 
@@ -129,13 +132,6 @@ export default class StreamController extends BaseStreamController {
         this.state = State.IDLE;
       }
     }
-      break;
-    case State.ERROR:
-    case State.STOPPED:
-    case State.FRAG_LOADING:
-    case State.PARSING:
-    case State.PARSED:
-    case State.ENDED:
       break;
     default:
       break;
@@ -172,7 +168,7 @@ export default class StreamController extends BaseStreamController {
       return;
     }
     // compute max Buffer Length that we could get from this load level, based on level bitrate. don't buffer more than 60 MB and more than 30s
-    const levelBitrate = levelInfo.bitrate;
+    const levelBitrate = levelInfo.maxBitrate;
     let maxBufLen;
     if (levelBitrate) {
       maxBufLen = Math.max(8 * config.maxBufferSize / levelBitrate, config.maxBufferLength);
@@ -199,7 +195,7 @@ export default class StreamController extends BaseStreamController {
     // if level info not retrieved yet, switch state and wait for level retrieval
     // if live playlist, ensure that new playlist has been refreshed to avoid loading/try to load
     // a useless and outdated fragment (that might even introduce load error if it is already out of the live playlist)
-    if (!levelDetails || (levelDetails.live && this.levelLastLoaded !== level)) {
+    if (!levelDetails || this.state === State.WAITING_LEVEL || (levelDetails.live && this.levelLastLoaded !== level)) {
       this.state = State.WAITING_LEVEL;
       return;
     }
@@ -221,7 +217,9 @@ export default class StreamController extends BaseStreamController {
         this.log(`Loading key for ${frag.sn} of [${levelDetails.startSN} ,${levelDetails.endSN}],level ${level}`);
         this._loadKey(frag);
       } else {
-        this.log(`Loading fragment ${frag.sn} of [${levelDetails.startSN} ,${levelDetails.endSN}],level ${level}, currentTime:${pos.toFixed(3)},bufferEnd:${bufferInfo.end.toFixed(3)}`);
+        if (this.fragCurrent !== frag) {
+          this.log(`Loading fragment ${frag.sn} of [${levelDetails.startSN} ,${levelDetails.endSN}],level ${level}, currentTime:${pos.toFixed(3)},bufferEnd:${bufferInfo.end.toFixed(3)}`);
+        }
         this._loadFragment(frag);
       }
     }
@@ -259,6 +257,10 @@ export default class StreamController extends BaseStreamController {
         this.fragmentTracker.removeFragment(frag);
       }
     }
+  }
+
+  getAppendedFrag (position) {
+    return this.fragmentTracker.getAppendedFrag(position, PlaylistLoader.LevelType.MAIN);
   }
 
   getBufferedFrag (position) {
@@ -335,7 +337,7 @@ export default class StreamController extends BaseStreamController {
     if (media && media.readyState) {
       let fetchdelay;
       let nextBufferedFrag;
-      const fragPlayingCurrent = this.getBufferedFrag(media.currentTime);
+      const fragPlayingCurrent = this.getAppendedFrag(media.currentTime);
       if (fragPlayingCurrent && fragPlayingCurrent.startPTS > 1) {
         // flush buffer preceding current fragment (flush until current fragment start offset)
         // minus 1s to avoid video freezing, that could happen if we flush keyframe of current video ...
@@ -347,7 +349,7 @@ export default class StreamController extends BaseStreamController {
         const nextLevel = levels[nextLevelId];
         const fragLastKbps = this.fragLastKbps;
         if (fragLastKbps && this.fragCurrent) {
-          fetchdelay = this.fragCurrent.duration * nextLevel.bitrate / (1000 * fragLastKbps) + 1;
+          fetchdelay = this.fragCurrent.duration * nextLevel.maxBitrate / (1000 * fragLastKbps) + 1;
         } else {
           fetchdelay = 0;
         }
@@ -388,9 +390,11 @@ export default class StreamController extends BaseStreamController {
 
   onMediaAttached (data) {
     const media = this.media = this.mediaBuffer = data.media;
+    this.onvplaying = this.onMediaPlaying.bind(this);
     this.onvseeking = this.onMediaSeeking.bind(this);
     this.onvseeked = this.onMediaSeeked.bind(this);
     this.onvended = this.onMediaEnded.bind(this);
+    media.addEventListener('playing', this.onvplaying);
     media.addEventListener('seeking', this.onvseeking);
     media.addEventListener('seeked', this.onvseeked);
     media.addEventListener('ended', this.onvended);
@@ -414,21 +418,27 @@ export default class StreamController extends BaseStreamController {
       levels.forEach(level => {
         if (level.details) {
           level.details.fragments.forEach(fragment => {
-            fragment.backtracked = undefined;
+            fragment.backtracked = false;
           });
         }
       });
     }
     // remove video listeners
     if (media) {
+      media.removeEventListener('playing', this.onvplaying);
       media.removeEventListener('seeking', this.onvseeking);
       media.removeEventListener('seeked', this.onvseeked);
       media.removeEventListener('ended', this.onvended);
-      this.onvseeking = this.onvseeked = this.onvended = null;
+      this.onvplaying = this.onvseeking = this.onvseeked = this.onvended = null;
     }
     this.media = this.mediaBuffer = null;
     this.loadedmetadata = false;
     this.stopLoad();
+  }
+
+  onMediaPlaying () {
+    // tick to speed up FRAG_CHANGED triggering
+    this.tick();
   }
 
   onMediaSeeked () {
@@ -438,7 +448,7 @@ export default class StreamController extends BaseStreamController {
       this.log(`Media seeked to ${currentTime.toFixed(3)}`);
     }
 
-    // tick to speed up FRAGMENT_PLAYING triggering
+    // tick to speed up FRAG_CHANGED triggering
     this.tick();
   }
 
@@ -476,10 +486,10 @@ export default class StreamController extends BaseStreamController {
 
     this.levels = data.levels;
     this.startFragRequested = false;
-    const config = this.config;
-    if (config.autoStartLoad || this.forceStartLoad) {
-      this.hls.startLoad(config.startPosition);
-    }
+  }
+
+  onLevelLoading () {
+    this.state = State.WAITING_LEVEL;
   }
 
   onLevelLoaded (data) {
@@ -507,7 +517,8 @@ export default class StreamController extends BaseStreamController {
     // override level info
     curLevel.details = newDetails;
     this.levelLastLoaded = newLevelId;
-    this.hls.trigger(Event.LEVEL_UPDATED, { details: newDetails, level: newLevelId });
+    const levelUpdatedData: LevelUpdatedData = { details: newDetails, level: newLevelId };
+    this.hls.trigger(Event.LEVEL_UPDATED, levelUpdatedData);
 
     if (!this.startFragRequested) {
       this.setStartPosition(newDetails, sliding);
@@ -535,7 +546,9 @@ export default class StreamController extends BaseStreamController {
       return;
     }
     const currentLevel = levels[frag.level];
-    const details = currentLevel.details;
+    const details = currentLevel.details as LevelDetails;
+    console.assert(details, 'Audio track details are defined on fragment load progress');
+    const videoCodec = currentLevel.videoCodec;
 
     // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live) and if media is not seeking (this is to overcome potential timestamp drifts between playlists and fragments)
     const accurateTimeOffset = !(media && media.seeking) && (details.PTSKnown || !details.live);
@@ -554,7 +567,7 @@ export default class StreamController extends BaseStreamController {
       payload,
       initSegmentData,
       audioCodec,
-      currentLevel.videoCodec,
+      videoCodec,
       frag,
       details.totalduration,
       accurateTimeOffset,
@@ -750,7 +763,7 @@ export default class StreamController extends BaseStreamController {
   // Checks the health of the buffer and attempts to resolve playback stalls.
   private checkBuffer () {
     const { media, gapController } = this;
-    if (!media || !media.readyState) {
+    if (!media || !gapController || !media.readyState) {
       // Exit early if we don't have media or if the media hasn't buffered anything yet (readyState 0)
       return;
     }
@@ -765,7 +778,7 @@ export default class StreamController extends BaseStreamController {
       this.immediateLevelSwitchEnd();
     } else {
       // Resolve gaps using the main buffer, whose ranges are the intersections of the A/V sourcebuffers
-      gapController.poll(this.lastCurrentTime, media.buffered);
+      gapController.poll(this.lastCurrentTime);
     }
 
     this.lastCurrentTime = media.currentTime;
@@ -816,7 +829,7 @@ export default class StreamController extends BaseStreamController {
     // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
     const startPosition = media.seeking ? currentTime : this.startPosition;
     // if currentTime not matching with expected startPosition or startPosition not buffered but close to first buffered
-    if (currentTime !== startPosition) {
+    if (currentTime !== startPosition && startPosition >= 0) {
       // if startPosition not buffered, let's seek to buffered.start(0)
       this.log(`Target start position not buffered, seek to buffered.start(0) ${startPosition} from current time ${currentTime} `);
       media.currentTime = startPosition;
@@ -892,7 +905,7 @@ export default class StreamController extends BaseStreamController {
         this.backtrack(frag, video.startPTS);
         return;
       } else {
-        frag.setElementaryStreamInfo(ElementaryStreamTypes.VIDEO, video.startPTS, video.endPTS, video.startDTS, video.endDTS);
+        frag.setElementaryStreamInfo(video.type as ElementaryStreamTypes, video.startPTS, video.endPTS, video.startDTS, video.endDTS);
         this.bufferFragmentData(video, frag, chunkMeta);
       }
     }
@@ -902,7 +915,7 @@ export default class StreamController extends BaseStreamController {
       this.bufferFragmentData(audio, frag, chunkMeta);
     }
 
-    if (id3) {
+    if (id3 && id3.samples && id3.samples.length) {
       const emittedID3: any = id3;
       emittedID3.frag = frag;
       emittedID3.id = id;
@@ -987,7 +1000,7 @@ export default class StreamController extends BaseStreamController {
   private checkFragmentChanged () {
     const video = this.media;
     let fragPlayingCurrent;
-    if (video && video.readyState && video.seeking === false) {
+    if (video && video.readyState > 1 && video.seeking === false) {
       const currentTime = video.currentTime;
       /* if video element is in seeked state, currentTime can only increase.
         (assuming that playback rate is positive ...)
@@ -997,14 +1010,14 @@ export default class StreamController extends BaseStreamController {
       */
 
       if (BufferHelper.isBuffered(video, currentTime)) {
-        fragPlayingCurrent = this.getBufferedFrag(currentTime);
+        fragPlayingCurrent = this.getAppendedFrag(currentTime);
       } else if (BufferHelper.isBuffered(video, currentTime + 0.1)) {
         /* ensure that FRAG_CHANGED event is triggered at startup,
           when first video frame is displayed and playback is paused.
           add a tolerance of 100ms, in case current position is not buffered,
           check if current pos+100ms is buffered and use that buffer range
           for FRAG_CHANGED event reporting */
-        fragPlayingCurrent = this.getBufferedFrag(currentTime + 0.1);
+        fragPlayingCurrent = this.getAppendedFrag(currentTime + 0.1);
       }
       if (fragPlayingCurrent) {
         const fragPlaying = fragPlayingCurrent;
@@ -1037,9 +1050,9 @@ export default class StreamController extends BaseStreamController {
   get currentLevel () {
     const media = this.media;
     if (media) {
-      const frag = this.getBufferedFrag(media.currentTime);
-      if (frag) {
-        return frag.level;
+      const fragPlayingCurrent = this.getAppendedFrag(media.currentTime);
+      if (fragPlayingCurrent) {
+        return fragPlayingCurrent.level;
       }
     }
     return -1;
@@ -1049,7 +1062,8 @@ export default class StreamController extends BaseStreamController {
     const media = this.media;
     if (media) {
       // first get end range of current fragment
-      return this.followingBufferedFrag(this.getBufferedFrag(media.currentTime));
+      const fragPlayingCurrent = this.getAppendedFrag(media.currentTime);
+      return this.followingBufferedFrag(fragPlayingCurrent);
     } else {
       return null;
     }
@@ -1057,6 +1071,10 @@ export default class StreamController extends BaseStreamController {
 
   set liveSyncPosition (value) {
     this._liveSyncPosition = value;
+  }
+
+  get forceStartLoad () {
+    return this._forceStartLoad;
   }
 }
 

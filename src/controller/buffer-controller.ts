@@ -9,16 +9,14 @@ import { ErrorDetails, ErrorTypes } from '../errors';
 import { getMediaSource } from '../utils/mediasource-helper';
 import Fragment, { ElementaryStreamTypes } from '../loader/fragment';
 import { TrackSet } from '../types/track';
-import { BufferAppendingEventPayload } from '../types/bufferAppendingEventPayload';
 import BufferOperationQueue from './buffer-operation-queue';
-
 import {
   BufferOperation,
   SourceBuffers,
-  SourceBufferFlushRange,
   SourceBufferName,
-  SourceBufferListener
+  SourceBufferListeners
 } from '../types/buffer';
+import { LevelUpdatedData, BufferAppendingEventPayload } from '../types/events';
 
 const MediaSource = getMediaSource();
 
@@ -33,16 +31,9 @@ export default class BufferController extends EventHandler {
   // cache the self generated object url to detect hijack of video tag
   private _objectUrl: string | null = null;
   // A queue of buffer operations which require the SourceBuffer to not be updating upon execution
-  private operationQueue: BufferOperationQueue;
-  // References to event listeners for each SourceBuffer, so that they can be reference for event removal
-  private listeners: { [key in SourceBufferName]: Array<SourceBufferListener> } = {
-    audio: [],
-    video: [],
-    audiovideo: []
-  };
-
-  // this is optional because this property is removed from the class sometimes
-  public audioTimestampOffset?: number;
+  private operationQueue!: BufferOperationQueue;
+  // References to event listeners for each SourceBuffer, so that they can be referenced for event removal
+  private listeners!: SourceBufferListeners;
 
   // The number of BUFFER_CODEC events received before any sourceBuffers are created
   public bufferCodecEventsExpected: number = 0;
@@ -58,8 +49,7 @@ export default class BufferController extends EventHandler {
 
   public tracks: TrackSet = {};
   public pendingTracks: TrackSet = {};
-  public sourceBuffer: SourceBuffers = {};
-  public flushRange: SourceBufferFlushRange[] = [];
+  public sourceBuffer!: SourceBuffers;
 
   constructor (hls: any) {
     super(hls,
@@ -76,7 +66,17 @@ export default class BufferController extends EventHandler {
       Events.FRAG_PARSED
     );
     this.hls = hls;
+    this._initSourceBuffer();
+  }
+
+  private _initSourceBuffer () {
+    this.sourceBuffer = {};
     this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
+    this.listeners = {
+      audio: [],
+      video: [],
+      audiovideo: []
+    };
   }
 
   onManifestParsed (data: { altAudio: boolean }) {
@@ -163,19 +163,13 @@ export default class BufferController extends EventHandler {
           }
           // Synchronously remove the SB from the map before the next call in order to prevent an async function from
           // accessing it
-          this.sourceBuffer[type] = undefined;
+          sourceBuffer[type] = undefined;
         }
       } catch (err) {
         logger.warn(`Failed to reset the ${type} buffer`, err);
       }
     });
-    this.sourceBuffer = {};
-    this.operationQueue = new BufferOperationQueue(this.sourceBuffer);
-    this.listeners = {
-      audio: [],
-      video: [],
-      audiovideo: []
-    };
+    this._initSourceBuffer();
   }
 
   onBufferCodecs (tracks: TrackSet) {
@@ -210,7 +204,7 @@ export default class BufferController extends EventHandler {
     const operation: BufferOperation = {
       execute: () => {
         chunkStats.executeStart = performance.now();
-        this.appendExecuteor(data, type);
+        this.appendExecutor(data, type);
       },
       onComplete: () => {
         const end = performance.now();
@@ -225,13 +219,20 @@ export default class BufferController extends EventHandler {
           timeRanges[type] = sourceBuffer[type].buffered;
         }
         this.appendError = 0;
-        this.hls.trigger(Events.BUFFER_APPENDED, { parent: frag.type, timeRanges, chunkMeta });
+        this.hls.trigger(Events.BUFFER_APPENDED, { parent: frag.type, timeRanges, frag, chunkMeta });
       },
       onError: (err) => {
         // in case any error occured while appending, put back segment in segments table
         logger.error(`[buffer-controller]: Error encountered while trying to append to the ${type} SourceBuffer`, err);
-        const event = { type: ErrorTypes.MEDIA_ERROR, parent: frag.type, details: '', fatal: false };
-        if (err.code === 22) {
+        const event = {
+          type: ErrorTypes.MEDIA_ERROR,
+          parent: frag.type,
+          details: '',
+          err,
+          fatal: false
+        };
+        if (err.code === DOMException.QUOTA_EXCEEDED_ERR) {
+          // TODO: enum MSE error codes
           // TODO: Should queues be cleared on this error?
           // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
           // let's stop appending any segments, and report BUFFER_FULL_ERROR error
@@ -256,7 +257,7 @@ export default class BufferController extends EventHandler {
   onBufferFlushing (data: { startOffset: number, endOffset: number, type?: SourceBufferName }) {
     const { operationQueue } = this;
     const flushOperation = (type): BufferOperation => ({
-      execute: this.removeExecuteor.bind(this, type, data.startOffset, data.endOffset),
+      execute: this.removeExecutor.bind(this, type, data.startOffset, data.endOffset),
       onComplete: () => {
         this.hls.trigger(Events.BUFFER_FLUSHED);
       },
@@ -277,11 +278,15 @@ export default class BufferController extends EventHandler {
     const { frag } = data;
     const buffersAppendedTo: Array<SourceBufferName> = [];
 
-    if (frag.elementaryStreams[ElementaryStreamTypes.AUDIO]) {
-      buffersAppendedTo.push('audio');
-    }
-    if (frag.elementaryStreams[ElementaryStreamTypes.VIDEO]) {
-      buffersAppendedTo.push('video');
+    if (frag.elementaryStreams[ElementaryStreamTypes.AUDIOVIDEO]) {
+      buffersAppendedTo.push('audiovideo');
+    } else {
+      if (frag.elementaryStreams[ElementaryStreamTypes.AUDIO]) {
+        buffersAppendedTo.push('audio');
+      }
+      if (frag.elementaryStreams[ElementaryStreamTypes.VIDEO]) {
+        buffersAppendedTo.push('video');
+      }
     }
     console.assert(buffersAppendedTo.length, 'Fragments must have at least one ElementaryStreamType set', frag);
 
@@ -321,11 +326,11 @@ export default class BufferController extends EventHandler {
     this.blockBuffers(endStream);
   }
 
-  onLevelUpdated ({ details }: { details: { totalduration: number, targetduration?: number, averagetargetduration?: number, live: boolean, fragments: any[] } }) {
+  onLevelUpdated ({ details }: LevelUpdatedData) {
     if (!details.fragments.length) {
       return;
     }
-    this._levelTargetDuration = details.averagetargetduration || details.targetduration || 10;
+    this._levelTargetDuration = details.levelTargetDuration;
     this._live = details.live;
 
     const levelDuration = details.totalduration + details.fragments[0].start;
@@ -361,7 +366,7 @@ export default class BufferController extends EventHandler {
     }
 
     const operation = {
-      execute: this.abortExecuteor.bind(this, type),
+      execute: this.abortExecutor.bind(this, type),
       onComplete () {
         if (audioBuffer) {
           logger.log(`[buffer-controller]: Updating audio SourceBuffer timestampOffset to ${data.start}`);
@@ -485,7 +490,13 @@ export default class BufferController extends EventHandler {
           };
         } catch (err) {
           logger.error(`error while trying to add sourceBuffer:${err.message}`);
-          this.hls.trigger(Events.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_ADD_CODEC_ERROR, fatal: false, err: err, mimeType: mimeType });
+          this.hls.trigger(Events.ERROR, {
+            type: ErrorTypes.MEDIA_ERROR,
+            details: ErrorDetails.BUFFER_ADD_CODEC_ERROR,
+            fatal: false,
+            err,
+            mimeType: mimeType
+          });
         }
       }
     }
@@ -514,8 +525,7 @@ export default class BufferController extends EventHandler {
 
   private _onSBUpdateEnd (type: SourceBufferName) {
     const { operationQueue } = this;
-    const queue = operationQueue.queues[type];
-    const operation = queue[0];
+    const operation = operationQueue.current(type);
     console.assert(operation, 'Operation should exist on update end');
 
     operation.onComplete();
@@ -528,15 +538,14 @@ export default class BufferController extends EventHandler {
     // SourceBuffer errors are not necessarily fatal; if so, the HTMLMediaElement will fire an error event
     this.hls.trigger(Events.ERROR, { type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_APPENDING_ERROR, fatal: false });
     // updateend is always fired after error, so we'll allow that to shift the current operation off of the queue
-    const queue = this.operationQueue.queues[type];
-    const operation = queue[0];
+    const operation = this.operationQueue.current(type);
     if (operation) {
       operation.onError(event);
     }
   }
 
   // This method must result in an updateend event; if remove is not called, _onSBUpdateEnd must be called manually
-  private removeExecuteor (type: SourceBufferName, startOffset: number, endOffset: number) {
+  private removeExecutor (type: SourceBufferName, startOffset: number, endOffset: number) {
     const { media, operationQueue, sourceBuffer } = this;
     const sb = sourceBuffer[type];
     if (!media || !sb) {
@@ -558,7 +567,7 @@ export default class BufferController extends EventHandler {
   }
 
   // This method must result in an updateend event; if append is not called, _onSBUpdateEnd must be called manually
-  private appendExecuteor (data: Uint8Array, type: SourceBufferName) {
+  private appendExecutor (data: Uint8Array, type: SourceBufferName) {
     const { operationQueue, sourceBuffer } = this;
     const sb = sourceBuffer[type];
     if (!sb) {
@@ -575,7 +584,7 @@ export default class BufferController extends EventHandler {
   // SourceBuffers can be aborted while the updating flag is true, but only if it is because of an append operation -
   // aborting during a remove will throw an InvalidStateError. It's safer to enqueue aborts and execute them only if
   // updating is false
-  private abortExecuteor (type: SourceBufferName) {
+  private abortExecutor (type: SourceBufferName) {
     const { operationQueue, sourceBuffer } = this;
     const sb = sourceBuffer[type];
     if (!sb) {

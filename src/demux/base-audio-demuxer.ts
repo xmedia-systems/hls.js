@@ -2,12 +2,13 @@ import ID3 from '../demux/id3';
 import { DemuxerResult, Demuxer, DemuxedTrack, DemuxedAudioTrack } from '../types/demuxer';
 import { dummyTrack } from './dummy-demuxed-track';
 import { appendUint8Array } from '../utils/mp4-tools';
+import { sliceUint8 } from '../utils/typed-array';
 
 class BaseAudioDemuxer implements Demuxer {
   protected _audioTrack!: DemuxedAudioTrack;
   protected _id3Track!: DemuxedTrack;
   protected frameIndex: number = 0;
-  protected cachedData: Uint8Array = new Uint8Array();
+  protected cachedData: Uint8Array | null = null;
   protected initPTS: number | null = null;
 
   resetInitSegment (audioCodec: string, videoCodec: string, duration: number) {
@@ -38,9 +39,9 @@ class BaseAudioDemuxer implements Demuxer {
 
   // feed incoming data to the front of the parsing pipeline
   demux (data: Uint8Array, timeOffset: number): DemuxerResult {
-    if (this.cachedData.length) {
+    if (this.cachedData) {
       data = appendUint8Array(this.cachedData, data);
-      this.cachedData = new Uint8Array();
+      this.cachedData = null;
     }
 
     let id3Data = ID3.getID3Data(data, 0) || [];
@@ -82,8 +83,12 @@ class BaseAudioDemuxer implements Demuxer {
         offset++;
       }
       if (offset === length && lastDataIndex !== length) {
-        const partialData = data.slice(lastDataIndex);
-        this.cachedData = appendUint8Array(this.cachedData, partialData);
+        const partialData = sliceUint8(data, lastDataIndex);
+        if (this.cachedData) {
+          this.cachedData = appendUint8Array(this.cachedData, partialData);
+        } else {
+          this.cachedData = partialData;
+        }
       }
     }
 
@@ -107,7 +112,7 @@ class BaseAudioDemuxer implements Demuxer {
 
     this.frameIndex = 0;
     this.initPTS = null;
-    this.cachedData = new Uint8Array();
+    this.cachedData = null;
 
     return {
       audioTrack: this._audioTrack,

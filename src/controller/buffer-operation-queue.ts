@@ -1,12 +1,12 @@
 import { logger } from '../utils/logger';
-import { BufferOperation, SourceBuffers, SourceBufferName } from '../types/buffer';
+import { BufferOperation, BufferOperationQueues, SourceBuffers, SourceBufferName } from '../types/buffer';
 
 export default class BufferOperationQueue {
   private buffers: SourceBuffers;
-  public queues = {
-    audiovideo: [] as Array<BufferOperation>,
-    audio: [] as Array<BufferOperation>,
-    video: [] as Array<BufferOperation>
+  private queues: BufferOperationQueues = {
+    video: [],
+    audio: [],
+    audiovideo: []
   };
 
   constructor (sourceBufferReference: SourceBuffers) {
@@ -28,7 +28,7 @@ export default class BufferOperationQueue {
     const promise: Promise<{}> = new Promise((resolve, reject) => {
       execute = resolve;
     });
-    const operation = {
+    const operation: BufferOperation = {
       execute,
       onComplete: () => {},
       onError: () => {}
@@ -65,5 +65,9 @@ export default class BufferOperationQueue {
   public shiftAndExecuteNext (type: SourceBufferName) {
     this.queues[type].shift();
     this.executeNext(type);
+  }
+
+  public current (type: SourceBufferName) {
+    return this.queues[type][0];
   }
 }

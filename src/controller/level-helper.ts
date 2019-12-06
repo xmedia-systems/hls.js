@@ -56,7 +56,6 @@ export function updatePTS (fragments: Fragment[], fromIdx: number, toIdx: number
 }
 
 export function updateFragPTSDTS (details: LevelDetails, frag: Fragment, startPTS: number, endPTS: number, startDTS: number, endDTS: number): number {
-  // update frag PTS/DTS
   let maxStartPTS = startPTS;
   if (Number.isFinite(frag.startPTS)) {
     // delta PTS between audio and video
@@ -77,7 +76,7 @@ export function updateFragPTSDTS (details: LevelDetails, frag: Fragment, startPT
   const drift = startPTS - frag.start;
   frag.start = frag.startPTS = startPTS;
   frag.maxStartPTS = maxStartPTS;
-  frag.endPTS = endPTS;
+  frag.endPTS = frag.appendedPTS = endPTS;
   frag.startDTS = startDTS;
   frag.endDTS = endDTS;
   frag.duration = endPTS - startPTS;
@@ -184,10 +183,6 @@ export function mergeSubtitlePlaylists (oldPlaylist: LevelDetails, newPlaylist: 
 }
 
 export function mapFragmentIntersection (oldPlaylist: LevelDetails, newPlaylist: LevelDetails, intersectionFn): void {
-  if (!oldPlaylist || !newPlaylist) {
-    return;
-  }
-
   const start = Math.max(oldPlaylist.startSN, newPlaylist.startSN) - newPlaylist.startSN;
   const end = Math.min(oldPlaylist.endSN, newPlaylist.endSN) - newPlaylist.startSN;
   const delta = newPlaylist.startSN - oldPlaylist.startSN;
@@ -216,7 +211,7 @@ export function adjustSliding (oldPlaylist: LevelDetails, newPlaylist: LevelDeta
 }
 
 export function computeReloadInterval (newDetails: LevelDetails, stats: LoaderStats): number {
-  const reloadInterval = 1000 * (newDetails.averagetargetduration ? newDetails.averagetargetduration : newDetails.targetduration);
+  const reloadInterval = 1000 * newDetails.levelTargetDuration;
   const reloadIntervalAfterMiss = reloadInterval / 2;
   const timeSinceLastModified = newDetails.lastModified ? +new Date() - newDetails.lastModified : 0;
   const useLastModified = timeSinceLastModified > 0 && timeSinceLastModified < reloadInterval * 3;
@@ -230,9 +225,10 @@ export function computeReloadInterval (newDetails: LevelDetails, stats: LoaderSt
     if (useLastModified) {
       // estimate = 'miss round trip';
       // We should have had a hit so try again in the time it takes to get a response,
-      // but no less than ~1/4 second. After 4 retries, at least 1.1 seconds will have gone by.
-      const minRetry = 283;
-      estimatedTimeUntilUpdate = Math.max(Math.min(reloadIntervalAfterMiss, roundTrip), minRetry);
+      // but no less than 1/3 second.
+      const minRetry = 333 * newDetails.misses;
+      estimatedTimeUntilUpdate = Math.max(Math.min(reloadIntervalAfterMiss, roundTrip * 2), minRetry);
+      newDetails.availabilityDelay = (newDetails.availabilityDelay || 0) + estimatedTimeUntilUpdate;
     } else {
       // estimate = 'miss half average';
       // follow HLS Spec, If the client reloads a Playlist file and finds that it has not
@@ -244,11 +240,8 @@ export function computeReloadInterval (newDetails: LevelDetails, stats: LoaderSt
     // estimate = 'next modified date';
     // Get the closest we've been to timeSinceLastModified on update
     availabilityDelay = Math.min(availabilityDelay || reloadInterval / 2, timeSinceLastModified);
-    // TODO: Network controllers should maintain this and other stats, rather than passing it from one level details to then next after each response
     newDetails.availabilityDelay = availabilityDelay;
-    // TODO: Back off from reloading too close to the time the server is expected to update,  rather than using this hardcoded value
-    const minAvailabilityDelay = 1000;
-    estimatedTimeUntilUpdate = Math.max(availabilityDelay / 2, minAvailabilityDelay) + reloadInterval - timeSinceLastModified;
+    estimatedTimeUntilUpdate = availabilityDelay + reloadInterval - timeSinceLastModified;
   } else {
     estimatedTimeUntilUpdate = reloadInterval - roundTrip;
   }

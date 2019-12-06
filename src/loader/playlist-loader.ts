@@ -299,11 +299,16 @@ class PlaylistLoader extends EventHandler {
     // multi level playlist, parse level info
     const audioGroups = levels.map((level: LevelParsed) => ({
       id: level.attrs.AUDIO,
-      codec: level.audioCodec
+      audioCodec: level.audioCodec
+    }));
+
+    const subtitleGroups = levels.map((level: LevelParsed) => ({
+      id: level.attrs.SUBTITLES,
+      textCodec: level.textCodec
     }));
 
     const audioTracks = M3U8Parser.parseMasterPlaylistMedia(string, url, 'AUDIO', audioGroups);
-    const subtitles = M3U8Parser.parseMasterPlaylistMedia(string, url, 'SUBTITLES');
+    const subtitles = M3U8Parser.parseMasterPlaylistMedia(string, url, 'SUBTITLES', subtitleGroups);
     const captions = M3U8Parser.parseMasterPlaylistMedia(string, url, 'CLOSED-CAPTIONS');
 
     if (audioTracks.length) {
@@ -322,7 +327,10 @@ class PlaylistLoader extends EventHandler {
           default: false,
           autoselect: false,
           forced: false,
-          id: -1
+          id: -1,
+          attrs: {},
+          bitrate: 0,
+          url: ''
         });
       }
     }
@@ -380,6 +388,7 @@ class PlaylistLoader extends EventHandler {
         attrs: {},
         bitrate: 0,
         details: levelDetails,
+        name: '',
         url
       };
 

@@ -9,7 +9,7 @@ import {
 import LoadStats from '../loader/load-stats';
 import ChunkCache from '../demux/chunk-cache';
 
-const { fetch, AbortController, ReadableStream, Request, Headers, performance } = self as any;
+const { fetch, AbortController, ReadableStream, Request, Headers, performance } = self;
 
 export function fetchSupported () {
   if (fetch && AbortController && ReadableStream && Request) {
@@ -21,8 +21,7 @@ export function fetchSupported () {
   return false;
 }
 
-class
-FetchLoader implements Loader<LoaderContext> {
+class FetchLoader implements Loader<LoaderContext> {
   private fetchSetup: Function;
   private requestTimeout?: number;
   private request!: Request;
@@ -83,7 +82,7 @@ FetchLoader implements Loader<LoaderContext> {
       stats.loading.first = Math.max(performance.now(), stats.loading.start);
       stats.total = parseInt(response.headers.get('Content-Length') || '0');
 
-      if (onProgress) {
+      if (onProgress && Number.isFinite(config.highWaterMark)) {
         this.loadProgressively(response, stats, context, config.highWaterMark, onProgress);
       }
 
@@ -101,6 +100,10 @@ FetchLoader implements Loader<LoaderContext> {
         url: response.url,
         data: responseData
       };
+
+      if (onProgress && !Number.isFinite(config.highWaterMark)) {
+        onProgress(stats, context, responseData, response);
+      }
 
       callbacks.onSuccess(loaderResponse, stats, context, response);
     }).catch((error) => {
@@ -129,30 +132,27 @@ FetchLoader implements Loader<LoaderContext> {
 
     const pump = () => {
       reader.read().then((data: { done: boolean, value: Uint8Array }) => {
-        const { done, value: chunk } = data;
-        if (done) {
+        if (data.done) {
           if (chunkCache.dataLength) {
             onProgress(stats, context, chunkCache.flush(), response);
           }
           return;
         }
+        const chunk = data.value;
         const len = chunk.length;
         stats.loaded += len;
-        if (len >= highWaterMark) {
-          // The cache already has data, and the current chunk is large enough to be emitted. Push it to the cache
-          // and flush in order to join the typed arrays
-          if (chunkCache.dataLength) {
-            chunkCache.push(chunk);
-            onProgress(stats, context, chunkCache.flush(), response);
-          } else {
-            // If there's nothing cached already, just emit the progress event
-            onProgress(stats, context, chunk, response);
-          }
-        } else {
+        if (len < highWaterMark || chunkCache.dataLength) {
+          // The current chunk is too small to to be emitted or the cache already has data
+          // Push it to the cache
           chunkCache.push(chunk);
           if (chunkCache.dataLength >= highWaterMark) {
+            // flush in order to join the typed arrays
             onProgress(stats, context, chunkCache.flush(), response);
           }
+        } else {
+          // If there's nothing cached already, and the chache is large enough
+          // just emit the progress event
+          onProgress(stats, context, chunk, response);
         }
         pump();
       }).catch(() => { /* aborted */ });

@@ -9,16 +9,17 @@ import {
   LoaderCallbacks
 } from '../types/loader';
 
-const MIN_CHUNK_SIZE = Math.pow(2, 14); // 16kb
+const MIN_CHUNK_SIZE = Math.pow(2, 17); // 128kb
 
 export default class FragmentLoader {
-  private config: any;
+  private readonly config: any;
   private loader: Loader<FragmentLoaderContext> | null = null;
+
   constructor (config) {
     this.config = config;
   }
 
-  load (frag: Fragment, onProgress?: FragmentLoadProgressCallback): Promise<FragLoadSuccessResult | LoadError> {
+  load (frag: Fragment, onProgress?: FragmentLoadProgressCallback, highWaterMark?: number): Promise<FragLoadSuccessResult | LoadError> {
     if (!frag.url) {
       return Promise.reject(new LoadError(null, 'Fragment does not have a url'));
     }
@@ -56,7 +57,7 @@ export default class FragmentLoader {
       maxRetry: 0,
       retryDelay: 0,
       maxRetryDelay: config.fragLoadingMaxRetryTimeout,
-      highWaterMark: MIN_CHUNK_SIZE
+      highWaterMark: Math.max(highWaterMark || 0, MIN_CHUNK_SIZE)
     };
 
     return new Promise((resolve, reject) => {

@@ -9,6 +9,7 @@ import { logger } from '../utils/logger';
 import { isCodecType, CodecType } from '../utils/codecs';
 import { MediaPlaylist, AudioGroup, MediaPlaylistType } from '../types/media-playlist';
 import { PlaylistLevelType } from '../types/loader';
+import { LevelAttributes } from '../types/level';
 
 /**
  * M3U8 parser
@@ -65,7 +66,7 @@ export default class M3U8Parser {
 
     // TODO(typescript-level)
     function setCodecs (codecs: Array<string>, level: any) {
-      ['video', 'audio'].forEach((type: CodecType) => {
+      ['video', 'audio', 'text'].forEach((type: CodecType) => {
         const filtered = codecs.filter((codec) => isCodecType(codec, type));
         if (filtered.length) {
           const preferred = filtered.filter((codec) => {
@@ -94,9 +95,9 @@ export default class M3U8Parser {
         level.height = resolution.height;
       }
       level.bitrate = attrs.decimalInteger('AVERAGE-BANDWIDTH') || attrs.decimalInteger('BANDWIDTH');
-      level.name = attrs['NAME'];
+      level.name = attrs.NAME;
 
-      setCodecs([].concat((attrs['CODECS'] || '').split(/[ ,]+/)), level);
+      setCodecs((attrs.CODECS || '').split(/[ ,]+/), level);
 
       if (level.videoCodec && level.videoCodec.indexOf('avc1') !== -1) {
         level.videoCodec = M3U8Parser.convertAVC1ToAVCOTI(level.videoCodec);
@@ -107,39 +108,36 @@ export default class M3U8Parser {
     return levels;
   }
 
-  static parseMasterPlaylistMedia (string: string, baseurl: string, type: MediaPlaylistType, audioGroups: Array<AudioGroup> = []): Array<MediaPlaylist> {
+  static parseMasterPlaylistMedia (string: string, baseurl: string, type: MediaPlaylistType, groups: Array<AudioGroup> = []): Array<MediaPlaylist> {
     let result: RegExpExecArray | null;
     const medias: Array<MediaPlaylist> = [];
     let id = 0;
     MASTER_PLAYLIST_MEDIA_REGEX.lastIndex = 0;
     while ((result = MASTER_PLAYLIST_MEDIA_REGEX.exec(string)) !== null) {
-      const attrs = new AttrList(result[1]);
-      if (attrs['TYPE'] === type) {
+      const attrs = new AttrList(result[1]) as LevelAttributes;
+      if (attrs.TYPE === type) {
         const media: MediaPlaylist = {
+          attrs,
+          bitrate: 0,
           id: id++,
           groupId: attrs['GROUP-ID'],
           instreamId: attrs['INSTREAM-ID'],
-          name: attrs['NAME'] || attrs['LANGUAGE'],
+          name: attrs.NAME || attrs.LANGUAGE || '',
           type,
-          default: (attrs['DEFAULT'] === 'YES'),
-          autoselect: (attrs['AUTOSELECT'] === 'YES'),
-          forced: (attrs['FORCED'] === 'YES'),
-          lang: attrs['LANGUAGE']
+          default: (attrs.DEFAULT === 'YES'),
+          autoselect: (attrs.AUTOSELECT === 'YES'),
+          forced: (attrs.FORCED === 'YES'),
+          lang: attrs.LANGUAGE,
+          url: attrs.URI ? M3U8Parser.resolve(attrs.URI, baseurl) : ''
         };
 
-        if (attrs['URI']) {
-          media.url = M3U8Parser.resolve(attrs['URI'], baseurl);
-        }
-
-        if (audioGroups.length) {
-          // If there are audio groups signalled in the manifest, let's look for a matching codec string for this track
-          let groupCodec;
-          if (media.groupId) {
-            groupCodec = M3U8Parser.findGroup(audioGroups, media.groupId);
-          }
+        if (groups.length) {
+          // If there are audio or text groups signalled in the manifest, let's look for a matching codec string for this track
           // If we don't find the track signalled, lets use the first audio groups codec we have
           // Acting as a best guess
-          media.audioCodec = groupCodec ? groupCodec.codec : audioGroups[0].codec;
+          const groupCodec = M3U8Parser.findGroup(groups, media.groupId as string) || groups[0];
+          assignCodec(media, groupCodec, 'audioCodec');
+          assignCodec(media, groupCodec, 'textCodec');
         }
 
         medias.push(media);
@@ -171,7 +169,7 @@ export default class M3U8Parser {
         // avoid sliced strings    https://github.com/video-dev/hls.js/issues/939
         const title = (' ' + result[2]).slice(1);
         frag.title = title || null;
-        frag.tagList.push(title ? [ 'INF', duration, title ] : [ 'INF', duration ]);
+        frag.tagList.push(title ? ['INF', duration, title] : ['INF', duration]);
       } else if (result[3]) { // url
         if (Number.isFinite(frag.duration)) {
           const sn = currentSN++;
@@ -227,7 +225,7 @@ export default class M3U8Parser {
 
         switch (result[i]) {
         case '#':
-          frag.tagList.push(value2 ? [ value1, value2 ] : [ value1 ]);
+          frag.tagList.push(value2 ? [value1, value2] : [value1]);
           break;
         case 'PLAYLIST-TYPE':
           level.type = value1.toUpperCase();
@@ -283,7 +281,7 @@ export default class M3U8Parser {
           const decryptparams = value1;
           const keyAttrs = new AttrList(decryptparams);
           const decryptmethod = keyAttrs.enumeratedString('METHOD');
-          const decrypturi = keyAttrs['URI'];
+          const decrypturi = keyAttrs.URI;
           const decryptiv = keyAttrs.hexadecimalInteger('IV');
 
           if (decryptmethod) {
@@ -308,9 +306,9 @@ export default class M3U8Parser {
         }
         case 'MAP': {
           const mapAttrs = new AttrList(value1);
-          frag.relurl = mapAttrs['URI'];
-          if (mapAttrs['BYTERANGE']) {
-            frag.setByteRange(mapAttrs['BYTERANGE']);
+          frag.relurl = mapAttrs.URI;
+          if (mapAttrs.BYTERANGE) {
+            frag.setByteRange(mapAttrs.BYTERANGE);
           }
           frag.baseurl = baseurl;
           frag.level = id;
@@ -334,7 +332,9 @@ export default class M3U8Parser {
       totalduration -= frag.duration;
     }
     level.totalduration = totalduration;
-    level.averagetargetduration = totalduration / level.fragments.length;
+    if (totalduration > 0 && level.fragments.length) {
+      level.averagetargetduration = totalduration / level.fragments.length;
+    }
     level.endSN = currentSN - 1;
     level.startCC = level.fragments[0] ? level.fragments[0].cc : 0;
     level.endCC = discontinuityCounter;
@@ -372,6 +372,13 @@ export default class M3U8Parser {
     }
 
     return level;
+  }
+}
+
+function assignCodec (media, groupItem, codecProperty) {
+  const codecValue = groupItem[codecProperty];
+  if (codecValue) {
+    media[codecProperty] = codecValue;
   }
 }
 

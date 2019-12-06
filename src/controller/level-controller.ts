@@ -6,11 +6,11 @@ import {
   ManifestLoadedData,
   ManifestParsedData,
   LevelLoadedData,
-  AudioTrackSwitchedData,
+  TrackSwitchedData,
   FragLoadedData,
   ErrorData
 } from '../types/events';
-import { Level, LevelParsed, PlaylistMedia } from '../types/level';
+import { Level, LevelParsed } from '../types/level';
 import Event from '../events';
 import EventHandler from '../event-handler';
 import { logger } from '../utils/logger';
@@ -18,6 +18,7 @@ import { ErrorTypes, ErrorDetails } from '../errors';
 import { isCodecSupportedInMp4 } from '../utils/codecs';
 import { addGroupId, computeReloadInterval } from './level-helper';
 import Fragment from '../loader/fragment';
+import { MediaPlaylist } from '../types/media-playlist';
 
 let chromeOrFirefox: boolean;
 
@@ -30,6 +31,7 @@ export default class LevelController extends EventHandler {
   private levelRetryCount: number = 0;
   private manualLevelIndex: number = -1;
   private timer: number | null = null;
+  public onParsedComplete!: Function;
 
   constructor (hls) {
     super(hls,
@@ -83,7 +85,7 @@ export default class LevelController extends EventHandler {
 
   protected onManifestLoaded (data: ManifestLoadedData): void {
     let levels: Level[] = [];
-    let audioTracks: PlaylistMedia[] = [];
+    let audioTracks: MediaPlaylist[] = [];
     let bitrateStart: number | undefined;
     const levelSet: { [bitrate: number]: Level; } = {};
     let levelFromSet: Level;
@@ -158,7 +160,7 @@ export default class LevelController extends EventHandler {
       }
 
       // Audio is only alternate if manifest include a URI along with the audio group tag
-      this.hls.trigger(Event.MANIFEST_PARSED, {
+      const edata: ManifestParsedData = {
         levels,
         audioTracks,
         firstLevel: this._firstLevel,
@@ -166,7 +168,10 @@ export default class LevelController extends EventHandler {
         audio: audioCodecFound,
         video: videoCodecFound,
         altAudio: audioTracks.some(t => !!t.url)
-      } as ManifestParsedData);
+      };
+      this.hls.trigger(Event.MANIFEST_PARSED, edata);
+
+      this.onParsedComplete();
     } else {
       this.hls.trigger(Event.ERROR, {
         type: ErrorTypes.MEDIA_ERROR,
@@ -210,8 +215,7 @@ export default class LevelController extends EventHandler {
           // check if we need to load playlist for this level
           if (!levelDetails || levelDetails.live) {
             // level not retrieved yet, or live playlist we need to (re)load it
-            const urlId = level.urlId;
-            hls.trigger(Event.LEVEL_LOADING, { url: level.url[urlId], level: newLevel, id: urlId });
+            this.loadLevel();
           }
         } else {
           // invalid level id given, trigger error
@@ -402,6 +406,8 @@ export default class LevelController extends EventHandler {
       throw new Error('Levels are not set');
     }
     const curLevel = this._levels[level];
+    const curDetails = curLevel.details;
+    curLevel.details = details;
     // reset level load error counter on successful level loaded only if there is no issues with fragments
     if (!curLevel.fragmentError) {
       curLevel.loadError = 0;
@@ -409,9 +415,7 @@ export default class LevelController extends EventHandler {
     }
     // if current playlist is a live playlist, arm a timer to reload it
     if (details.live) {
-      const curDetails = curLevel.details;
-      details.updated = (!curDetails || details.endSN !== curDetails.endSN || details.url !== curDetails.url);
-      details.availabilityDelay = curDetails && curDetails.availabilityDelay;
+      details.reloaded(curDetails);
       const reloadInterval = computeReloadInterval(details, data.stats);
       logger.log(`[level-controller]: live playlist ${details.updated ? 'REFRESHED' : 'MISSED'}, reload in ${Math.round(reloadInterval)} ms`);
       this.timer = self.setTimeout(() => this.loadLevel(), reloadInterval);
@@ -420,24 +424,21 @@ export default class LevelController extends EventHandler {
     }
   }
 
-  protected onAudioTrackSwitched (data: AudioTrackSwitchedData) {
+  protected onAudioTrackSwitched (data: TrackSwitchedData) {
     const audioGroupId = this.hls.audioTracks[data.id].groupId;
 
     const currentLevel = this.hls.levels[this.currentLevelIndex as number];
     if (!currentLevel) {
       return;
     }
-
     if (currentLevel.audioGroupIds) {
       let urlId = -1;
-
-      for (let i = 0; i < currentLevel.audioGroupIds.length; i++) {
-        if (currentLevel.audioGroupIds[i] === audioGroupId) {
+      currentLevel.audioGroupIds.some((groupId, i) => {
+        if (groupId === audioGroupId) {
           urlId = i;
-          break;
+          return true;
         }
-      }
-
+      });
       if (urlId !== currentLevel.urlId) {
         currentLevel.urlId = urlId;
         this.startLoad();

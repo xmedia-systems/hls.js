@@ -1,4 +1,3 @@
-import './polyfills/runtime-polyfills';
 import * as URLToolkit from 'url-toolkit';
 
 import {
@@ -13,8 +12,6 @@ import { FragmentTracker } from './controller/fragment-tracker';
 import StreamController from './controller/stream-controller';
 import LevelController from './controller/level-controller';
 
-import PerformancMonitor from './performance/performance-monitor';
-
 import { isSupported } from './is-supported';
 import { logger, enableLogs } from './utils/logger';
 import { HlsConfig, hlsDefaultConfig, mergeConfig, setStreamingMode } from './config';
@@ -22,7 +19,8 @@ import { HlsConfig, hlsDefaultConfig, mergeConfig, setStreamingMode } from './co
 import HlsEvents from './events';
 
 import { Observer } from './observer';
-import { Level, PlaylistMedia } from './types/level';
+import { Level } from './types/level';
+import { MediaPlaylist } from './types/media-playlist';
 
 /**
  * @module Hls
@@ -43,7 +41,7 @@ export default class Hls extends Observer {
   private subtitleTrackController: any;
   private emeController: any;
   private coreComponents: any[];
-  private media: HTMLMediaElement | null = null;
+  private _media: HTMLMediaElement | null = null;
   private url: string | null = null;
 
   static get version (): string {
@@ -109,9 +107,16 @@ export default class Hls extends Observer {
 
     // network controllers
     const levelController = this.levelController = new LevelController(this);
-    // FIXME: FragmentTracker must be defined before StreamController because the order of event handling is important
+    // FragmentTracker must be defined before StreamController because the order of event handling is important
     const fragmentTracker = new FragmentTracker(this);
     const streamController = this.streamController = new StreamController(this, fragmentTracker);
+
+    // Level Controller initiates loading after all controllers have received MANIFEST_PARSED
+    levelController.onParsedComplete = () => {
+      if (config.autoStartLoad || streamController.forceStartLoad) {
+        this.startLoad(config.startPosition);
+      }
+    };
 
     // Cap level controller uses streamController to flush the buffer
     capLevelController.setStreamController(streamController);
@@ -139,9 +144,6 @@ export default class Hls extends Observer {
     this.createController(config.subtitleStreamController, fragmentTracker, networkControllers);
     this.createController(config.timelineController, null, coreComponents);
     this.emeController = this.createController(config.emeController, null, coreComponents);
-
-    // Push the performance monitor last so that it is the last class to handle events
-    coreComponents.push(new PerformancMonitor(this));
 
     this.coreComponents = coreComponents;
   }
@@ -178,7 +180,7 @@ export default class Hls extends Observer {
    */
   attachMedia (media: HTMLMediaElement) {
     logger.log('attachMedia');
-    this.media = media;
+    this._media = media;
     this.trigger(HlsEvents.MEDIA_ATTACHING, { media: media });
   }
 
@@ -188,7 +190,7 @@ export default class Hls extends Observer {
   detachMedia () {
     logger.log('detachMedia');
     this.trigger(HlsEvents.MEDIA_DETACHING);
-    this.media = null;
+    this._media = null;
   }
 
   /**
@@ -243,7 +245,7 @@ export default class Hls extends Observer {
    */
   recoverMediaError () {
     logger.log('recoverMediaError');
-    const media = this.media;
+    const media = this._media;
     this.detachMedia();
     if (media) {
       this.attachMedia(media);
@@ -417,8 +419,7 @@ export default class Hls extends Observer {
    * @type {number}
    */
   get bandwidthEstimate (): number {
-    const bwEstimator = this.abrController._bwEstimator;
-    return bwEstimator ? bwEstimator.getEstimate() : NaN;
+    return this.abrController._bwEstimator.getEstimate();
   }
 
   /**
@@ -426,8 +427,10 @@ export default class Hls extends Observer {
    * @type {number}
    */
   set autoLevelCapping (newLevel: number) {
-    logger.log(`set autoLevelCapping:${newLevel}`);
-    this._autoLevelCapping = newLevel;
+    if (this._autoLevelCapping !== newLevel) {
+      logger.log(`set autoLevelCapping:${newLevel}`);
+      this._autoLevelCapping = newLevel;
+    }
   }
 
   /**
@@ -455,11 +458,7 @@ export default class Hls extends Observer {
     const len = levels ? levels.length : 0;
 
     for (let i = 0; i < len; i++) {
-      const levelNextBitrate = levels[i].realBitrate
-        ? Math.max(levels[i].realBitrate, levels[i].bitrate)
-        : levels[i].bitrate;
-
-      if (levelNextBitrate > minAutoBitrate) {
+      if (levels[i].maxBitrate > minAutoBitrate) {
         return i;
       }
     }
@@ -508,7 +507,7 @@ export default class Hls extends Observer {
   /**
    * @type {AudioTrack[]}
    */
-  get audioTracks (): Array<PlaylistMedia> {
+  get audioTracks (): Array<MediaPlaylist> {
     const audioTrackController = this.audioTrackController;
     return audioTrackController ? audioTrackController.audioTracks : [];
   }
@@ -537,14 +536,14 @@ export default class Hls extends Observer {
    * @type {Seconds}
    */
   get liveSyncPosition (): number {
-    return this.streamController._liveSyncPosition;
+    return this.streamController.liveSyncPosition;
   }
 
   /**
    * get alternate subtitle tracks list from playlist
-   * @type {PlaylistMedia[]}
+   * @type {MediaPlaylist[]}
    */
-  get subtitleTracks (): Array<PlaylistMedia> {
+  get subtitleTracks (): Array<MediaPlaylist> {
     const subtitleTrackController = this.subtitleTrackController;
     return subtitleTrackController ? subtitleTrackController.subtitleTracks : [];
   }
@@ -560,6 +559,10 @@ export default class Hls extends Observer {
 
   get progressive () {
     return this.config.progressive;
+  }
+
+  get media () {
+    return this._media;
   }
 
   /**

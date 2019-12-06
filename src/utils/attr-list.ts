@@ -1,11 +1,13 @@
-import { GenericObjectType } from '../types/general';
+import { StringMap } from '../types/general';
 
 const DECIMAL_RESOLUTION_REGEX = /^(\d+)x(\d+)$/; // eslint-disable-line no-useless-escape
 const ATTR_LIST_REGEX = /\s*(.+?)\s*=((?:\".*?\")|.*?)(?:,|$)/g; // eslint-disable-line no-useless-escape
 
 // adapted from https://github.com/kanongil/node-m3u8parse/blob/master/attrlist.js
 class AttrList {
-  constructor (attrs: string | GenericObjectType) {
+  [key: string]: any
+
+  constructor (attrs: string | StringMap) {
     if (typeof attrs === 'string') {
       attrs = AttrList.parseAttrList(attrs);
     }
@@ -74,7 +76,7 @@ class AttrList {
     };
   }
 
-  static parseAttrList (input: string): GenericObjectType {
+  static parseAttrList (input: string): StringMap {
     let match;
     const attrs = {};
     const quote = '"';
